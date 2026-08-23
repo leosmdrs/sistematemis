@@ -31,6 +31,25 @@ from .widgets import fit_to_screen, hsep
 #  LADRILHO DE FERRAMENTA
 # ─────────────────────────────────────────
 
+#: Tamanho do ladrilho do portal, em pixels de widget.
+#:
+#: A pirâmide inteira precisa caber sem barra de rolagem num notebook de
+#: catorze polegadas — que, medido, dá cerca de 656 pixels de área útil
+#: no portal, seja a 1920×1080 com escala de 150% do Windows, seja numa
+#: tela menor. Os números abaixo saíram dessa conta, não de estimativa:
+#: mediu-se a altura que o conteúdo pedia e cortou-se até sobrar folga.
+LADRILHO = (194, 131)
+
+#: Proporções internas do ladrilho, acompanhando o tamanho dele. Encolher
+#: a moldura sem encolher o conteúdo apertaria o texto contra a borda.
+ICONE_LADRILHO = 34
+
+#: Altura reservada à frase: duas linhas a dez pixels, medidas — não
+#: estimadas. Seis das dez frases ocupam duas linhas na largura nova, e
+#: reservar de menos corta a segunda pela metade.
+FRASE_LADRILHO = 32
+
+
 class ToolTile(QFrame):
     """Ladrilho clicável do portal: ícone grande e nome, sem texto extra."""
 
@@ -40,7 +59,7 @@ class ToolTile(QFrame):
         super().__init__(parent)
         self._meta = meta
         self.setObjectName("tile" if meta.available else "tile_soon")
-        self.setFixedSize(216, 146)
+        self.setFixedSize(*LADRILHO)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setToolTip(
             f"{meta.name} — {meta.tagline}"
@@ -50,7 +69,7 @@ class ToolTile(QFrame):
         accent = PALETTE["gold"] if meta.available else PALETTE["text3"]
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 12, 14, 9)
+        layout.setContentsMargins(12, 10, 12, 8)
         layout.setSpacing(0)
 
         # Esticadas dos dois lados: com uma só, o conjunto encostava no
@@ -58,44 +77,45 @@ class ToolTile(QFrame):
         layout.addStretch()
 
         icon = QLabel()
-        icon.setPixmap(draw_icon(meta.icon, 38, accent, width=2.0).pixmap(38, 38))
+        icon.setPixmap(draw_icon(meta.icon, ICONE_LADRILHO, accent, width=2.0)
+                       .pixmap(ICONE_LADRILHO, ICONE_LADRILHO))
         icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(icon)
 
-        layout.addSpacing(8)
+        layout.addSpacing(7)
 
         name = QLabel(meta.name)
         name.setAlignment(Qt.AlignmentFlag.AlignCenter)
         name.setWordWrap(True)
         name.setStyleSheet(
-            "font-size: 14px; font-weight: 700; color: "
+            "font-size: 13px; font-weight: 700; color: "
             f"{PALETTE['text'] if meta.available else PALETTE['text2']};"
         )
         layout.addWidget(name)
 
-        layout.addSpacing(6)
+        layout.addSpacing(5)
 
         tagline = QLabel(meta.tagline)
         tagline.setAlignment(Qt.AlignmentFlag.AlignCenter)
         tagline.setWordWrap(True)
         tagline.setStyleSheet(
-            f"font-size: 11px; color: {PALETTE['text3']}; line-height: 130%;")
+            f"font-size: 10px; color: {PALETTE['text3']}; line-height: 130%;")
         # Altura de duas linhas em todos: assim o conteúdo tem a mesma
         # altura em qualquer ladrilho, e os ícones ficam na mesma linha ao
         # longo da fileira mesmo com a frase centrada no quadrado.
-        tagline.setFixedHeight(30)
+        tagline.setFixedHeight(FRASE_LADRILHO)
         tagline.setAlignment(Qt.AlignmentFlag.AlignHCenter
                              | Qt.AlignmentFlag.AlignTop)
         layout.addWidget(tagline)
 
         layout.addStretch()
 
-        # Uma ferramenta que sai da máquina precisa dizer isso no portal:
-        # a linha "todo o processamento é local" não pode encobri-la.
+        # A faixa "REQUER INTERNET" saiu do ladrilho, mas o aviso não se
+        # perdeu: a linha logo acima da pirâmide nomeia a ferramenta que
+        # abre página externa, e a tela "Sobre" repete. Dizer no quadrado
+        # era uma terceira vez, no lugar mais apertado da tela.
         if not meta.available:
             rotulo, obj = "EM BREVE", "badge_soon"
-        elif meta.online:
-            rotulo, obj = "REQUER INTERNET", "badge_online"
         else:
             rotulo, obj = "", ""
         # A faixa fica presa ao rodapé, fora do empilhamento: se entrasse
@@ -122,15 +142,25 @@ class ToolTile(QFrame):
 def fileiras(total: int, maximo: int = 4) -> list[int]:
     """Como repartir os ladrilhos em fileiras.
 
-    Reparte o mais igualmente possível, respeitando o teto por fileira:
-    sete ferramentas saem 4 e 3, e não 4, 4 e 1 — uma fileira com um
-    ladrilho solto desequilibra a tela.
+    A disposição é uma pirâmide: uma peça no alto, duas abaixo, três,
+    quatro. Não é ornamento — o vértice é a ferramenta que dá sentido às
+    outras, e a leitura desce do procedimento para os instrumentos que o
+    instruem.
+
+    Com dez ferramentas a pirâmide fecha exata. Se o número não for
+    triangular, as fileiras crescem enquanto cabem e o que sobrar forma
+    a última — cada fileira é centrada por conta própria, de modo que
+    uma incompleta continua equilibrada.
     """
-    if total <= maximo:
-        return [total] if total else []
-    linhas = -(-total // maximo)              # arredonda para cima
-    base, resto = divmod(total, linhas)
-    return [base + (1 if i < resto else 0) for i in range(linhas)]
+    linhas: list[int] = []
+    restante = total
+    largura = 1
+    while restante > 0:
+        cabe = min(largura, restante, maximo)
+        linhas.append(cabe)
+        restante -= cabe
+        largura += 1
+    return linhas
 
 
 class PortalPage(QWidget):
@@ -209,8 +239,10 @@ class PortalPage(QWidget):
 
         body = QWidget()
         layout = QVBoxLayout(body)
-        layout.setContentsMargins(28, 24, 28, 24)
-        layout.setSpacing(6)
+        layout.setContentsMargins(28, 10, 28, 10)
+        # Apertado de proposito: este espacamento vale entre cada par de
+        # itens do empilhamento, e com quatro fileiras ele se multiplica.
+        layout.setSpacing(4)
 
         # O bloco inteiro fica centrado na vertical: encostado no topo,
         # sobrava um vazio enorme embaixo em telas grandes.
@@ -238,15 +270,24 @@ class PortalPage(QWidget):
         privacy.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(privacy)
 
-        layout.addSpacing(28)
+        layout.addSpacing(14)
 
         # Cada fileira é centrada por conta própria. Numa grade comum a
         # última fileira incompleta encostaria à esquerda, desequilibrando
         # o conjunto — e ela quase sempre é incompleta.
+        #
+        # O respiro vai só **entre** fileiras. Antes ele era acrescentado
+        # depois de cada uma, inclusive da última, e ali sobrava um vão
+        # que ninguém via mas que empurrava a pirâmide para fora da tela.
+        # Somado ao espaçamento do próprio layout, cada intervalo custava
+        # trinta pixels.
         inicio = 0
-        for quantidade in fileiras(len(REGISTRY), self.COLUMNS):
+        distribuicao = fileiras(len(REGISTRY), self.COLUMNS)
+        for numero, quantidade in enumerate(distribuicao):
+            if numero:
+                layout.addSpacing(8)
             row = QHBoxLayout()
-            row.setSpacing(18)
+            row.setSpacing(16)
             row.addStretch()
             for meta, _cls in REGISTRY[inicio:inicio + quantidade]:
                 tile = ToolTile(meta)
@@ -254,7 +295,6 @@ class PortalPage(QWidget):
                 row.addWidget(tile)
             row.addStretch()
             layout.addLayout(row)
-            layout.addSpacing(18)
             inicio += quantidade
 
         layout.addStretch(1)
@@ -312,6 +352,15 @@ class ToolFrame(QWidget):
 
         bl.addStretch()
 
+        # Antes de "Sobre", porque a dúvida de quem abre uma ferramenta
+        # pela primeira vez é o que ela faz — não quem escreveu o sistema.
+        ajuda = QPushButton("  Como usar")
+        ajuda.setIcon(draw_icon("manual", 16, PALETTE["gold"]))
+        ajuda.setToolTip(f"Para que serve a {meta.name} e como utilizá-la")
+        ajuda.setCursor(Qt.CursorShape.PointingHandCursor)
+        ajuda.clicked.connect(self._abrir_guia)
+        bl.addWidget(ajuda)
+
         about = QPushButton("  Sobre")
         about.setIcon(draw_icon("info", 16, PALETTE["text2"]))
         about.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -321,6 +370,10 @@ class ToolFrame(QWidget):
         layout.addWidget(bar)
         layout.addWidget(hsep())
         layout.addWidget(tool, 1)
+
+    def _abrir_guia(self):
+        from .guias import GuiaDialog
+        GuiaDialog(self.tool.meta, self).exec()
 
 
 # ─────────────────────────────────────────

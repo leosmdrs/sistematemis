@@ -227,6 +227,33 @@ def draw_icon(kind: str, size: int = 16, color: str = None, width: float = 1.8) 
         p.setBrush(QBrush(QColor(color)))
         p.drawEllipse(QPointF(c + s * 0.24, c - s * 0.02), s * 0.04, s * 0.04)
         p.setBrush(Qt.BrushStyle.NoBrush)
+    elif kind == "tool_ocrpdf":
+        # letra dentro da moldura de leitura — a imagem virando texto
+        canto = s * 0.16
+        for (ax, ay), (bx, by), (cx2, cy2) in (
+                ((m, m + canto), (m, m), (m + canto, m)),
+                ((s - m - canto, m), (s - m, m), (s - m, m + canto)),
+                ((m, s - m - canto), (m, s - m), (m + canto, s - m)),
+                ((s - m - canto, s - m), (s - m, s - m), (s - m, s - m - canto))):
+            p.drawLine(QPointF(ax, ay), QPointF(bx, by))
+            p.drawLine(QPointF(bx, by), QPointF(cx2, cy2))
+        alto, baixo = s * 0.30, s * 0.70
+        p.drawLine(QPointF(c - s * 0.15, baixo), QPointF(c, alto))
+        p.drawLine(QPointF(c, alto), QPointF(c + s * 0.15, baixo))
+        p.drawLine(QPointF(c - s * 0.08, c + s * 0.06),
+                   QPointF(c + s * 0.08, c + s * 0.06))
+    elif kind == "tool_varredura":
+        # lupa sobre uma pilha de arquivos — procurar dentro do acervo
+        for i, dy in enumerate((s * 0.30, s * 0.15, s * 0.00)):
+            p.drawRoundedRect(
+                QRectF(m * 0.8 + i * s * 0.035, m * 0.8 + dy,
+                       s * (0.44 - i * 0.035), s * 0.12),
+                s * 0.03, s * 0.03)
+        raio = s * 0.19
+        centro = QPointF(s * 0.63, s * 0.63)
+        p.drawEllipse(centro, raio, raio)
+        p.drawLine(QPointF(centro.x() + raio * 0.72, centro.y() + raio * 0.72),
+                   QPointF(s - m * 0.7, s - m * 0.7))
     elif kind == "tool_quadro":
         # alfinetes ligados por barbante — o mural de investigação
         a = (s * 0.24, s * 0.26)

@@ -87,6 +87,19 @@ def autoteste() -> int:
         from PIL import Image                                # noqa: F401
         return "PyMuPDF e Pillow presentes"
 
+    def busca():
+        import sqlite3
+        con = sqlite3.connect(":memory:")
+        con.execute("CREATE VIRTUAL TABLE t USING fts5(c)")
+        con.close()
+        return f"FTS5 disponível (SQLite {sqlite3.sqlite_version})"
+
+    def ocr():
+        from temis.tools import ocr_windows
+        if not ocr_windows.disponivel():
+            raise RuntimeError(ocr_windows.diagnostico())
+        return ocr_windows.diagnostico()
+
     def ferramentas():
         from temis.tools import REGISTRY
         return f"{len(REGISTRY)} ferramentas registradas"
@@ -97,6 +110,8 @@ def autoteste() -> int:
         ("ffmpeg empacotado", ffmpeg),
         ("reconhecimento de fala", whisper),
         ("leitura de documentos", documentos),
+        ("índice de busca", busca),
+        ("reconhecimento óptico", ocr),
         ("registro de ferramentas", ferramentas),
     ):
         conferir(rotulo, funcao)

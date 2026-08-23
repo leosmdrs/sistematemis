@@ -277,6 +277,54 @@ QListWidget::item:selected {{
 QListWidget::item:hover {{
     background: {P['surface2']};
 }}
+
+/* ── Tabelas em árvore (resultados da Varredura) ──── */
+QTreeWidget, QTreeView {{
+    background: {P['bg']};
+    alternate-background-color: {P['surface']};
+    border: none;
+    color: {P['text']};
+    outline: none;
+    font-size: 12px;
+}}
+QTreeWidget::item, QTreeView::item {{
+    padding: 4px 6px;
+    border: none;
+}}
+QTreeWidget::item:selected, QTreeView::item:selected {{
+    background: {P['surface3']};
+    color: {P['text']};
+}}
+QTreeWidget::item:hover, QTreeView::item:hover {{
+    background: {P['surface2']};
+}}
+QHeaderView::section {{
+    background: {P['surface']};
+    color: {P['text2']};
+    border: none;
+    border-right: 1px solid {P['border']};
+    border-bottom: 1px solid {P['border']};
+    padding: 6px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+}}
+QHeaderView::section:hover {{
+    background: {P['surface2']};
+    color: {P['text']};
+}}
+
+/* ── Barra de progresso ──────────────────────────── */
+QProgressBar {{
+    background: {P['surface']};
+    border: 1px solid {P['border']};
+    border-radius: 4px;
+}}
+QProgressBar::chunk {{
+    background: {P['gold']};
+    border-radius: 3px;
+}}
+
 QGroupBox {{
     border: 1px solid {P['border']};
     border-radius: 8px;

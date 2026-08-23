@@ -9,8 +9,30 @@ Uso (a partir da raiz do projeto):
 
 import os
 
+from PyInstaller.utils.hooks import collect_dynamic_libs, collect_submodules
+
 ROOT = os.path.abspath(os.getcwd())
 ICON = os.path.join(ROOT, "build", "temis.ico")
+
+# O reconhecimento óptico usa o motor do próprio Windows, alcançado pelos
+# pacotes `winrt`. São *namespace packages* com extensões compiladas, e o
+# PyInstaller não os enxerga por inteiro sozinho — sem esta lista, a
+# Varredura e o PDF Pesquisável sairiam do forno anunciando "OCR
+# indisponível", e só na máquina de quem instalou, que é o pior lugar
+# para se descobrir uma coisa dessas.
+WINRT = [
+    "winrt.runtime",
+    "winrt.system",
+    "winrt.windows.foundation",
+    "winrt.windows.foundation.collections",
+    "winrt.windows.globalization",
+    "winrt.windows.graphics.imaging",
+    "winrt.windows.media.ocr",
+    "winrt.windows.storage.streams",
+] + collect_submodules("winrt")
+
+#: O pacote traz o runtime do Visual C++ de que suas extensões dependem.
+WINRT_BINARIOS = collect_dynamic_libs("winrt")
 
 # FFmpeg vai junto, na pasta "ffmpeg": a Edição de Vídeo depende dele e as
 # estações onde o Têmis roda não têm como instalar pré-requisitos.
@@ -30,9 +52,9 @@ a = Analysis(
     # quebraria todos os imports relativos do pacote.
     [os.path.join(ROOT, "run_temis.py")],
     pathex=[ROOT],
-    binaries=[],
+    binaries=WINRT_BINARIOS,
     datas=FFMPEG,
-    hiddenimports=[],
+    hiddenimports=WINRT,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -44,11 +66,19 @@ a = Analysis(
     # não é conveniência, é o instrumento da captura. Ambiente controlado,
     # sem extensão e sem sessão anterior, com a versão do motor viajando
     # junto com a versão do programa, é o que dá valor à peça.
+    # `numpy` esteve nesta lista e não podia estar. A exclusão vinha de
+    # quando o sistema não transcrevia nada; com a Degravação, tanto o
+    # faster-whisper quanto o sherpa-onnx dependem dele. O resultado é que
+    # a ferramenta funcionava ao rodar pelo código-fonte — onde o numpy
+    # está instalado — e falhava no programa instalado, com
+    # "ModuleNotFoundError: No module named 'numpy'". Descoberto rodando
+    # `SistemaTemis.exe --autoteste` no pacote gerado, que é o único lugar
+    # onde esse tipo de erro aparece.
     excludes=[
         "PyQt6.QtQuick3D", "PyQt6.QtMultimedia", "PyQt6.QtBluetooth",
         "PyQt6.QtSql", "PyQt6.QtTest", "PyQt6.QtDesigner", "PyQt6.QtCharts",
         "tkinter", "unittest", "pydoc", "doctest",
-        "matplotlib", "numpy", "scipy", "pandas",
+        "matplotlib", "scipy", "pandas",
     ],
     noarchive=False,
     optimize=0,

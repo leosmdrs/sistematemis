@@ -1,23 +1,96 @@
-DOCUMENTOS SEM TIMBRE INSTITUCIONAL
+VARREDURA — indexação e busca em massa de acervos digitais
 
-O cabeçalho "POLÍCIA RODOVIÁRIA FEDERAL" saiu do alto de todas as peças
-geradas: Relatório de Constatação de Texto Oculto, Termo de Juntada, Termo
-de Juntada e Extração de Metadados, Termo de Constatação de Conteúdo em
-Meio Eletrônico e Termo de Degravação. O título do documento permanece e
-ganhou o destaque que era do timbre.
+Aponta-se para um pendrive, um cartão ou uma pasta e ela percorre tudo
+uma vez: calcula o SHA-256 de cada arquivo, extrai o texto de PDF, Word,
+Excel, PowerPoint, ODF, e-mail, HTML, RTF e texto puro, e reconhece por
+OCR o que for imagem ou página digitalizada. A partir daí a busca é
+instantânea e não toca mais no dispositivo, que pode ser lacrado.
 
-O timbre é aplicado pelo SEI no momento da juntada, que é onde ele tem
-validade. Não cabia ao programa imprimi-lo por conta própria.
+Acha também pelo nome do arquivo, pelo caminho e pelos metadados: o
+modelo do celular que tirou a foto, o nome de quem editou o documento.
+Filtra por natureza, por data, por tamanho e — o mais revelador num
+acervo de fotografias — só as que trazem coordenadas. Tem galeria de
+imagens, lista de duplicados e panorama do conjunto.
+
+As miniaturas ficam guardadas dentro do índice, de modo que a galeria
+continua servindo depois de a origem ser devolvida.
+
+O termo traz a identificação do dispositivo, inclusive o número de série
+do volume, as pesquisas que foram registradas e o resumo criptográfico
+do conjunto — reproduzível, e por isso capaz de demonstrar que o acervo
+não mudou. Traz também, impressas, as ressalvas: não alcança arquivo
+apagado, espaço não alocado nem contêiner cifrado; é triagem, não
+perícia.
+
+Ao escolher a origem, avisa que montar um dispositivo no Windows não é
+operação inócua, e oferece a declaração de acesso somente para leitura.
 
 
-EXPORTAÇÃO EM HTML NO ANTI-INJECTION
+PDF PESQUISÁVEL — reconhecimento óptico em documentos digitalizados
 
-O Relatório de Constatação de Texto Oculto passou a oferecer "Salvar HTML"
-ao lado de "Salvar PDF", como as demais peças do sistema. Exporta o que
-está na tela — com os ajustes de redação que tenham sido feitos — já limpo
-para a importação do SEI.
+Acrescenta a PDFs escaneados e a fotos de documentos uma camada de texto
+invisível, encaixada palavra por palavra sobre a imagem. O documento
+continua idêntico ao original — medido: renderiza pixel a pixel igual e
+a imagem embutida sai byte a byte a mesma —, mas passa a permitir busca,
+seleção e cópia, e a ser encontrado pela Varredura.
 
-Com isso, todas as ferramentas que produzem documento oferecem as duas
-saídas. Ficam de fora, por natureza: o Quadro de Evidências, que exporta a
-imagem do mural, e a Tarja Preta, que salva o próprio PDF tarjado — em
-HTML a tarja deixaria de ser irreversível.
+Aceita PDF e imagem, um arquivo ou uma pasta inteira. Por padrão só
+reconhece as páginas que não têm texto, e documento que nada ganharia
+não gera cópia. O original nunca é sobrescrito.
+
+O termo registra o resumo criptográfico do arquivo recebido e o do
+gerado, e ressalva que o reconhecimento é automático e sujeito a erro:
+divergência entre o texto pesquisável e a imagem resolve-se sempre em
+favor da imagem.
+
+
+RECONHECIMENTO ÓPTICO PELO MOTOR DO WINDOWS
+
+As duas ferramentas usam o OCR que já vem no sistema operacional, com o
+reconhecedor de português do Brasil. A ligação custa 3,5 MB no
+instalador, contra cerca de 50 MB do Tesseract e 134 MB de um motor de
+rede neural própria, e mediu-se que ele devolve o texto de um termo
+digitalizado com todos os acentos corretos.
+
+Quando a máquina não tem reconhecedor instalado, as ferramentas dizem
+isso e ensinam onde acrescentá-lo, em vez de fingir que leram.
+
+
+COMO USAR, EM CADA FERRAMENTA
+
+Ao lado de "Sobre", na barra de cada ferramenta, há agora "Como usar".
+Abre uma janela que responde, nesta ordem: para que serve — o problema
+concreto que aquilo resolve —, quando usar, como usar passo a passo com
+os nomes dos botões como estão na tela, e os limites de cada uma.
+
+Os limites não são rodapé. A Varredura diz que não recupera arquivo
+apagado e que é triagem, não perícia; a Degravação diz que vozes
+parecidas podem ser confundidas; a Tarja diz que o documento gerado
+deixa de ser pesquisável e que metadados não são tarjados.
+
+
+PORTAL EM PIRÂMIDE
+
+As dez ferramentas passaram a ocupar quatro fileiras — uma, duas, três e
+quatro —, com o Encarregado de IPS no vértice. A leitura desce do
+procedimento para os instrumentos que o instruem: identificação e
+captura da prova, extração de conteúdo do material apreendido, preparo e
+apoio.
+
+Os ladrilhos encolheram e o espaçamento entre fileiras foi enxugado,
+para que a pirâmide inteira caiba sem barra de rolagem em notebook de
+catorze polegadas. A faixa "requer internet" saiu do quadrado — o aviso
+continua na linha acima da pirâmide e na tela "Sobre".
+
+
+DEGRAVAÇÃO CORRIGIDA NO PROGRAMA INSTALADO
+
+A transcrição não funcionava na versão instalada, embora funcionasse ao
+rodar pelo código-fonte. A biblioteca numpy, de que o reconhecimento de
+fala depende, estava na lista de exclusões do empacotador — resquício de
+quando o sistema ainda não transcrevia nada. Quem abrisse a Degravação
+recebia erro de módulo ausente.
+
+O autoteste passou a conferir também o índice de busca e o
+reconhecimento óptico, de modo que falha de empacotamento apareça em
+`SistemaTemis.exe --autoteste` e não na mão de quem instalou.

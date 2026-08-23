@@ -4,3 +4,13 @@ Pillow>=10.0
 PyQt6-WebEngine>=6.6
 faster-whisper>=1.2
 sherpa-onnx>=1.13
+
+# Reconhecimento óptico pelo motor do próprio Windows (Varredura e PDF
+# Pesquisável). Custa 3,5 MB, contra ~50 MB do Tesseract.
+winrt-runtime>=3.2
+winrt-Windows.Media.Ocr>=3.2
+winrt-Windows.Graphics.Imaging>=3.2
+winrt-Windows.Storage.Streams>=3.2
+winrt-Windows.Globalization>=3.2
+winrt-Windows.Foundation>=3.2
+winrt-Windows.Foundation.Collections>=3.2

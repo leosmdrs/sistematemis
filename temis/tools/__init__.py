@@ -13,9 +13,11 @@ from .antiinj import AntiInjectionTool
 from .constatacao import ConstatacaoTool
 from .ips import IPSTool
 from .metadados import MetadadosTool
+from .ocrpdf import OCRPDFTool
 from .quadro import QuadroTool
 from .tarja_preta import TarjaPretaTool
 from .transcricao import TranscricaoTool
+from .varredura import VarreduraTool
 from .video import VideoTool
 
 
@@ -24,15 +26,26 @@ from .video import VideoTool
 # ─────────────────────────────────────────
 
 #: (meta, classe da ferramenta ou None se ainda não implementada)
+#:
+#: A ordem é a da pirâmide do portal, lida de cima para baixo. No
+#: vértice, a peça que instrui o procedimento; na fileira seguinte, o
+#: que identifica e captura a prova onde ela está; depois, o que extrai
+#: conteúdo do material apreendido; na base, o preparo e o apoio.
 REGISTRY: list[tuple[ToolMeta, type | None]] = [
+    # vértice — o procedimento
+    (IPSTool.meta,           IPSTool),
+    # identificação e captura da prova
+    (MetadadosTool.meta,     MetadadosTool),
+    (ConstatacaoTool.meta,   ConstatacaoTool),
+    # extração de conteúdo do material apreendido
+    (VarreduraTool.meta,     VarreduraTool),
+    (OCRPDFTool.meta,        OCRPDFTool),
+    (TranscricaoTool.meta,   TranscricaoTool),
+    # preparo e apoio
     (TarjaPretaTool.meta,    TarjaPretaTool),
     (AntiInjectionTool.meta, AntiInjectionTool),
     (QuadroTool.meta,        QuadroTool),
     (VideoTool.meta,         VideoTool),
-    (IPSTool.meta,           IPSTool),
-    (MetadadosTool.meta,     MetadadosTool),
-    (ConstatacaoTool.meta,   ConstatacaoTool),
-    (TranscricaoTool.meta,   TranscricaoTool),
 ]
 
 
