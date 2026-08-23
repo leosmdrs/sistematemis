@@ -156,6 +156,12 @@ def main() -> int:
         if compilado is not None:
             instalador = compilado
 
+        # ASSINATURA — quando houver certificado, o passo entra AQUI, antes
+        # do manifesto. Assinar altera o arquivo e portanto o seu SHA-256;
+        # assinar depois de escrever o versao.json faria toda estação
+        # recusar a atualização, com a mensagem certa e a causa
+        # indecifrável. Veja ASSINATURA.md.
+
     if not instalador.is_file():
         print(f"! instalador não encontrado em {instalador}")
         return 1

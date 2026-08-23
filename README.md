@@ -1,13 +1,38 @@
 # Sistema Têmis
 
-**Ferramentas da Corregedoria-Geral / PRF** — um único programa instalável
-reunindo os instrumentos de apoio à atividade de apuração e controle interno.
+Um único programa instalável reunindo instrumentos de apoio à atividade de
+apuração e controle interno: tarjamento de documentos, integridade de
+arquivos, detecção de conteúdo oculto, extração de metadados, registro de
+conteúdo publicado na internet, degravação de oitivas, organização de
+evidências e montagem da Informação de juízo de admissibilidade.
 
 Os arquivos não saem da máquina: nenhum documento, hash ou metadado é
-enviado a servidor algum. O único acesso à rede é a verificação de
-atualização ao abrir, que lê um arquivo de versão sem enviar
-identificação do usuário ou da estação — e pode ser desligada em
-**Sobre**.
+enviado a servidor algum. Os acessos à rede são dois, ambos visíveis: a
+verificação de atualização ao abrir — que lê um arquivo de versão, sem
+enviar identificação do usuário ou da estação, e pode ser desligada em
+**Sobre** — e a Constatação Web, que por definição acessa a página que se
+quer constatar.
+
+## Autoria e vínculo
+
+Escrito por **Leonardo Medeiros**, Policial Rodoviário Federal, por
+iniciativa e conta próprias. **Não é um produto oficial da Polícia
+Rodoviária Federal**, que não o encomendou, não o custeia e não o mantém.
+
+O programa produz documentos destinados a procedimentos correcionais e por
+isso os apresenta no formato dessas peças, com o timbre que elas levam. O
+uso é responsabilidade de quem assina o documento produzido.
+
+## Licença
+
+**AGPL-3.0-or-later** — veja [LICENSE](LICENSE).
+
+A licença não é escolha estética: é a mais restritiva entre as dos
+componentes que o instalador distribui. O PyQt6 é GPL-3.0, o PyMuPDF é
+AGPL-3.0 e o FFmpeg empacotado foi compilado com `--enable-gpl`. Licenciar
+o conjunto de forma permissiva declararia a quem recebe uma condição que
+não corresponde à realidade. Os componentes e a origem do código-fonte de
+cada um estão em [TERCEIROS.md](TERCEIROS.md).
 
 ---
 
@@ -16,10 +41,27 @@ identificação do usuário ou da estação — e pode ser desligada em
 Baixe o instalador mais recente em
 [Releases](https://github.com/leosmdrs/sistematemis/releases).
 
-O instalador não é assinado, então o Windows vai avisar: em **“O Windows
+O instalador ainda não é assinado, então o Windows avisa: em **“O Windows
 protegeu o seu PC”**, clique em *Mais informações* → *Executar assim
-mesmo*. Em estações com **Smart App Control** ligado a instalação é
-recusada e não há como contornar sem certificado de assinatura.
+mesmo*.
+
+Em estações com **Smart App Control** ligado, a instalação pode ser
+recusada de saída. O recurso não tem lista de exceções: ele libera um
+programa por assinatura de autoridade certificadora reconhecida ou por
+reputação acumulada. Na prática, tentar de novo alguns minutos depois
+costuma funcionar, porque a avaliação de reputação é assíncrona. Para
+saber se a estação tem o recurso ligado:
+
+```
+reg query "HKLM\SYSTEM\CurrentControlSet\Control\CI\Policy" /v VerifiedAndReputablePolicyState
+```
+
+Se o instalador não abrir e você quiser conferir se o que foi instalado
+está íntegro, o executável aceita:
+
+```
+SistemaTemis.exe --autoteste
+```
 
 Das versões seguintes em diante o próprio sistema avisa quando houver
 atualização, pede autorização, baixa e confere o SHA-256 antes de
