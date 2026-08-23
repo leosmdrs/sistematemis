@@ -7,8 +7,8 @@
 ; ─────────────────────────────────────────────────────────────
 
 #define AppName        "Sistema Têmis"
-#define AppVersion     "1.2.0"
-#define AppPublisher   "Corregedoria-Geral / PRF"
+#define AppVersion     "1.2.1"
+#define AppPublisher   "Leonardo Medeiros"
 #define AppExe         "SistemaTemis.exe"
 
 [Setup]

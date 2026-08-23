@@ -1,45 +1,40 @@
-NOVA FERRAMENTA — Degravação
+IDENTIDADE E LICENÇA
 
-Transcreve oitivas e gravações com reconhecimento de fala executado
-integralmente nesta máquina. Nenhum trecho de áudio é enviado a serviço
-externo.
+O programa deixa de se apresentar como produto institucional. O subtítulo
+sob o nome, que dizia "Ferramentas da Corregedoria-Geral / PRF", passa a ser
+"Ferramentas de apoio às atividades de investigação". O mesmo vale para o
+editor do instalador e para as propriedades do executável, que agora
+identificam o autor.
 
-Separa automaticamente quem fala, na cronologia do diálogo. Ao final, cada
-fala vem marcada como "Locutor 1", "Locutor 2", e basta nomear cada voz uma
-vez, no painel do alto — todas as falas daquela pessoa mudam juntas. Numa
-oitiva de uma hora isso é a diferença entre uma resposta e duzentas.
+O timbre "POLÍCIA RODOVIÁRIA FEDERAL" continua nos documentos gerados, e
+deve continuar: as peças são institucionais, produzidas por servidor no
+exercício da função. O que não cabia era o programa se apresentar como obra
+da instituição — ele foi escrito por iniciativa e conta próprias.
 
-Aceita qualquer áudio ou vídeo, pelo mesmo FFmpeg que já acompanha o
-sistema. Cada trecho fica editável, com marca de tempo. O termo de
-degravação traz o resumo SHA-256 da mídia de origem e sai em PDF ou em HTML
-para o SEI.
+O projeto passa a declarar a licença sob a qual efetivamente distribui:
+AGPL-3.0-or-later. Não é escolha estética — é a mais restritiva entre as
+dos componentes que o instalador carrega: o PyQt6 é GPL-3.0, o PyMuPDF é
+AGPL-3.0 e o FFmpeg empacotado foi compilado com --enable-gpl. O inventário
+de cada componente, com licença e origem do código-fonte, está em
+TERCEIROS.md.
 
-Sobre os limites, com franqueza: o reconhecimento erra, e a separação de
-vozes erra mais ainda em gravação com microfone único e pessoas se
-interrompendo. Por isso o texto sai para revisão e o termo declara que a
-fidelidade da transcrição é do signatário — o reconhecimento automático é
-meio de trabalho, não fonte de fé.
-
-Os modelos não vêm no instalador: são baixados na primeira vez que a
-ferramenta é usada. O de transcrição tem 464 MB e o de separação de vozes,
-46 MB. Se a rede da unidade bloquear o download, a mensagem de erro informa
-a pasta exata onde eles podem ser copiados à mão.
+O código-fonte completo está em github.com/leosmdrs/sistematemis.
 
 
-AUTOTESTE DA INSTALAÇÃO
+SOBRE O BLOQUEIO DO WINDOWS
 
-O executável passou a aceitar `SistemaTemis.exe --autoteste`, que confere
-num terminal se tudo o que foi empacotado funciona naquela máquina —
-interface, navegador embutido, FFmpeg, reconhecimento de fala e leitura de
-documentos. O relatório também é gravado em arquivo, para quem precisar
-enviá-lo a quem dá suporte.
+Em estações com Smart App Control ativo, a instalação pode ser recusada.
+O recurso não tem lista de exceções: libera um programa por assinatura de
+autoridade certificadora reconhecida ou por reputação acumulada. Como a
+avaliação de reputação é assíncrona, tentar de novo alguns minutos depois
+costuma resolver.
 
-Existe porque erro de empacotamento não aparece aqui: aparece na estação de
-quem instalou, e na forma de uma janela que não abre.
+Para saber se a sua estação tem o recurso ligado:
+
+    reg query "HKLM\SYSTEM\CurrentControlSet\Control\CI\Policy" /v VerifiedAndReputablePolicyState
+
+O documento ASSINATURA.md explica o problema por inteiro e o andamento da
+solução definitiva, que é a assinatura de código.
 
 
-SOBRE O TAMANHO
-
-Esta versão é maior que a anterior por causa das bibliotecas de
-reconhecimento de fala. Os modelos, que são o grosso, continuam fora do
-instalador.
+Sem mudanças nas ferramentas nesta versão.

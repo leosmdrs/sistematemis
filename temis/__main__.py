@@ -6,7 +6,7 @@ import sys
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication
 
-from . import __appname__, __version__
+from . import __appname__, __author__, __version__
 from .icons import app_icon
 from .shell import TemisWindow
 
@@ -52,7 +52,7 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName(__appname__)
     app.setApplicationVersion(__version__)
-    app.setOrganizationName("Polícia Rodoviária Federal")
+    app.setOrganizationName(__author__)
     app.setWindowIcon(app_icon())
 
     win = TemisWindow()

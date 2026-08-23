@@ -183,7 +183,7 @@ class PortalPage(QWidget):
         )
         titles.addWidget(name)
 
-        org = QLabel(f"Ferramentas da {__org__}")
+        org = QLabel(__org__)
         org.setStyleSheet(
             f"color: {PALETTE['gold']}; font-size: 12px; font-weight: 600;"
             "letter-spacing: 0.3px;"
@@ -352,7 +352,7 @@ class SobreDialog(QDialog):
         nome = QLabel(__appname__)
         nome.setObjectName("heading")
         titulos.addWidget(nome)
-        org = QLabel(f"Ferramentas da {__org__}")
+        org = QLabel(__org__)
         org.setStyleSheet(f"color: {PALETTE['gold']}; font-weight: 600;")
         titulos.addWidget(org)
         titulos.addStretch()
@@ -436,7 +436,7 @@ class TemisWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(f"{__appname__} — {__org__}")
+        self.setWindowTitle(__appname__)
         self.setWindowIcon(app_icon())
         self.resize(1280, 840)
         self.setMinimumSize(940, 620)

@@ -13,7 +13,11 @@ QUALQUER GARANTIA. Veja a Licença Pública Geral Affero GNU para
 mais detalhes: <https://www.gnu.org/licenses/>.
 """
 
-__version__ = "1.2.0"
+__version__ = "1.2.1"
 __appname__ = "Sistema Têmis"
-__org__ = "Corregedoria-Geral / PRF"
+#: Linha de apoio sob o nome do sistema. Não nomeia a
+#: instituição: o programa é obra pessoal do autor, e a
+#: assinatura institucional cabe às peças que ele gera, não
+#: a ele próprio.
+__org__ = "Ferramentas de apoio às atividades de investigação"
 __author__ = "Leonardo Medeiros"
