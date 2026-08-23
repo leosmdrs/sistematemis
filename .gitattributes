@@ -1,0 +1,6 @@
+# Normaliza a quebra de linha: o repositório guarda LF, a cópia de
+# trabalho no Windows recebe CRLF. Sem isto, o primeiro commit feito em
+# outra máquina apareceria como se todos os arquivos tivessem mudado.
+* text=auto eol=lf
+*.png binary
+*.ico binary

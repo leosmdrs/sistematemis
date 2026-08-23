@@ -1,0 +1,563 @@
+"""
+Extrator de Metadados — o que cada arquivo informa sobre si mesmo.
+
+Segue a mesma disposição do Anti-Injection: painel à esquerda com a lista
+do que foi aberto, barra de modos no alto, e o termo de diligência saindo
+pelo botão verde do rodapé.
+"""
+
+from __future__ import annotations
+
+import datetime
+from pathlib import Path
+
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtGui import QColor, QFont, QGuiApplication
+from PyQt6.QtWidgets import (
+    QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog,
+    QFrame, QSizePolicy, QMessageBox, QDialog, QTextEdit, QButtonGroup,
+    QListWidget, QListWidgetItem, QProgressDialog, QLineEdit, QGridLayout,
+)
+
+from ..icons import draw_icon
+from ..impressao import imprimir_documento, preparar_escritor
+from ..theme import PALETTE
+from ..widgets import (
+    SidebarPanel, ViewerToolbar, field_label, fit_to_screen, hsep,
+    output_button, primary_button, subtext,
+)
+from .base import ToolPage, ToolMeta
+from . import metadados_core as core
+
+
+META = ToolMeta(
+    key="metadados",
+    name="Extrator de Metadados",
+    icon="tool_metadados",
+    tagline="O que o arquivo informa sobre si",
+    description=(
+        "Lê os metadados de documentos, fotografias, planilhas e mídias: "
+        "autor, programa que gerou, datas de criação e alteração, "
+        "equipamento de origem e, quando o aparelho as gravou, as "
+        "coordenadas da captura. Emite termo de diligência pronto para os "
+        "autos, com o resumo SHA-256 de cada arquivo."
+    ),
+)
+
+#: Formatos oferecidos no seletor de arquivos.
+FILTRO = (
+    "Todos os suportados (*.pdf *.jpg *.jpeg *.png *.tif *.tiff *.webp "
+    "*.heic *.bmp *.gif *.docx *.xlsx *.pptx *.odt *.ods *.odp *.mp4 *.mov "
+    "*.avi *.mkv *.wmv *.m4v *.mp3 *.wav *.m4a *.aac *.ogg *.flac *.webm);;"
+    "Documentos (*.pdf *.docx *.xlsx *.pptx *.odt *.ods *.odp);;"
+    "Imagens (*.jpg *.jpeg *.png *.tif *.tiff *.webp *.heic *.bmp *.gif);;"
+    "Mídias (*.mp4 *.mov *.avi *.mkv *.wmv *.m4v *.mp3 *.wav *.m4a *.aac "
+    "*.ogg *.flac *.webm);;"
+    "Todos os arquivos (*)"
+)
+
+TINTA = core.INK
+CINZA = core.CINZA
+
+
+# ─────────────────────────────────────────
+#  LEITURA EM SEGUNDO PLANO
+# ─────────────────────────────────────────
+
+class ExtrairThread(QThread):
+    """Lê o lote fora da interface: o SHA-256 de um vídeo demora."""
+
+    progresso = pyqtSignal(int, int)
+    pronto = pyqtSignal(list)
+
+    def __init__(self, caminhos: list[str]):
+        super().__init__()
+        self._caminhos = caminhos
+
+    def run(self):
+        self.pronto.emit(core.extrair_varios(
+            self._caminhos,
+            progresso=lambda i, t: self.progresso.emit(i, t)))
+
+
+# ─────────────────────────────────────────
+#  TERMO DE DILIGÊNCIA
+# ─────────────────────────────────────────
+
+class TermoDialog(QDialog):
+    """Documento pronto para os autos, editável antes de salvar."""
+
+    def __init__(self, arquivos: list[core.Arquivo], quando: str,
+                 so_relevantes: bool, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Termo de Diligência — Extração de Metadados")
+        self._arquivos = arquivos
+        self._quando = quando
+        self._so_relevantes = so_relevantes
+        fit_to_screen(self, 900, 760)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 18, 20, 16)
+        layout.setSpacing(10)
+
+        titulo = QLabel("Termo de Diligência")
+        titulo.setObjectName("heading")
+        layout.addWidget(titulo)
+        layout.addWidget(subtext(
+            "Confira e ajuste o texto antes de salvar. O documento sai em "
+            "PDF, pronto para juntada.", wrap=True))
+        layout.addWidget(self._build_form())
+        layout.addWidget(hsep())
+
+        self._view = QTextEdit()
+        self._view.setStyleSheet(
+            "QTextEdit { background: #FFFFFF; color: #16233A; "
+            f"border: 1px solid {PALETTE['border']}; border-radius: 6px; "
+            "padding: 26px; }")
+        layout.addWidget(self._view, 1)
+        layout.addWidget(hsep())
+
+        acoes = QWidget()
+        acoes.setSizePolicy(QSizePolicy.Policy.Preferred,
+                            QSizePolicy.Policy.Fixed)
+        linha = QHBoxLayout(acoes)
+        linha.setContentsMargins(0, 8, 0, 0)
+        linha.setSpacing(8)
+
+        pdf = output_button("Salvar PDF")
+        pdf.clicked.connect(self._salvar_pdf)
+        linha.addWidget(pdf)
+
+        copiar = QPushButton("Copiar texto")
+        copiar.setCursor(Qt.CursorShape.PointingHandCursor)
+        copiar.clicked.connect(self._copiar)
+        linha.addWidget(copiar)
+
+        restaurar = QPushButton("  Restaurar original")
+        restaurar.setIcon(draw_icon("undo"))
+        restaurar.setToolTip("Descarta as alterações e remonta o termo")
+        restaurar.setCursor(Qt.CursorShape.PointingHandCursor)
+        restaurar.clicked.connect(self._remontar)
+        linha.addWidget(restaurar)
+
+        self._aviso = QLabel("")
+        self._aviso.setObjectName("badge_ok")
+        linha.addWidget(self._aviso)
+
+        linha.addStretch()
+        fechar = QPushButton("Fechar")
+        fechar.setCursor(Qt.CursorShape.PointingHandCursor)
+        fechar.clicked.connect(self.accept)
+        linha.addWidget(fechar)
+
+        layout.addWidget(acoes)
+        self._remontar()
+
+    def _build_form(self) -> QWidget:
+        caixa = QWidget()
+        grade = QGridLayout(caixa)
+        grade.setContentsMargins(0, 4, 0, 4)
+        grade.setHorizontalSpacing(10)
+        grade.setVerticalSpacing(4)
+
+        self._in_nome = QLineEdit()
+        self._in_nome.setPlaceholderText("Ex.: João da Silva")
+        self._in_matricula = QLineEdit()
+        self._in_matricula.setPlaceholderText("Ex.: 1234567")
+        self._in_lotacao = QLineEdit()
+        self._in_lotacao.setPlaceholderText("Ex.: CGCOR - PRF/DF")
+
+        for coluna, (rotulo, campo) in enumerate((
+            ("Nome do servidor", self._in_nome),
+            ("Matrícula", self._in_matricula),
+            ("Lotação", self._in_lotacao),
+        )):
+            grade.addWidget(field_label(rotulo), 0, coluna)
+            grade.addWidget(campo, 1, coluna)
+            campo.textChanged.connect(self._remontar)
+
+        grade.setColumnStretch(0, 3)
+        grade.setColumnStretch(1, 1)
+        grade.setColumnStretch(2, 2)
+        return caixa
+
+    # ── documento ────────────────────────────────
+    def _declarante(self) -> core.Declarante:
+        return core.Declarante(
+            nome=self._in_nome.text().strip(),
+            matricula=self._in_matricula.text().strip(),
+            lotacao=self._in_lotacao.text().strip(),
+        )
+
+    def _remontar(self):
+        self._view.setHtml(core.build_html(
+            self._arquivos, self._quando, self._declarante(),
+            self._so_relevantes))
+
+    def _copiar(self):
+        QGuiApplication.clipboard().setText(self._view.toPlainText())
+        self._aviso.setText("✓ Texto copiado")
+
+    def _salvar_pdf(self):
+        base = (Path(self._arquivos[0].caminho).stem
+                if self._arquivos else "arquivos")
+        caminho, _ = QFileDialog.getSaveFileName(
+            self, "Salvar termo de diligência",
+            f"metadados-{base}.pdf", "Arquivos PDF (*.pdf)")
+        if not caminho:
+            return
+        if not caminho.lower().endswith(".pdf"):
+            caminho += ".pdf"
+        try:
+            escritor = preparar_escritor(
+                caminho, "Termo de Diligência — Extração de Metadados")
+            # Clona o documento em edição: remontar a partir dos dados
+            # descartaria em silêncio os ajustes feitos na tela.
+            doc = self._view.document().clone()
+            doc.setDefaultFont(QFont("Segoe UI", 10))
+            imprimir_documento(doc, escritor)
+            self._aviso.setText("✓ PDF salvo")
+        except Exception as e:                          # noqa: BLE001
+            QMessageBox.critical(self, "Erro ao salvar",
+                                 f"Não foi possível gerar o PDF:\n{e}")
+
+
+# ─────────────────────────────────────────
+#  FERRAMENTA
+# ─────────────────────────────────────────
+
+class MetadadosTool(ToolPage):
+    meta = META
+
+    MODOS = ("Relevantes", "Completo")
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._arquivos: list[core.Arquivo] = []
+        self._modo = "Relevantes"
+        self._thread: ExtrairThread | None = None
+        self._build_ui()
+
+    # ── montagem ─────────────────────────────────
+    def _build_ui(self):
+        raiz = QHBoxLayout(self)
+        raiz.setContentsMargins(0, 0, 0, 0)
+        raiz.setSpacing(0)
+        raiz.addWidget(self._build_sidebar())
+
+        principal = QWidget()
+        coluna = QVBoxLayout(principal)
+        coluna.setContentsMargins(0, 0, 0, 0)
+        coluna.setSpacing(0)
+        coluna.addWidget(self._build_toolbar())
+        coluna.addWidget(self._build_alerta())
+
+        self._view = QTextEdit()
+        self._view.setReadOnly(True)
+        self._view.setStyleSheet(
+            "QTextEdit { background: #FFFFFF; color: #16233A; "
+            f"border: none; padding: 30px 38px; }}")
+        coluna.addWidget(self._view, 1)
+
+        raiz.addWidget(principal, 1)
+        self._boas_vindas()
+
+    def _build_toolbar(self) -> ViewerToolbar:
+        barra = ViewerToolbar(paginacao=False, zoom=False)
+
+        self._grupo = QButtonGroup(self)
+        self._grupo.setExclusive(True)
+        for i, nome in enumerate(self.MODOS):
+            b = QPushButton(nome)
+            b.setCheckable(True)
+            b.setChecked(i == 0)
+            b.setMinimumWidth(92)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setToolTip({
+                "Relevantes": "Só o que costuma interessar à apuração: "
+                              "pessoas, equipamento, datas e local",
+                "Completo": "Todos os metadados lidos do arquivo",
+            }[nome])
+            b.clicked.connect(lambda _c, n=nome: self._definir_modo(n))
+            self._grupo.addButton(b)
+            barra.add_widget(b)
+
+        barra.add_separator()
+
+        self._btn_copiar = QPushButton("  Copiar")
+        self._btn_copiar.setIcon(draw_icon("note", 15, PALETTE["text"]))
+        self._btn_copiar.setToolTip("Copia os metadados deste arquivo")
+        self._btn_copiar.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_copiar.clicked.connect(self._copiar)
+        barra.add_widget(self._btn_copiar)
+
+        barra.add_stretch()
+        return barra
+
+    def _build_alerta(self) -> QFrame:
+        self._alerta = QFrame()
+        self._alerta.setFixedHeight(34)
+        self._alerta.setStyleSheet(
+            f"background: {PALETTE['surface2']}; "
+            f"border-bottom: 1px solid {PALETTE['border']};")
+        lay = QHBoxLayout(self._alerta)
+        lay.setContentsMargins(16, 0, 16, 0)
+        self._lbl_alerta = QLabel("")
+        lay.addWidget(self._lbl_alerta)
+        lay.addStretch()
+        self._alerta.setVisible(False)
+        return self._alerta
+
+    def _build_sidebar(self) -> SidebarPanel:
+        painel = SidebarPanel()
+
+        self._btn_abrir = primary_button("Abrir arquivos…", "plus")
+        self._btn_abrir.clicked.connect(self._abrir)
+        painel.header.addWidget(self._btn_abrir)
+
+        self._lbl_estado = subtext("Nenhum arquivo aberto", wrap=True)
+        painel.header.addWidget(self._lbl_estado)
+
+        linha = QHBoxLayout()
+        titulo = QLabel("Arquivos")
+        titulo.setObjectName("heading")
+        linha.addWidget(titulo)
+        linha.addStretch()
+        self._lbl_contagem = subtext("—")
+        linha.addWidget(self._lbl_contagem)
+        painel.body.addLayout(linha)
+
+        self._lista = QListWidget()
+        self._lista.setWordWrap(True)
+        self._lista.setStyleSheet(
+            f"QListWidget {{ background: {PALETTE['bg']}; "
+            f"border: 1px solid {PALETTE['border']}; border-radius: 6px; }}"
+            f"QListWidget::item {{ padding: 9px 10px; "
+            f"border-bottom: 1px solid {PALETTE['surface2']}; }}")
+        self._lista.currentRowChanged.connect(self._mostrar)
+        painel.body.addWidget(self._lista, 1)
+
+        acoes = QHBoxLayout()
+        self._btn_remover = QPushButton("  Remover")
+        self._btn_remover.setIcon(draw_icon("trash", 14, PALETTE["danger"]))
+        self._btn_remover.setToolTip("Tira este arquivo da lista")
+        self._btn_remover.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_remover.clicked.connect(self._remover)
+        acoes.addWidget(self._btn_remover)
+        self._btn_limpar = QPushButton("Limpar tudo")
+        self._btn_limpar.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_limpar.clicked.connect(self._limpar)
+        acoes.addWidget(self._btn_limpar)
+        painel.body.addLayout(acoes)
+
+        self._btn_termo = output_button("Termo de diligência")
+        self._btn_termo.clicked.connect(self._mostrar_termo)
+        self._btn_termo.setEnabled(False)
+        painel.footer.addWidget(self._btn_termo)
+        painel.add_note("Leitura 100% local. Os arquivos não são alterados.")
+        return painel
+
+    # ── abertura ─────────────────────────────────
+    def _abrir(self):
+        caminhos, _ = QFileDialog.getOpenFileNames(
+            self, "Abrir arquivos para extração", "", FILTRO)
+        if caminhos:
+            self.acrescentar(caminhos)
+
+    def acrescentar(self, caminhos: list[str]):
+        """Lê os arquivos e junta ao que já está na lista."""
+        ja = {a.caminho for a in self._arquivos}
+        novos = [c for c in caminhos if str(Path(c)) not in ja]
+        if not novos:
+            self.status_msg.emit("Estes arquivos já estão na lista.")
+            return
+
+        progresso = QProgressDialog("Lendo metadados…", "Cancelar", 0,
+                                    len(novos), self)
+        progresso.setWindowTitle("Extração")
+        progresso.setMinimumDuration(400)
+        progresso.setValue(0)
+
+        self._thread = ExtrairThread(novos)
+        self._thread.progresso.connect(
+            lambda i, t: (progresso.setMaximum(t), progresso.setValue(i)))
+        self._thread.pronto.connect(
+            lambda lidos: self._ao_extrair(lidos, progresso))
+        self._thread.start()
+
+    def _ao_extrair(self, lidos: list[core.Arquivo],
+                    progresso: QProgressDialog):
+        progresso.close()
+        self._arquivos.extend(lidos)
+        self._preencher_lista()
+        self._lista.setCurrentRow(len(self._arquivos) - len(lidos))
+        self._btn_termo.setEnabled(bool(self._arquivos))
+        com_local = sum(1 for a in self._arquivos if a.tem_localizacao)
+        self.status_msg.emit(
+            f"{len(lidos)} arquivo(s) lido(s)"
+            + (f" · {com_local} com coordenadas" if com_local else ""))
+
+    # ── lista ────────────────────────────────────
+    def _preencher_lista(self):
+        self._lista.blockSignals(True)
+        atual = self._lista.currentRow()
+        self._lista.clear()
+        for a in self._arquivos:
+            marca = "!" if a.tem_localizacao else ("×" if a.erro else "•")
+            cor = (PALETTE["warning"] if a.tem_localizacao
+                   else PALETTE["danger"] if a.erro else PALETTE["text2"])
+            item = QListWidgetItem(f" {marca}  {a.nome}\n      {a.tipo} · "
+                                   f"{len(a.relevantes)} de interesse")
+            item.setForeground(QColor(cor))
+            self._lista.addItem(item)
+        self._lista.blockSignals(False)
+        self._lbl_contagem.setText(f"{len(self._arquivos)}")
+        self._lbl_estado.setText(
+            f"{len(self._arquivos)} arquivo(s) na diligência"
+            if self._arquivos else "Nenhum arquivo aberto")
+        if 0 <= atual < self._lista.count():
+            self._lista.setCurrentRow(atual)
+
+    def _remover(self):
+        i = self._lista.currentRow()
+        if not (0 <= i < len(self._arquivos)):
+            return
+        self._arquivos.pop(i)
+        self._preencher_lista()
+        self._btn_termo.setEnabled(bool(self._arquivos))
+        if self._arquivos:
+            self._lista.setCurrentRow(min(i, len(self._arquivos) - 1))
+        else:
+            self._boas_vindas()
+
+    def _limpar(self):
+        if not self._arquivos:
+            return
+        if QMessageBox.question(
+            self, "Limpar lista",
+            "Tirar todos os arquivos da diligência?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        ) != QMessageBox.StandardButton.Yes:
+            return
+        self._arquivos.clear()
+        self._preencher_lista()
+        self._btn_termo.setEnabled(False)
+        self._boas_vindas()
+
+    # ── exibição ─────────────────────────────────
+    def _atual(self) -> core.Arquivo | None:
+        i = self._lista.currentRow()
+        return self._arquivos[i] if 0 <= i < len(self._arquivos) else None
+
+    def _definir_modo(self, nome: str):
+        self._modo = nome
+        self._mostrar(self._lista.currentRow())
+
+    def _mostrar(self, _linha: int = -1):
+        a = self._atual()
+        if a is None:
+            self._boas_vindas()
+            return
+        self._view.setHtml(self._html(a))
+        self._atualizar_alerta(a)
+
+    def _html(self, a: core.Arquivo) -> str:
+        import html as _html
+
+        e = _html.escape
+        campos = a.relevantes if self._modo == "Relevantes" else a.campos
+        partes = [
+            f'<p style="font-size:14pt; margin-bottom:2px;">'
+            f'<b><font color="{TINTA}">{e(a.nome)}</font></b></p>'
+            f'<p style="margin-top:0;"><font color="{CINZA}" size="2">'
+            f"{e(a.tipo)}</font></p>"
+        ]
+        if a.erro:
+            partes.append(
+                f'<p><font color="{core.DESTAQUE}">Leitura parcial: '
+                f"{e(a.erro)}</font></p>")
+
+        for grupo in core.GRUPOS:
+            do_grupo = [c for c in campos if c.grupo == grupo]
+            if not do_grupo:
+                continue
+            linhas = "".join(
+                "<tr>"
+                f'<td width="34%"><font color="{CINZA}">{e(c.rotulo)}</font>'
+                "</td>"
+                f'<td><font color="'
+                f'{core.DESTAQUE if grupo == "Localização" else TINTA}">'
+                + (f"<b>{e(c.valor)}</b>" if c.relevante else e(c.valor))
+                + "</font></td></tr>"
+                for c in do_grupo)
+            partes.append(
+                f'<p style="margin-top:16px; margin-bottom:4px;">'
+                f'<b><font color="{TINTA}">{e(grupo)}</font></b></p>'
+                '<table width="100%" cellspacing="0" cellpadding="5" '
+                'border="1" style="border-collapse:collapse; font-size:10pt;">'
+                f"{linhas}</table>")
+
+        if a.sha256:
+            partes.append(
+                f'<p style="margin-top:18px;"><font color="{CINZA}" size="2">'
+                "Resumo criptográfico (SHA-256)</font><br/>"
+                f'<font color="{TINTA}" face="Courier New" size="2">'
+                f"{a.sha256}</font></p>")
+
+        if not campos:
+            partes.append(f'<p><font color="{CINZA}">Nenhum metadado '
+                          "registrado neste arquivo.</font></p>")
+
+        return ("<html><body style=\"font-family:'Segoe UI',Arial,sans-serif;"
+                f' color:{TINTA};">' + "".join(partes) + "</body></html>")
+
+    def _atualizar_alerta(self, a: core.Arquivo):
+        if a.tem_localizacao:
+            coords = a.valor("Coordenadas")
+            self._lbl_alerta.setText(
+                f"<span style='color:{PALETTE['warning']};'><b>Coordenadas "
+                f"geográficas registradas no arquivo</b></span> "
+                f"<span style='color:{PALETTE['text2']};'>— {coords}</span>")
+            self._alerta.setVisible(True)
+        elif a.relevantes:
+            self._lbl_alerta.setText(
+                f"<span style='color:{PALETTE['text2']};'>"
+                f"{len(a.relevantes)} campo(s) de interesse para a apuração"
+                "</span>")
+            self._alerta.setVisible(True)
+        else:
+            self._alerta.setVisible(False)
+
+    def _boas_vindas(self):
+        self._alerta.setVisible(False)
+        self._view.setHtml(
+            "<html><body style=\"font-family:'Segoe UI',Arial,sans-serif;\">"
+            f'<p style="font-size:13pt; color:{CINZA};">'
+            "Abra um ou mais arquivos para extrair os metadados.</p>"
+            f'<p style="color:{CINZA}; font-size:10pt;">'
+            "Documentos PDF e de escritório, fotografias e mídias. "
+            "De fotografias e vídeos de celular costumam sair o equipamento, "
+            "o instante da captura e, quando o aparelho as gravou, as "
+            "coordenadas.</p></body></html>")
+
+    def _copiar(self):
+        a = self._atual()
+        if a is None:
+            return
+        QGuiApplication.clipboard().setText(self._view.toPlainText())
+        self.status_msg.emit("Metadados copiados.")
+
+    # ── termo ────────────────────────────────────
+    def _mostrar_termo(self):
+        if not self._arquivos:
+            return
+        quando = datetime.datetime.now().strftime("%d/%m/%Y às %H:%M")
+        dlg = TermoDialog(self._arquivos, quando,
+                          self._modo == "Relevantes", self)
+        dlg.exec()
+
+    # ── contrato do casco ────────────────────────
+    def shutdown(self):
+        if self._thread is not None and self._thread.isRunning():
+            self._thread.wait(3000)

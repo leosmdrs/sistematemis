@@ -1,0 +1,35 @@
+__pycache__/
+*.py[cod]
+
+# ── Saídas de build ──────────────────────────────────────
+dist/
+build/_work/
+build/temis.ico
+*.spec.bak
+
+# ── Binários de terceiros ────────────────────────────────
+# O FFmpeg soma ~196 MB e não entra no repositório. Para montar o
+# ambiente, baixe a build **essentials** de gyan.dev — a mesma que o
+# ffmpeg.org indica para Windows — e ponha `ffmpeg.exe` e `ffprobe.exe`
+# em `vendor/ffmpeg/bin/`:
+#
+#     https://github.com/GyanD/codexffmpeg/releases
+#     ffmpeg-9.0.1-essentials_build.zip
+#
+# A variante importa mais que a versão: precisa ser a *essentials*, que
+# traz libx264, AAC e o demuxer concat — tudo de que a Edição de Vídeo
+# depende. A *full* funciona, mas é maior à toa.
+vendor/
+
+# ── Capturas e sobras de teste ───────────────────────────
+# Geradas pelas verificações automatizadas; não são fonte.
+_i_*.png
+Teste.png
+*.parcial
+
+# ── Ambiente local ───────────────────────────────────────
+.venv/
+venv/
+.vscode/
+.idea/
+*.log

@@ -1,0 +1,23 @@
+Primeira versão publicada do Sistema Têmis.
+
+Sete ferramentas de apoio à atividade de corregedoria, todas com
+processamento local:
+
+- Tarja Preta — tarjamento seguro de PDFs, com a marca aderindo ao trecho
+  em qualquer nível de zoom.
+- Anti-Injection — detecção de texto oculto em PDFs (opacidade zero, corpo
+  minúsculo, branco sobre branco, fora da página, camadas ocultas), com
+  relatório de constatação em PDF.
+- Gerador de Hash — SHA-256 de arquivos e Termo de Juntada pronto para os
+  autos.
+- Quadro de Evidências — mural de vínculos da investigação, com imagens,
+  ligações e histórico de casos.
+- Edição de Vídeo — compactar, fatiar e mesclar gravações.
+- Encarregado de IPS — montagem da Informação de juízo de admissibilidade,
+  com o roteiro das seis partes do art. 92 da IN PRF nº 127/2024, texto
+  padrão já embutido, exportação em HTML para o SEI e em PDF.
+- Extrator de Metadados — autor, equipamento, datas e coordenadas de
+  documentos, fotografias e mídias, com termo de diligência.
+
+A partir desta versão, o sistema avisa quando houver atualização e pede
+autorização antes de baixar.
