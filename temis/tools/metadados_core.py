@@ -67,6 +67,10 @@ class Arquivo:
     campos: list[Campo] = field(default_factory=list)
     erro: str = ""
     sha256: str = ""
+    tamanho: int = 0
+    #: Número do documento no SEI, digitado pelo encarregado. Vai para a
+    #: coluna do termo de juntada, que é o que amarra o arquivo aos autos.
+    sei: str = ""
 
     @property
     def nome(self) -> str:
@@ -561,6 +565,11 @@ def extrair(caminho: str | Path, com_hash: bool = True) -> Arquivo:
                 saida.erro = f"{type(e).__name__}: {e}"
             break
 
+    try:
+        saida.tamanho = caminho.stat().st_size
+    except OSError:
+        pass
+
     if com_hash:
         from .hash_core import sha256_file
         try:
@@ -592,6 +601,18 @@ CINZA = "#5B6B82"
 DESTAQUE = "#B3261E"
 
 
+#: Quanto de metadado acompanha o termo.
+SO_HASH = "so_hash"          # termo de juntada puro, sem metadados
+RELEVANTES = "relevantes"    # só o que interessa à apuração
+COMPLETO = "completo"        # tudo o que foi lido
+
+MODOS = {
+    SO_HASH: "Só hash",
+    RELEVANTES: "Relevantes",
+    COMPLETO: "Completo",
+}
+
+
 @dataclass
 class Declarante:
     """Quem assina o termo."""
@@ -600,6 +621,31 @@ class Declarante:
     matricula: str = ""
     lotacao: str = ""
     cargo: str = "Policial Rodoviário Federal"
+
+
+@dataclass
+class Juntada:
+    """O vínculo do termo aos autos.
+
+    É o que distingue esta peça de um relatório técnico: sem o número do
+    procedimento e a data por extenso, o documento não se presta à
+    juntada.
+    """
+
+    tipo_processo: str = "IPS"
+    numero_processo: str = ""
+    dia: int = 1
+    mes: int = 1
+    ano: int = 2026
+
+    def intro(self, decl: Declarante) -> str:
+        """Parágrafo de abertura, na redação já consagrada no sistema."""
+        from .hash_core import TermoData, build_intro
+        return build_intro(TermoData(
+            nome=decl.nome, matricula=decl.matricula, lotacao=decl.lotacao,
+            tipo_processo=self.tipo_processo,
+            numero_processo=self.numero_processo,
+            dia=self.dia, mes=self.mes, ano=self.ano))
 
 
 def _linha(rotulo: str, valor: str, campo: "Campo | None" = None) -> str:
@@ -657,29 +703,90 @@ def _bloco_arquivo(a: Arquivo, numero: int, so_relevantes: bool) -> str:
 """
 
 
+def _quadro_juntada(arquivos: list[Arquivo]) -> str:
+    """A tabela do termo de juntada: o que se está juntando aos autos."""
+    import html as _html
+
+    e = _html.escape
+    from .hash_core import format_size
+
+    linhas = []
+    for i, a in enumerate(arquivos, 1):
+        linhas.append(
+            "<tr>"
+            f'<td align="center"><font color="{INK}">{i}</font></td>'
+            f'<td><font color="{INK}">{e(a.nome)}</font></td>'
+            f'<td align="center"><font color="{INK}">'
+            f"{e(format_size(a.tamanho))}</font></td>"
+            f'<td><font color="{INK}" face="Courier New" size="1">'
+            f"{e(a.sha256)}</font></td>"
+            f'<td><font color="{INK}">{e(a.sei)}</font></td>'
+            "</tr>")
+
+    return f"""
+<table width="100%" cellspacing="0" cellpadding="5" border="1"
+       style="border-collapse:collapse; font-size:9pt;">
+  <tr style="background-color:#0A2442; color:#FFD633;">
+    <th width="4%">Nº</th>
+    <th width="30%">Nome do Arquivo</th>
+    <th width="10%">Tamanho</th>
+    <th width="40%">Hash SHA-256</th>
+    <th width="16%">Nº SEI!</th>
+  </tr>
+  {''.join(linhas)}
+</table>
+"""
+
+
 def build_html(arquivos: list[Arquivo], quando: str,
                decl: Declarante | None = None,
-               so_relevantes: bool = False) -> str:
-    """Termo de diligência em HTML, para exibir e exportar em PDF."""
+               modo: str = RELEVANTES,
+               juntada: "Juntada | None" = None) -> str:
+    """Termo em HTML, para exibir e exportar em PDF.
+
+    O documento é um só: abre como termo de juntada — que é o que lhe dá
+    valor de peça — e, conforme o modo, traz em seguida os metadados de
+    cada arquivo. Em `SO_HASH` sai o termo de juntada puro, sem os
+    quadros; há juntada em que a lista de metadados só atrapalha a
+    leitura.
+    """
     import html as _html
 
     e = _html.escape
     decl = decl or Declarante()
+    juntada = juntada or Juntada()
+    com_metadados = modo != SO_HASH
 
-    com_local = [a for a in arquivos if a.tem_localizacao]
-    total_campos = sum(len(a.campos) for a in arquivos)
+    abertura = juntada.intro(decl) if decl.nome else (
+        "Declaro que foi realizada a juntada dos arquivos abaixo.")
 
-    frase = (
-        f"Procedeu-se à extração dos metadados de <b>{len(arquivos)}</b> "
-        f"arquivo(s), dos quais foram obtidos <b>{total_campos}</b> "
-        "registro(s), conforme os quadros abaixo."
-    )
-    if com_local:
-        frase += (f" <b>{len(com_local)}</b> arquivo(s) contém coordenadas "
-                  "geográficas registradas pelo equipamento de origem.")
+    corpo = [
+        f'<p align="justify" style="font-size:11pt; line-height:160%;">'
+        f"{e(abertura)}</p>",
+        _quadro_juntada(arquivos),
+    ]
 
-    blocos = "".join(_bloco_arquivo(a, i, so_relevantes)
-                     for i, a in enumerate(arquivos, 1))
+    if com_metadados:
+        com_local = [a for a in arquivos if a.tem_localizacao]
+        total = sum(len(a.campos) for a in arquivos)
+        frase = (
+            f"Procedeu-se, ainda, à extração dos metadados dos "
+            f"<b>{len(arquivos)}</b> arquivo(s) acima, dos quais foram "
+            f"obtidos <b>{total}</b> registro(s), conforme os quadros a "
+            "seguir."
+        )
+        if com_local:
+            frase += (f" <b>{len(com_local)}</b> arquivo(s) contém "
+                      "coordenadas geográficas registradas pelo equipamento "
+                      "de origem.")
+        corpo.append(
+            f'<p align="justify" style="font-size:11pt; line-height:160%; '
+            f'margin-top:18px;">{frase}</p>')
+        corpo.append("".join(
+            _bloco_arquivo(a, i, modo == RELEVANTES)
+            for i, a in enumerate(arquivos, 1)))
+
+    blocos = "".join(corpo)
 
     assinatura = ""
     if decl.nome:
@@ -700,24 +807,23 @@ def build_html(arquivos: list[Arquivo], quando: str,
 <html><body style="font-family:'Segoe UI',Arial,sans-serif; color:{INK};">
 <div align="center" style="margin-bottom:16px;">
   <b style="font-size:15pt; letter-spacing:1px;">POLÍCIA RODOVIÁRIA FEDERAL</b><br/>
-  <span style="font-size:11pt;">Termo de Diligência — Extração de Metadados</span>
+  <span style="font-size:11pt;">{
+    "Termo de Juntada de Arquivo(s) Digital(is)" if not com_metadados
+    else "Termo de Juntada e Extração de Metadados"}</span>
 </div>
 <hr/>
-<table width="100%" cellspacing="0" cellpadding="4" style="font-size:10pt;">
-  <tr><td width="24%"><font color="{CINZA}">Arquivos examinados</font></td>
-      <td><b><font color="{INK}">{len(arquivos)}</font></b></td></tr>
-  <tr><td><font color="{CINZA}">Data da diligência</font></td>
-      <td><font color="{INK}">{e(quando)}</font></td></tr>
-  <tr><td><font color="{CINZA}">Processamento</font></td>
-      <td><font color="{INK}">Local, sem envio dos arquivos a terceiros</font></td></tr>
-</table>
-<p align="justify" style="font-size:11pt; line-height:160%;">{frase}</p>
 {blocos}
 <p align="justify" style="font-size:10pt; line-height:150%; margin-top:16px;">
-Os metadados acima foram lidos diretamente da estrutura interna de cada
-arquivo, sem qualquer alteração do original. O resumo criptográfico SHA-256
-permite verificar, a qualquer tempo, que o arquivo examinado é o mesmo
-juntado aos autos.
+{"O resumo criptográfico SHA-256 de cada arquivo permite verificar, a "
+ "qualquer tempo, que o arquivo juntado é o mesmo aqui identificado."
+ if not com_metadados else
+ "Os metadados acima foram lidos diretamente da estrutura interna de cada "
+ "arquivo, sem qualquer alteração do original. O resumo criptográfico "
+ "SHA-256 permite verificar, a qualquer tempo, que o arquivo examinado é o "
+ "mesmo juntado aos autos."}
+{"" if not quando else
+ f'<br/>Diligência realizada em {e(quando)}, com processamento local, sem '
+ "envio dos arquivos a terceiros."}
 </p>
 <p align="justify" style="font-size:11pt; margin-top:14px;">
 Sem mais a relatar, encerro o presente termo.

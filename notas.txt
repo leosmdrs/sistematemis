@@ -1,23 +1,55 @@
-Primeira versão publicada do Sistema Têmis.
+NOVA FERRAMENTA — Constatação Web
 
-Sete ferramentas de apoio à atividade de corregedoria, todas com
-processamento local:
+Registra conteúdo publicado na internet com rigor técnico. Abre o endereço
+num navegador dedicado, sem extensões e sem sessão de navegação anterior, e
+guarda o que foi exibido: a página inteira em PDF com texto selecionável, o
+código-fonte, a tela, o endereço IP do servidor e o certificado que ele
+apresentou — cada peça com o seu SHA-256, encadeados num resumo da
+diligência.
 
-- Tarja Preta — tarjamento seguro de PDFs, com a marca aderindo ao trecho
-  em qualquer nível de zoom.
-- Anti-Injection — detecção de texto oculto em PDFs (opacidade zero, corpo
-  minúsculo, branco sobre branco, fora da página, camadas ocultas), com
-  relatório de constatação em PDF.
-- Gerador de Hash — SHA-256 de arquivos e Termo de Juntada pronto para os
-  autos.
-- Quadro de Evidências — mural de vínculos da investigação, com imagens,
-  ligações e histórico de casos.
-- Edição de Vídeo — compactar, fatiar e mesclar gravações.
-- Encarregado de IPS — montagem da Informação de juízo de admissibilidade,
-  com o roteiro das seis partes do art. 92 da IN PRF nº 127/2024, texto
-  padrão já embutido, exportação em HTML para o SEI e em PDF.
-- Extrator de Metadados — autor, equipamento, datas e coordenadas de
-  documentos, fotografias e mídias, com termo de diligência.
+A verificação de rede é feita por conexão própria, independente da que
+renderizou a página: são duas observações distintas do mesmo fato, o que
+torna a peça bem mais difícil de contestar.
 
-A partir desta versão, o sistema avisa quando houver atualização e pede
-autorização antes de baixar.
+Quando o conteúdo só é visível após login — uma postagem restrita, uma
+conversa —, marque "Sessão autenticada" e informe a conta. O termo declara
+isso em destaque, porque conteúdo restrito é fato diferente de conteúdo
+público.
+
+O termo sai em PDF, em HTML para o SEI, e as peças num ZIP com índice e
+hashes. Ele não constitui ata notarial, ato privativo de tabelião, nem
+atesta a veracidade do conteúdo — atesta que o conteúdo estava acessível
+naquele endereço, naquela data e hora, nas condições descritas.
+
+
+METADADOS E HASH — duas ferramentas viraram uma
+
+O Gerador de Hash foi incorporado ao Extrator de Metadados. As duas
+recebiam uma lista de arquivos e calculavam o mesmo SHA-256; na prática o
+encarregado fazia o mesmo trabalho duas vezes, em duas telas.
+
+Agora sai um documento só, que abre como termo de juntada — com a data por
+extenso, matrícula, lotação e vínculo ao IPS/PAD — seguido do quadro com
+nome, tamanho, hash e nº SEI, e depois os quadros de metadados.
+
+Três modos: "Só hash" produz o termo de juntada puro, como antes;
+"Relevantes" acrescenta o que interessa à apuração; "Completo" acrescenta
+tudo o que foi lido. O nº SEI é digitado por arquivo, ao lado da lista.
+
+
+OUTRAS MUDANÇAS
+
+- O termo de Metadados e Hash também exporta em HTML, para importar no SEI.
+- A limpeza de HTML para o SEI passou a ser a mesma do Encarregado de IPS,
+  para que a regra não divirja entre as duas ferramentas.
+
+
+SOBRE O TAMANHO
+
+Esta versão é bem maior que a anterior. A Constatação Web precisa de um
+navegador embutido, e ele responde por quase todo o acréscimo. Diferente da
+Calculadora ePAD, que foi retirada por não justificar o peso, aqui o
+navegador não é conveniência: é o instrumento da captura. O ambiente
+controlado — sem extensão, sem sessão anterior, com a versão do motor
+viajando junto com a versão do programa — é justamente o que dá valor à
+peça produzida.

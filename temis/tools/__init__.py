@@ -10,7 +10,7 @@ desenvolvimento".
 
 from .base import ToolMeta, ToolPage, PlaceholderPage
 from .antiinj import AntiInjectionTool
-from .hash import HashTool
+from .constatacao import ConstatacaoTool
 from .ips import IPSTool
 from .metadados import MetadadosTool
 from .quadro import QuadroTool
@@ -26,11 +26,11 @@ from .video import VideoTool
 REGISTRY: list[tuple[ToolMeta, type | None]] = [
     (TarjaPretaTool.meta,    TarjaPretaTool),
     (AntiInjectionTool.meta, AntiInjectionTool),
-    (HashTool.meta,          HashTool),
     (QuadroTool.meta,        QuadroTool),
     (VideoTool.meta,         VideoTool),
     (IPSTool.meta,           IPSTool),
     (MetadadosTool.meta,     MetadadosTool),
+    (ConstatacaoTool.meta,   ConstatacaoTool),
 ]
 
 

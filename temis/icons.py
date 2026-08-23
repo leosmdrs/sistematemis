@@ -191,6 +191,19 @@ def draw_icon(kind: str, size: int = 16, color: str = None, width: float = 1.8) 
         p.drawLine(QPointF(m + s * 0.08, m + s * 0.12), QPointF(c, m + s * 0.12))
         p.drawEllipse(QPointF(c + s * 0.10, c + s * 0.10), s * 0.19, s * 0.19)
         p.drawLine(QPointF(c + s * 0.24, c + s * 0.24), QPointF(s - m * 0.55, s - m * 0.55))
+    elif kind == "tool_constatacao":
+        # janela de navegador com um selo — a página registrada
+        p.drawRect(QRectF(m, m + s * 0.06, s - 2 * m, s - 2 * m - s * 0.06))
+        p.drawLine(QPointF(m, m + s * 0.24), QPointF(s - m, m + s * 0.24))
+        p.setBrush(QBrush(QColor(color)))
+        for i in range(3):
+            p.drawEllipse(QPointF(m + s * 0.09 + i * s * 0.09, m + s * 0.15),
+                          s * 0.022, s * 0.022)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawEllipse(QPointF(c + s * 0.16, c + s * 0.20), s * 0.17, s * 0.17)
+        poly((c + s * 0.09, c + s * 0.20),
+             (c + s * 0.14, c + s * 0.26),
+             (c + s * 0.24, c + s * 0.13))
     elif kind == "tool_metadados":
         # etiqueta presa ao documento — o que o arquivo diz sobre si
         poly((m, s - m), (m, m), (c + s * 0.06, m), (c + s * 0.06, s - m),

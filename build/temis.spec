@@ -36,16 +36,16 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    # Módulos Qt que não usamos. O QtWebEngine é o que mais pesa: um
-    # Chromium inteiro, cerca de 350 MB entre a DLL, os recursos e o
-    # QtQuick/QtQml de que depende. Entrou no sistema por causa da
-    # Calculadora ePAD e saiu com ela — o instalador inteiro passou a
-    # caber em menos que aquela única biblioteca.
+    # Módulos Qt que não usamos.
+    #
+    # O QtWebEngine saiu do pacote quando a Calculadora ePAD foi retirada:
+    # 350 MB de Chromium para exibir uma página que um favorito resolvia.
+    # Voltou com a Constatação Web, e aí a conta é outra — ali o navegador
+    # não é conveniência, é o instrumento da captura. Ambiente controlado,
+    # sem extensão e sem sessão anterior, com a versão do motor viajando
+    # junto com a versão do programa, é o que dá valor à peça.
     excludes=[
-        "PyQt6.QtWebEngineWidgets", "PyQt6.QtWebEngineCore",
-        "PyQt6.QtWebEngineQuick", "PyQt6.QtWebChannel",
-        "PyQt6.QtQuick", "PyQt6.QtQuick3D", "PyQt6.QtQml",
-        "PyQt6.QtMultimedia", "PyQt6.QtBluetooth", "PyQt6.QtPositioning",
+        "PyQt6.QtQuick3D", "PyQt6.QtMultimedia", "PyQt6.QtBluetooth",
         "PyQt6.QtSql", "PyQt6.QtTest", "PyQt6.QtDesigner", "PyQt6.QtCharts",
         "tkinter", "unittest", "pydoc", "doctest",
         "matplotlib", "numpy", "scipy", "pandas",
@@ -67,21 +67,8 @@ def _traducao_alheia(destino: str) -> bool:
     return not any(f"_{i}.qm" in d for i in IDIOMAS)
 
 
-#: Restos do QtWebEngine que o PyInstaller recolhe como dados, e que a
-#: lista `excludes` não alcança por não serem módulos Python.
-def _resto_do_navegador(destino: str) -> bool:
-    d = destino.replace("\\", "/").lower()
-    return ("webengine" in d or "/qtwebengine" in d
-            or d.endswith("qtwebengineprocess.exe"))
-
-
-def _dispensavel(destino: str) -> bool:
-    return _traducao_alheia(destino) or _resto_do_navegador(destino)
-
-
-a.datas = TOC([(d, o, k) for d, o, k in a.datas if not _dispensavel(d)])
-a.binaries = TOC([(d, o, k) for d, o, k in a.binaries
-                  if not _resto_do_navegador(d)])
+a.datas = TOC([(d, o, k) for d, o, k in a.datas
+               if not _traducao_alheia(d)])
 
 pyz = PYZ(a.pure)
 

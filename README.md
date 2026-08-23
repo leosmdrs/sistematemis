@@ -33,11 +33,10 @@ instalar.
 |---|---|---|
 | **Tarja Preta** | ✅ Disponível | Tarjamento irreversível de PDFs. Tarja manual, marcação por `[colchetes]` e busca automática de CPF, CNPJ, RG, telefone e e-mail. |
 | **Anti-Injection** | ✅ Disponível | Detecção de texto oculto em PDFs, com modos Normal / Revelar / Raio-X e relatório de constatação. |
-| **Gerador de Hash** | ✅ Disponível | Hash SHA-256 dos arquivos e geração do Termo de Juntada de Arquivo(s) Digital(is), vinculado ao IPS/PAD. |
 | **Quadro de Evidências** | ✅ Disponível | Mural de vínculos da investigação: anotações, imagens e conexões por caso. |
 | **Edição de Vídeo** | ✅ Disponível | Compactar, fatiar e mesclar gravações para a juntada aos autos. |
 | **Encarregado de IPS** | ✅ Disponível | Montagem da Informação de juízo de admissibilidade: roteiro das seis partes do art. 92 da IN PRF nº 127/2024, texto padrão embutido, exportação em HTML para o SEI e em PDF. |
-| **Extrator de Metadados** | ✅ Disponível | Autor, equipamento, datas e coordenadas de documentos, fotografias e mídias, com termo de diligência. |
+| **Metadados e Hash** | ✅ Disponível | SHA-256 dos arquivos e o que eles informam sobre si — autor, equipamento, datas e coordenadas. Emite termo único de juntada e metadados, com coluna de nº SEI. |
 
 ### Heurísticas do Anti-Injection
 

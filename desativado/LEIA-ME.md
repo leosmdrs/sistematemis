@@ -21,3 +21,26 @@ O código está aqui inteiro. Para voltar atrás:
 
 A calculadora continua acessível pelo navegador, no endereço
 https://epad.cgu.gov.br/publico/calculadora/calc.html?tipo=pad
+
+
+## hash.py — Gerador de Hash
+
+Ferramenta separada que calculava o SHA-256 de arquivos e montava o Termo
+de Juntada. Foi fundida ao Extrator de Metadados em agosto de 2026, dando
+origem a **Metadados e Hash**.
+
+O motivo foi duplicação real: as duas ferramentas recebiam uma lista de
+arquivos e calculavam o mesmo hash — o extrator de metadados já importava
+`sha256_file` daqui. Na prática o encarregado fazia o mesmo trabalho duas
+vezes, em duas telas, para juntar os mesmos arquivos.
+
+O que sobreviveu, e continua em uso:
+
+- `temis/tools/hash_core.py` — inteiro. `sha256_file`, `format_size` e
+  sobretudo `build_intro`, que redige a abertura do termo ("Ao 1º dia do
+  mês de…"). A ferramenta nova chama essa mesma função, para que a
+  redação do termo não se bifurque em duas versões.
+
+O que se perdeu: a tabela editável de seis colunas, em que o nº SEI era
+digitado célula a célula. Na ferramenta nova o nº SEI é um campo abaixo da
+lista, preenchido para o arquivo selecionado.

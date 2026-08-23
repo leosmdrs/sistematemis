@@ -20,6 +20,7 @@ import uuid
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 
+from ..impressao import limpar_para_sei as _limpar_para_sei
 from . import ips_blocos as blocos
 from . import ips_modelo as modelo
 
@@ -455,30 +456,9 @@ _ESTILO_CORPO = (
 )
 
 
-def limpar_para_sei(fragmento: str) -> str:
-    """Remove do HTML o que o importador do SEI descarta ou estraga.
-
-    O Qt exporta o texto com um cabeçalho completo, folha de estilo e
-    atributos próprios. Levar isso para o SEI produz um documento com
-    formatação imprevisível — o importador ignora a folha e mantém
-    resíduos no corpo.
-    """
-    if not fragmento:
-        return ""
-
-    # Fica só o conteúdo do <body>, sem <head>, <style> ou <meta>.
-    corpo = re.search(r"<body[^>]*>(.*)</body>", fragmento,
-                      re.S | re.I)
-    texto = corpo.group(1) if corpo else fragmento
-
-    texto = re.sub(r"<!--.*?-->", "", texto, flags=re.S)
-    texto = re.sub(r"<(script|style)[^>]*>.*?</\1>", "", texto,
-                   flags=re.S | re.I)
-    # Atributos que só fazem sentido dentro do Qt.
-    texto = re.sub(r"\s+(class|id)=\"[^\"]*\"", "", texto, flags=re.I)
-    texto = re.sub(r"-qt-[a-z-]+\s*:\s*[^;\"]*;?", "", texto, flags=re.I)
-    texto = re.sub(r'\s+style="\s*"', "", texto)
-    return texto.strip()
+#: A limpeza mora em `temis.impressao`, usada também pelo termo de
+#: juntada. Regra de formatação duplicada é regra que diverge com o tempo.
+limpar_para_sei = _limpar_para_sei
 
 
 #: Como a imagem é referenciada dentro do editor.

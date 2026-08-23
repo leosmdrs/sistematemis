@@ -7,7 +7,7 @@
 ; ─────────────────────────────────────────────────────────────
 
 #define AppName        "Sistema Têmis"
-#define AppVersion     "1.0.0"
+#define AppVersion     "1.1.0"
 #define AppPublisher   "Corregedoria-Geral / PRF"
 #define AppExe         "SistemaTemis.exe"
 

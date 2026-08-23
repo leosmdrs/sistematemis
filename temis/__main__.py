@@ -24,6 +24,16 @@ def _preparar_escala():
     os.environ.setdefault("QT_SCALE_FACTOR", ESCALA_INTERFACE)
 
 
+def _preparar_webengine():
+    """Liga o contexto de OpenGL compartilhado, exigido pelo QtWebEngine.
+
+    Precisa valer **antes** de existir QApplication: ligado depois, o
+    componente de navegação da Constatação Web não carrega.
+    """
+    QApplication.setAttribute(
+        Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
+
+
 def main() -> int:
     # No Windows, informar o AppUserModelID faz a barra de tarefas usar o
     # ícone do programa em vez do ícone genérico do interpretador Python.
@@ -37,6 +47,7 @@ def main() -> int:
             pass
 
     _preparar_escala()
+    _preparar_webengine()
 
     app = QApplication(sys.argv)
     app.setApplicationName(__appname__)

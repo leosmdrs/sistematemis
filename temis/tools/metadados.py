@@ -1,9 +1,15 @@
 """
-Extrator de Metadados — o que cada arquivo informa sobre si mesmo.
+Metadados e Hash — o que o arquivo informa sobre si, e o que o identifica.
 
-Segue a mesma disposição do Anti-Injection: painel à esquerda com a lista
-do que foi aberto, barra de modos no alto, e o termo de diligência saindo
-pelo botão verde do rodapé.
+Reúne duas coisas que sempre andaram juntas na prática: o resumo
+criptográfico que amarra o arquivo aos autos e os metadados que ele
+carrega por dentro. Sai um documento só, que abre como termo de juntada —
+é o que lhe dá valor de peça — e, conforme o modo, traz em seguida os
+quadros de metadados.
+
+Segue a disposição do Anti-Injection: painel à esquerda com a lista do que
+foi aberto, barra de modos no alto, e o termo saindo pelo botão verde do
+rodapé.
 """
 
 from __future__ import annotations
@@ -11,20 +17,22 @@ from __future__ import annotations
 import datetime
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QDate, QThread, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QGuiApplication
 from PyQt6.QtWidgets import (
     QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog,
     QFrame, QSizePolicy, QMessageBox, QDialog, QTextEdit, QButtonGroup,
     QListWidget, QListWidgetItem, QProgressDialog, QLineEdit, QGridLayout,
+    QDateEdit,
 )
 
 from ..icons import draw_icon
-from ..impressao import imprimir_documento, preparar_escritor
+from ..impressao import (documento_html, imprimir_documento,
+                         limpar_para_sei, preparar_escritor)
 from ..theme import PALETTE
 from ..widgets import (
-    SidebarPanel, ViewerToolbar, field_label, fit_to_screen, hsep,
-    output_button, primary_button, subtext,
+    NoScrollComboBox, SidebarPanel, ViewerToolbar, field_label,
+    fit_to_screen, hsep, output_button, primary_button, subtext,
 )
 from .base import ToolPage, ToolMeta
 from . import metadados_core as core
@@ -32,15 +40,16 @@ from . import metadados_core as core
 
 META = ToolMeta(
     key="metadados",
-    name="Extrator de Metadados",
+    name="Metadados e Hash",
     icon="tool_metadados",
-    tagline="O que o arquivo informa sobre si",
+    tagline="Identifica o arquivo e o que ele carrega",
     description=(
-        "Lê os metadados de documentos, fotografias, planilhas e mídias: "
+        "Calcula o SHA-256 dos arquivos e lê o que eles informam sobre si: "
         "autor, programa que gerou, datas de criação e alteração, "
         "equipamento de origem e, quando o aparelho as gravou, as "
-        "coordenadas da captura. Emite termo de diligência pronto para os "
-        "autos, com o resumo SHA-256 de cada arquivo."
+        "coordenadas da captura. Emite um termo único — juntada e "
+        "metadados na mesma peça —, com coluna de nº SEI e assinatura do "
+        "servidor."
     ),
 )
 
@@ -88,24 +97,25 @@ class TermoDialog(QDialog):
     """Documento pronto para os autos, editável antes de salvar."""
 
     def __init__(self, arquivos: list[core.Arquivo], quando: str,
-                 so_relevantes: bool, parent=None):
+                 modo: str, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Termo de Diligência — Extração de Metadados")
+        self.setWindowTitle("Termo de Juntada e Extração de Metadados")
         self._arquivos = arquivos
         self._quando = quando
-        self._so_relevantes = so_relevantes
-        fit_to_screen(self, 900, 760)
+        self._modo = modo
+        fit_to_screen(self, 940, 800)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 18, 20, 16)
         layout.setSpacing(10)
 
-        titulo = QLabel("Termo de Diligência")
+        titulo = QLabel("Termo de Juntada")
         titulo.setObjectName("heading")
         layout.addWidget(titulo)
         layout.addWidget(subtext(
-            "Confira e ajuste o texto antes de salvar. O documento sai em "
-            "PDF, pronto para juntada.", wrap=True))
+            "Os campos abaixo montam a abertura do termo. Confira e ajuste "
+            "o texto antes de salvar — o documento sai em PDF, pronto para "
+            "juntada.", wrap=True))
         layout.addWidget(self._build_form())
         layout.addWidget(hsep())
 
@@ -127,6 +137,13 @@ class TermoDialog(QDialog):
         pdf = output_button("Salvar PDF")
         pdf.clicked.connect(self._salvar_pdf)
         linha.addWidget(pdf)
+
+        htm = QPushButton("  Salvar HTML")
+        htm.setIcon(draw_icon("save", 15, PALETTE["text"]))
+        htm.setToolTip("Arquivo HTML, para importar no SEI")
+        htm.setCursor(Qt.CursorShape.PointingHandCursor)
+        htm.clicked.connect(self._salvar_html)
+        linha.addWidget(htm)
 
         copiar = QPushButton("Copiar texto")
         copiar.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -176,9 +193,33 @@ class TermoDialog(QDialog):
             grade.addWidget(campo, 1, coluna)
             campo.textChanged.connect(self._remontar)
 
+        # Segunda fileira: o vínculo aos autos e a data por extenso. Sem
+        # eles o texto não passa de relatório técnico.
+        self._cb_tipo = NoScrollComboBox()
+        for t in ("IPS", "PAD"):
+            self._cb_tipo.addItem(t)
+        self._cb_tipo.currentIndexChanged.connect(self._remontar)
+        self._in_processo = QLineEdit()
+        self._in_processo.setPlaceholderText("Ex.: 08650.000123/2026-11")
+        self._in_processo.textChanged.connect(self._remontar)
+        self._data = QDateEdit()
+        self._data.setCalendarPopup(True)
+        self._data.setDisplayFormat("dd/MM/yyyy")
+        self._data.setDate(QDate.currentDate())
+        self._data.dateChanged.connect(self._remontar)
+
+        for coluna, (rotulo, campo) in enumerate((
+            ("Procedimento", self._cb_tipo),
+            ("Número do processo", self._in_processo),
+            ("Data do termo", self._data),
+        )):
+            grade.addWidget(field_label(rotulo), 2, coluna)
+            grade.addWidget(campo, 3, coluna)
+
         grade.setColumnStretch(0, 3)
         grade.setColumnStretch(1, 1)
         grade.setColumnStretch(2, 2)
+        grade.setRowMinimumHeight(2, 12)
         return caixa
 
     # ── documento ────────────────────────────────
@@ -189,28 +230,60 @@ class TermoDialog(QDialog):
             lotacao=self._in_lotacao.text().strip(),
         )
 
+    def _juntada(self) -> core.Juntada:
+        d = self._data.date()
+        return core.Juntada(
+            tipo_processo=self._cb_tipo.currentText(),
+            numero_processo=self._in_processo.text().strip(),
+            dia=d.day(), mes=d.month(), ano=d.year(),
+        )
+
     def _remontar(self):
         self._view.setHtml(core.build_html(
             self._arquivos, self._quando, self._declarante(),
-            self._so_relevantes))
+            self._modo, self._juntada()))
 
     def _copiar(self):
         QGuiApplication.clipboard().setText(self._view.toPlainText())
         self._aviso.setText("✓ Texto copiado")
 
-    def _salvar_pdf(self):
-        base = (Path(self._arquivos[0].caminho).stem
-                if self._arquivos else "arquivos")
+    def _salvar_html(self):
+        """Exporta o que está na tela, limpo para a importação do SEI."""
         caminho, _ = QFileDialog.getSaveFileName(
-            self, "Salvar termo de diligência",
-            f"metadados-{base}.pdf", "Arquivos PDF (*.pdf)")
+            self, "Salvar termo em HTML",
+            f"termo-{self._base()}.html", "Página HTML (*.html)")
+        if not caminho:
+            return
+        if not caminho.lower().endswith((".html", ".htm")):
+            caminho += ".html"
+        try:
+            # Sai o documento em edição, e não o remontado: os ajustes de
+            # redação feitos aqui têm de acompanhar o arquivo exportado.
+            corpo = limpar_para_sei(self._view.toHtml())
+            Path(caminho).write_text(
+                documento_html(corpo, "Termo de Juntada e Extração de "
+                                      "Metadados"),
+                encoding="utf-8")
+            self._aviso.setText("✓ HTML salvo")
+        except OSError as e:
+            QMessageBox.critical(self, "Erro ao salvar",
+                                 f"Não foi possível gravar o arquivo:\n{e}")
+
+    def _base(self) -> str:
+        return (Path(self._arquivos[0].caminho).stem
+                if self._arquivos else "arquivos")
+
+    def _salvar_pdf(self):
+        caminho, _ = QFileDialog.getSaveFileName(
+            self, "Salvar termo",
+            f"termo-{self._base()}.pdf", "Arquivos PDF (*.pdf)")
         if not caminho:
             return
         if not caminho.lower().endswith(".pdf"):
             caminho += ".pdf"
         try:
             escritor = preparar_escritor(
-                caminho, "Termo de Diligência — Extração de Metadados")
+                caminho, "Termo de Juntada e Extração de Metadados")
             # Clona o documento em edição: remontar a partir dos dados
             # descartaria em silêncio os ajustes feitos na tela.
             doc = self._view.document().clone()
@@ -229,12 +302,12 @@ class TermoDialog(QDialog):
 class MetadadosTool(ToolPage):
     meta = META
 
-    MODOS = ("Relevantes", "Completo")
+    MODOS = (core.SO_HASH, core.RELEVANTES, core.COMPLETO)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._arquivos: list[core.Arquivo] = []
-        self._modo = "Relevantes"
+        self._modo = core.RELEVANTES
         self._thread: ExtrairThread | None = None
         self._build_ui()
 
@@ -265,21 +338,30 @@ class MetadadosTool(ToolPage):
     def _build_toolbar(self) -> ViewerToolbar:
         barra = ViewerToolbar(paginacao=False, zoom=False)
 
+        dica = QLabel("Termo:")
+        dica.setObjectName("subtext")
+        barra.add_widget(dica)
+
         self._grupo = QButtonGroup(self)
         self._grupo.setExclusive(True)
-        for i, nome in enumerate(self.MODOS):
-            b = QPushButton(nome)
+        self._botoes_modo = {}
+        for chave in self.MODOS:
+            b = QPushButton(core.MODOS[chave])
             b.setCheckable(True)
-            b.setChecked(i == 0)
+            b.setChecked(chave == self._modo)
             b.setMinimumWidth(92)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setToolTip({
-                "Relevantes": "Só o que costuma interessar à apuração: "
-                              "pessoas, equipamento, datas e local",
-                "Completo": "Todos os metadados lidos do arquivo",
-            }[nome])
-            b.clicked.connect(lambda _c, n=nome: self._definir_modo(n))
+                core.SO_HASH: "Termo de juntada puro: nome, tamanho, "
+                              "hash e nº SEI, sem os quadros de metadados",
+                core.RELEVANTES: "Juntada mais o que costuma interessar à "
+                                 "apuração: pessoas, equipamento, datas e "
+                                 "local",
+                core.COMPLETO: "Juntada mais todos os metadados lidos",
+            }[chave])
+            b.clicked.connect(lambda _c, n=chave: self._definir_modo(n))
             self._grupo.addButton(b)
+            self._botoes_modo[chave] = b
             barra.add_widget(b)
 
         barra.add_separator()
@@ -337,6 +419,18 @@ class MetadadosTool(ToolPage):
         self._lista.currentRowChanged.connect(self._mostrar)
         painel.body.addWidget(self._lista, 1)
 
+        # O nº SEI é por arquivo, e é ele que amarra a peça aos autos.
+        # Fica junto da lista, e não numa tabela à parte, para que se veja
+        # de imediato a qual arquivo pertence.
+        painel.body.addWidget(field_label("Nº SEI deste arquivo"))
+        self._in_sei = QLineEdit()
+        self._in_sei.setPlaceholderText("Ex.: 28873450")
+        self._in_sei.setToolTip(
+            "Número do documento no SEI, que vai para a coluna do termo")
+        self._in_sei.setEnabled(False)
+        self._in_sei.textEdited.connect(self._anotar_sei)
+        painel.body.addWidget(self._in_sei)
+
         acoes = QHBoxLayout()
         self._btn_remover = QPushButton("  Remover")
         self._btn_remover.setIcon(draw_icon("trash", 14, PALETTE["danger"]))
@@ -350,7 +444,7 @@ class MetadadosTool(ToolPage):
         acoes.addWidget(self._btn_limpar)
         painel.body.addLayout(acoes)
 
-        self._btn_termo = output_button("Termo de diligência")
+        self._btn_termo = output_button("Gerar termo")
         self._btn_termo.clicked.connect(self._mostrar_termo)
         self._btn_termo.setEnabled(False)
         painel.footer.addWidget(self._btn_termo)
@@ -360,7 +454,7 @@ class MetadadosTool(ToolPage):
     # ── abertura ─────────────────────────────────
     def _abrir(self):
         caminhos, _ = QFileDialog.getOpenFileNames(
-            self, "Abrir arquivos para extração", "", FILTRO)
+            self, "Abrir arquivos para o termo", "", FILTRO)
         if caminhos:
             self.acrescentar(caminhos)
 
@@ -413,7 +507,7 @@ class MetadadosTool(ToolPage):
         self._lista.blockSignals(False)
         self._lbl_contagem.setText(f"{len(self._arquivos)}")
         self._lbl_estado.setText(
-            f"{len(self._arquivos)} arquivo(s) na diligência"
+            f"{len(self._arquivos)} arquivo(s) na juntada"
             if self._arquivos else "Nenhum arquivo aberto")
         if 0 <= atual < self._lista.count():
             self._lista.setCurrentRow(atual)
@@ -450,12 +544,21 @@ class MetadadosTool(ToolPage):
         i = self._lista.currentRow()
         return self._arquivos[i] if 0 <= i < len(self._arquivos) else None
 
+    def _anotar_sei(self, texto: str):
+        a = self._atual()
+        if a is not None:
+            a.sei = texto.strip()
+
     def _definir_modo(self, nome: str):
         self._modo = nome
+        for chave, b in self._botoes_modo.items():
+            b.setChecked(chave == nome)
         self._mostrar(self._lista.currentRow())
 
     def _mostrar(self, _linha: int = -1):
         a = self._atual()
+        self._in_sei.setEnabled(a is not None)
+        self._in_sei.setText(a.sei if a is not None else "")
         if a is None:
             self._boas_vindas()
             return
@@ -466,7 +569,7 @@ class MetadadosTool(ToolPage):
         import html as _html
 
         e = _html.escape
-        campos = a.relevantes if self._modo == "Relevantes" else a.campos
+        campos = a.relevantes if self._modo != core.COMPLETO else a.campos
         partes = [
             f'<p style="font-size:14pt; margin-bottom:2px;">'
             f'<b><font color="{TINTA}">{e(a.nome)}</font></b></p>'
@@ -553,8 +656,7 @@ class MetadadosTool(ToolPage):
         if not self._arquivos:
             return
         quando = datetime.datetime.now().strftime("%d/%m/%Y às %H:%M")
-        dlg = TermoDialog(self._arquivos, quando,
-                          self._modo == "Relevantes", self)
+        dlg = TermoDialog(self._arquivos, quando, self._modo, self)
         dlg.exec()
 
     # ── contrato do casco ────────────────────────

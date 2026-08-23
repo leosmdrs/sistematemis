@@ -19,6 +19,9 @@ documento saem 12 pt no papel e a linha termina na margem.
 
 from __future__ import annotations
 
+import html as _html
+import re
+
 from PyQt6.QtCore import QMarginsF, QRectF, QSizeF
 from PyQt6.QtGui import (
     QAbstractTextDocumentLayout, QColor, QGuiApplication, QPageLayout,
@@ -77,3 +80,47 @@ def imprimir_documento(doc: QTextDocument, escritor: QPdfWriter,
             pintor.restore()
     finally:
         pintor.end()
+
+
+# ─────────────────────────────────────────
+#  EXPORTAÇÃO EM HTML
+# ─────────────────────────────────────────
+
+def limpar_para_sei(fragmento: str) -> str:
+    """Remove do HTML o que o importador do SEI descarta ou estraga.
+
+    O Qt exporta o texto com um cabeçalho completo, folha de estilo e
+    atributos próprios. Levar isso para o SEI produz um documento com
+    formatação imprevisível — o importador ignora a folha e mantém
+    resíduos no corpo.
+    """
+    if not fragmento:
+        return ""
+
+    # Fica só o conteúdo do <body>, sem <head>, <style> ou <meta>.
+    corpo = re.search(r"<body[^>]*>(.*)</body>", fragmento, re.S | re.I)
+    texto = corpo.group(1) if corpo else fragmento
+
+    texto = re.sub(r"<!--.*?-->", "", texto, flags=re.S)
+    texto = re.sub(r"<(script|style)[^>]*>.*?</\1>", "", texto,
+                   flags=re.S | re.I)
+    # Atributos que só fazem sentido dentro do Qt.
+    texto = re.sub(r"\s+(class|id)=\"[^\"]*\"", "", texto, flags=re.I)
+    texto = re.sub(r"-qt-[a-z-]+\s*:\s*[^;\"]*;?", "", texto, flags=re.I)
+    texto = re.sub(r'\s+style="\s*"', "", texto)
+    return texto.strip()
+
+
+#: Estilo mínimo do arquivo exportado. O SEI descarta a folha na
+#: importação; ela serve para quem abrir o arquivo no navegador.
+_ESTILO_HTML = ("font-family:'Segoe UI',Arial,sans-serif; color:#16233A; "
+                "max-width:820px; margin:32px auto; padding:0 16px;")
+
+
+def documento_html(corpo: str, titulo: str = "") -> str:
+    """Envolve o corpo já limpo num arquivo HTML completo."""
+    return (
+        '<!DOCTYPE html>\n<html lang="pt-br"><head><meta charset="utf-8">'
+        f"<title>{_html.escape(titulo)}</title></head>\n"
+        f'<body style="{_ESTILO_HTML}">\n{corpo}\n</body></html>\n'
+    )
