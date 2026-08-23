@@ -143,8 +143,7 @@ def build_html(d: TermoData) -> str:
     return f"""
 <html><body style="font-family:'Segoe UI',Arial,sans-serif; color:#16233a;">
 <div align="center" style="margin-bottom:18px;">
-  <b style="font-size:15pt; letter-spacing:1px;">POLÍCIA RODOVIÁRIA FEDERAL</b><br/>
-  <span style="font-size:11pt;">Termo de Juntada de Arquivo(s) Digital(is)</span>
+  <b style="font-size:14pt; letter-spacing:0.5px;">Termo de Juntada de Arquivo(s) Digital(is)</b>
 </div>
 <hr/>
 <p align="justify" style="font-size:11pt; line-height:160%;">{e(build_intro(d))}</p>
@@ -173,7 +172,6 @@ def build_html(d: TermoData) -> str:
 def build_text(d: TermoData) -> str:
     """Termo em texto puro, para colar no SEI."""
     L = [
-        "POLÍCIA RODOVIÁRIA FEDERAL",
         "TERMO DE JUNTADA DE ARQUIVO(S) DIGITAL(IS)",
         "",
         build_intro(d),

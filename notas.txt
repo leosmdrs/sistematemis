@@ -1,40 +1,23 @@
-IDENTIDADE E LICENÇA
+DOCUMENTOS SEM TIMBRE INSTITUCIONAL
 
-O programa deixa de se apresentar como produto institucional. O subtítulo
-sob o nome, que dizia "Ferramentas da Corregedoria-Geral / PRF", passa a ser
-"Ferramentas de apoio às atividades de investigação". O mesmo vale para o
-editor do instalador e para as propriedades do executável, que agora
-identificam o autor.
+O cabeçalho "POLÍCIA RODOVIÁRIA FEDERAL" saiu do alto de todas as peças
+geradas: Relatório de Constatação de Texto Oculto, Termo de Juntada, Termo
+de Juntada e Extração de Metadados, Termo de Constatação de Conteúdo em
+Meio Eletrônico e Termo de Degravação. O título do documento permanece e
+ganhou o destaque que era do timbre.
 
-O timbre "POLÍCIA RODOVIÁRIA FEDERAL" continua nos documentos gerados, e
-deve continuar: as peças são institucionais, produzidas por servidor no
-exercício da função. O que não cabia era o programa se apresentar como obra
-da instituição — ele foi escrito por iniciativa e conta próprias.
-
-O projeto passa a declarar a licença sob a qual efetivamente distribui:
-AGPL-3.0-or-later. Não é escolha estética — é a mais restritiva entre as
-dos componentes que o instalador carrega: o PyQt6 é GPL-3.0, o PyMuPDF é
-AGPL-3.0 e o FFmpeg empacotado foi compilado com --enable-gpl. O inventário
-de cada componente, com licença e origem do código-fonte, está em
-TERCEIROS.md.
-
-O código-fonte completo está em github.com/leosmdrs/sistematemis.
+O timbre é aplicado pelo SEI no momento da juntada, que é onde ele tem
+validade. Não cabia ao programa imprimi-lo por conta própria.
 
 
-SOBRE O BLOQUEIO DO WINDOWS
+EXPORTAÇÃO EM HTML NO ANTI-INJECTION
 
-Em estações com Smart App Control ativo, a instalação pode ser recusada.
-O recurso não tem lista de exceções: libera um programa por assinatura de
-autoridade certificadora reconhecida ou por reputação acumulada. Como a
-avaliação de reputação é assíncrona, tentar de novo alguns minutos depois
-costuma resolver.
+O Relatório de Constatação de Texto Oculto passou a oferecer "Salvar HTML"
+ao lado de "Salvar PDF", como as demais peças do sistema. Exporta o que
+está na tela — com os ajustes de redação que tenham sido feitos — já limpo
+para a importação do SEI.
 
-Para saber se a sua estação tem o recurso ligado:
-
-    reg query "HKLM\SYSTEM\CurrentControlSet\Control\CI\Policy" /v VerifiedAndReputablePolicyState
-
-O documento ASSINATURA.md explica o problema por inteiro e o andamento da
-solução definitiva, que é a assinatura de código.
-
-
-Sem mudanças nas ferramentas nesta versão.
+Com isso, todas as ferramentas que produzem documento oferecem as duas
+saídas. Ficam de fora, por natureza: o Quadro de Evidências, que exporta a
+imagem do mural, e a Tarja Preta, que salva o próprio PDF tarjado — em
+HTML a tarja deixaria de ser irreversível.

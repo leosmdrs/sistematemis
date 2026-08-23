@@ -27,7 +27,8 @@ from PyQt6.QtWidgets import (
 )
 
 from ..icons import draw_icon
-from ..impressao import imprimir_documento, preparar_escritor
+from ..impressao import (documento_html, imprimir_documento,
+                         limpar_para_sei, preparar_escritor)
 from ..pdfview import PaginaPDF, VisorPDFContinuo
 from ..theme import PALETTE
 from ..widgets import (
@@ -256,6 +257,13 @@ class ReportDialog(QDialog):
         pdf.clicked.connect(self._save_pdf)
         row.addWidget(pdf)
 
+        htm = QPushButton("  Salvar HTML")
+        htm.setIcon(draw_icon("save", 15, PALETTE["text"]))
+        htm.setToolTip("Arquivo HTML, para importar no SEI")
+        htm.setCursor(Qt.CursorShape.PointingHandCursor)
+        htm.clicked.connect(self._save_html)
+        row.addWidget(htm)
+
         txt = QPushButton("Copiar texto")
         txt.setCursor(Qt.CursorShape.PointingHandCursor)
         txt.clicked.connect(self._copy)
@@ -325,6 +333,28 @@ class ReportDialog(QDialog):
     def _copy(self):
         QGuiApplication.clipboard().setText(self._view.toPlainText())
         self._feedback.setText("✓ Texto copiado")
+
+    def _save_html(self):
+        """Exporta o que está na tela, limpo para a importação do SEI."""
+        base = Path(self._file_name).stem or "documento"
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Salvar relatório em HTML",
+            f"constatacao-{base}.html", "Página HTML (*.html)")
+        if not path:
+            return
+        if not path.lower().endswith((".html", ".htm")):
+            path += ".html"
+        try:
+            # Sai o documento em edição, e não o remontado: os ajustes de
+            # redação feitos aqui têm de acompanhar o arquivo exportado.
+            Path(path).write_text(
+                documento_html(limpar_para_sei(self._view.toHtml()),
+                               "Relatório de Constatação de Texto Oculto"),
+                encoding="utf-8")
+            self._feedback.setText("✓ HTML salvo")
+        except OSError as e:
+            QMessageBox.critical(self, "Erro ao salvar",
+                                 f"Não foi possível gravar:\n{e}")
 
     def _save_pdf(self):
         base = Path(self._file_name).stem or "documento"

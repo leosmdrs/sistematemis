@@ -806,10 +806,9 @@ def build_html(arquivos: list[Arquivo], quando: str,
     return f"""
 <html><body style="font-family:'Segoe UI',Arial,sans-serif; color:{INK};">
 <div align="center" style="margin-bottom:16px;">
-  <b style="font-size:15pt; letter-spacing:1px;">POLÍCIA RODOVIÁRIA FEDERAL</b><br/>
-  <span style="font-size:11pt;">{
+  <b style="font-size:14pt; letter-spacing:0.5px;">{
     "Termo de Juntada de Arquivo(s) Digital(is)" if not com_metadados
-    else "Termo de Juntada e Extração de Metadados"}</span>
+    else "Termo de Juntada e Extração de Metadados"}</b>
 </div>
 <hr/>
 {blocos}

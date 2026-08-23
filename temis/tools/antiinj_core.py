@@ -450,8 +450,7 @@ def build_html(file_name: str, n_pages: int, findings: list[Finding],
     return f"""
 <html><body style="font-family:'Segoe UI',Arial,sans-serif; color:{INK};">
 <div align="center" style="margin-bottom:16px;">
-  <b style="font-size:15pt; letter-spacing:1px;">POLÍCIA RODOVIÁRIA FEDERAL</b><br/>
-  <span style="font-size:11pt;">Relatório de Constatação de Texto Oculto em Documento PDF</span>
+  <b style="font-size:14pt; letter-spacing:0.5px;">Relatório de Constatação de Texto Oculto em Documento PDF</b>
 </div>
 <hr/>
 <table width="100%" cellspacing="0" cellpadding="4" style="font-size:10pt;">

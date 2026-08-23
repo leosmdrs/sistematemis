@@ -448,8 +448,7 @@ def build_html(sessao: Sessao, decl: Declarante | None = None,
     return f"""
 <html><body style="font-family:'Segoe UI',Arial,sans-serif; color:{INK};">
 <div align="center" style="margin-bottom:16px;">
-  <b style="font-size:15pt; letter-spacing:1px;">POLÍCIA RODOVIÁRIA FEDERAL</b><br/>
-  <span style="font-size:11pt;">Termo de Constatação de Conteúdo em Meio Eletrônico</span>
+  <b style="font-size:14pt; letter-spacing:0.5px;">Termo de Constatação de Conteúdo em Meio Eletrônico</b>
 </div>
 <hr/>
 <p align="justify" style="font-size:11pt; line-height:160%;">{abertura}</p>
