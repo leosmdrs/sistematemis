@@ -191,6 +191,15 @@ def draw_icon(kind: str, size: int = 16, color: str = None, width: float = 1.8) 
         p.drawLine(QPointF(m + s * 0.08, m + s * 0.12), QPointF(c, m + s * 0.12))
         p.drawEllipse(QPointF(c + s * 0.10, c + s * 0.10), s * 0.19, s * 0.19)
         p.drawLine(QPointF(c + s * 0.24, c + s * 0.24), QPointF(s - m * 0.55, s - m * 0.55))
+    elif kind == "tool_transcricao":
+        # onda sonora virando linhas de texto
+        for i, alt in enumerate((0.16, 0.30, 0.22, 0.34, 0.18)):
+            x = m + s * 0.04 + i * s * 0.075
+            p.drawLine(QPointF(x, c - s * alt), QPointF(x, c + s * alt))
+        for i in range(3):
+            y = c - s * 0.16 + i * s * 0.16
+            p.drawLine(QPointF(c + s * 0.10, y),
+                       QPointF(s - m - (s * 0.10 if i == 2 else 0), y))
     elif kind == "tool_constatacao":
         # janela de navegador com um selo — a página registrada
         p.drawRect(QRectF(m, m + s * 0.06, s - 2 * m, s - 2 * m - s * 0.06))

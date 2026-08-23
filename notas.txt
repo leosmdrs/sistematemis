@@ -1,55 +1,45 @@
-NOVA FERRAMENTA — Constatação Web
+NOVA FERRAMENTA — Degravação
 
-Registra conteúdo publicado na internet com rigor técnico. Abre o endereço
-num navegador dedicado, sem extensões e sem sessão de navegação anterior, e
-guarda o que foi exibido: a página inteira em PDF com texto selecionável, o
-código-fonte, a tela, o endereço IP do servidor e o certificado que ele
-apresentou — cada peça com o seu SHA-256, encadeados num resumo da
-diligência.
+Transcreve oitivas e gravações com reconhecimento de fala executado
+integralmente nesta máquina. Nenhum trecho de áudio é enviado a serviço
+externo.
 
-A verificação de rede é feita por conexão própria, independente da que
-renderizou a página: são duas observações distintas do mesmo fato, o que
-torna a peça bem mais difícil de contestar.
+Separa automaticamente quem fala, na cronologia do diálogo. Ao final, cada
+fala vem marcada como "Locutor 1", "Locutor 2", e basta nomear cada voz uma
+vez, no painel do alto — todas as falas daquela pessoa mudam juntas. Numa
+oitiva de uma hora isso é a diferença entre uma resposta e duzentas.
 
-Quando o conteúdo só é visível após login — uma postagem restrita, uma
-conversa —, marque "Sessão autenticada" e informe a conta. O termo declara
-isso em destaque, porque conteúdo restrito é fato diferente de conteúdo
-público.
+Aceita qualquer áudio ou vídeo, pelo mesmo FFmpeg que já acompanha o
+sistema. Cada trecho fica editável, com marca de tempo. O termo de
+degravação traz o resumo SHA-256 da mídia de origem e sai em PDF ou em HTML
+para o SEI.
 
-O termo sai em PDF, em HTML para o SEI, e as peças num ZIP com índice e
-hashes. Ele não constitui ata notarial, ato privativo de tabelião, nem
-atesta a veracidade do conteúdo — atesta que o conteúdo estava acessível
-naquele endereço, naquela data e hora, nas condições descritas.
+Sobre os limites, com franqueza: o reconhecimento erra, e a separação de
+vozes erra mais ainda em gravação com microfone único e pessoas se
+interrompendo. Por isso o texto sai para revisão e o termo declara que a
+fidelidade da transcrição é do signatário — o reconhecimento automático é
+meio de trabalho, não fonte de fé.
 
-
-METADADOS E HASH — duas ferramentas viraram uma
-
-O Gerador de Hash foi incorporado ao Extrator de Metadados. As duas
-recebiam uma lista de arquivos e calculavam o mesmo SHA-256; na prática o
-encarregado fazia o mesmo trabalho duas vezes, em duas telas.
-
-Agora sai um documento só, que abre como termo de juntada — com a data por
-extenso, matrícula, lotação e vínculo ao IPS/PAD — seguido do quadro com
-nome, tamanho, hash e nº SEI, e depois os quadros de metadados.
-
-Três modos: "Só hash" produz o termo de juntada puro, como antes;
-"Relevantes" acrescenta o que interessa à apuração; "Completo" acrescenta
-tudo o que foi lido. O nº SEI é digitado por arquivo, ao lado da lista.
+Os modelos não vêm no instalador: são baixados na primeira vez que a
+ferramenta é usada. O de transcrição tem 464 MB e o de separação de vozes,
+46 MB. Se a rede da unidade bloquear o download, a mensagem de erro informa
+a pasta exata onde eles podem ser copiados à mão.
 
 
-OUTRAS MUDANÇAS
+AUTOTESTE DA INSTALAÇÃO
 
-- O termo de Metadados e Hash também exporta em HTML, para importar no SEI.
-- A limpeza de HTML para o SEI passou a ser a mesma do Encarregado de IPS,
-  para que a regra não divirja entre as duas ferramentas.
+O executável passou a aceitar `SistemaTemis.exe --autoteste`, que confere
+num terminal se tudo o que foi empacotado funciona naquela máquina —
+interface, navegador embutido, FFmpeg, reconhecimento de fala e leitura de
+documentos. O relatório também é gravado em arquivo, para quem precisar
+enviá-lo a quem dá suporte.
+
+Existe porque erro de empacotamento não aparece aqui: aparece na estação de
+quem instalou, e na forma de uma janela que não abre.
 
 
 SOBRE O TAMANHO
 
-Esta versão é bem maior que a anterior. A Constatação Web precisa de um
-navegador embutido, e ele responde por quase todo o acréscimo. Diferente da
-Calculadora ePAD, que foi retirada por não justificar o peso, aqui o
-navegador não é conveniência: é o instrumento da captura. O ambiente
-controlado — sem extensão, sem sessão anterior, com a versão do motor
-viajando junto com a versão do programa — é justamente o que dá valor à
-peça produzida.
+Esta versão é maior que a anterior por causa das bibliotecas de
+reconhecimento de fala. Os modelos, que são o grosso, continuam fora do
+instalador.

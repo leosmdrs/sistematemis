@@ -15,6 +15,7 @@ from .ips import IPSTool
 from .metadados import MetadadosTool
 from .quadro import QuadroTool
 from .tarja_preta import TarjaPretaTool
+from .transcricao import TranscricaoTool
 from .video import VideoTool
 
 
@@ -31,6 +32,7 @@ REGISTRY: list[tuple[ToolMeta, type | None]] = [
     (IPSTool.meta,           IPSTool),
     (MetadadosTool.meta,     MetadadosTool),
     (ConstatacaoTool.meta,   ConstatacaoTool),
+    (TranscricaoTool.meta,   TranscricaoTool),
 ]
 
 
