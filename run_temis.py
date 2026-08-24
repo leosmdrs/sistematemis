@@ -78,9 +78,30 @@ def autoteste() -> int:
         return f"FFmpeg em {ffmpeg_path().parent}"
 
     def whisper():
+        import os
+
         import ctranslate2
         from faster_whisper import WhisperModel              # noqa: F401
-        return f"faster-whisper pronto (CTranslate2 {ctranslate2.__version__})"
+        from faster_whisper.utils import get_assets_path
+
+        # Não basta importar. O detector de voz é um arquivo de modelo
+        # que a biblioteca carrega de dentro do próprio pacote, e ele
+        # ficou de fora do empacotamento na 1.3.0 — a Degravação
+        # importava sem queixa e morria ao transcrever. Conferir o
+        # arquivo aqui é o que faz esse erro aparecer no autoteste, e não
+        # na mão de quem instalou.
+        modelo = os.path.join(get_assets_path(), "silero_vad_v6.onnx")
+        if not os.path.isfile(modelo):
+            raise RuntimeError(
+                f"detector de voz ausente do pacote: {modelo}")
+        tamanho = os.path.getsize(modelo) // 1024
+        return (f"faster-whisper pronto (CTranslate2 "
+                f"{ctranslate2.__version__}), detector de voz {tamanho} KB")
+
+    def diarizacao():
+        import sherpa_onnx
+        sherpa_onnx.OfflineSpeakerDiarizationConfig          # noqa: B018
+        return f"sherpa-onnx {sherpa_onnx.__version__} carregado"
 
     def documentos():
         import fitz                                          # noqa: F401
@@ -109,6 +130,7 @@ def autoteste() -> int:
         ("navegador embutido", navegador),
         ("ffmpeg empacotado", ffmpeg),
         ("reconhecimento de fala", whisper),
+        ("separação de locutores", diarizacao),
         ("leitura de documentos", documentos),
         ("índice de busca", busca),
         ("reconhecimento óptico", ocr),

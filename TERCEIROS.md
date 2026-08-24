@@ -31,6 +31,17 @@ declararia a quem recebe uma condição que não corresponde à realidade.
 | **huggingface-hub** | Apache-2.0 | [github.com/huggingface/huggingface_hub](https://github.com/huggingface/huggingface_hub) |
 | **tokenizers** | Apache-2.0 | [github.com/huggingface/tokenizers](https://github.com/huggingface/tokenizers) |
 | **Python** | PSF-2.0 | [python.org](https://www.python.org/) |
+| **PyWinRT** (`winrt-runtime` e módulos `winrt-Windows.*`) | MIT | [github.com/pywinrt/pywinrt](https://github.com/pywinrt/pywinrt) |
+| **SQLite** (via módulo `sqlite3` do Python) | domínio público | [sqlite.org](https://www.sqlite.org/copyright.html) |
+
+## Componentes do sistema operacional
+
+O reconhecimento óptico de caracteres da Varredura e do PDF Pesquisável é
+feito pelo motor `Windows.Media.Ocr`, que faz parte do próprio Windows.
+Nada dele é redistribuído no instalador: o programa apenas chama a
+interface de programação do sistema, pelos módulos PyWinRT acima, na
+máquina em que já há licença de Windows. A captura de tela da Gravação de
+Tela usa a mesma via — a interface gráfica do próprio sistema.
 
 ## FFmpeg
 

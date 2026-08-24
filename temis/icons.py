@@ -227,6 +227,34 @@ def draw_icon(kind: str, size: int = 16, color: str = None, width: float = 1.8) 
         p.setBrush(QBrush(QColor(color)))
         p.drawEllipse(QPointF(c + s * 0.24, c - s * 0.02), s * 0.04, s * 0.04)
         p.setBrush(Qt.BrushStyle.NoBrush)
+    elif kind == "tool_extracao":
+        # janela de navegador com o carimbo de registro — a diligência
+        # feita dentro do sistema, e anotada
+        p.drawRoundedRect(QRectF(m, m + s * 0.06, s - 2 * m, s - 2 * m - s * 0.12),
+                          s * 0.06, s * 0.06)
+        p.drawLine(QPointF(m, m + s * 0.24), QPointF(s - m, m + s * 0.24))
+        p.setBrush(QBrush(QColor(color)))
+        p.setPen(Qt.PenStyle.NoPen)
+        for i in range(3):
+            p.drawEllipse(QPointF(m + s * (0.09 + i * 0.08), m + s * 0.15),
+                          s * 0.025, s * 0.025)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        pen = QPen(QColor(color), max(1.0, s * 0.075))
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        p.setPen(pen)
+        poly((c - s * 0.16, c + s * 0.08), (c - s * 0.04, c + s * 0.19),
+             (c + s * 0.19, c - s * 0.08))
+    elif kind == "tool_gravacao":
+        # monitor com o ponto de gravação — registrar o que está na tela
+        p.drawRoundedRect(QRectF(m, m + s * 0.04, s - 2 * m,
+                                 s - 2 * m - s * 0.18),
+                          s * 0.07, s * 0.07)
+        p.drawLine(QPointF(c - s * 0.15, s - m), QPointF(c + s * 0.15, s - m))
+        p.drawLine(QPointF(c, s - m - s * 0.14), QPointF(c, s - m))
+        p.setBrush(QBrush(QColor(color)))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.drawEllipse(QPointF(c, c - s * 0.04), s * 0.11, s * 0.11)
     elif kind == "tool_ocrpdf":
         # letra dentro da moldura de leitura — a imagem virando texto
         canto = s * 0.16

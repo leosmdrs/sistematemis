@@ -330,6 +330,125 @@ GUIAS: dict[str, Guia] = {
         ),
     ),
 
+    "extracao": Guia(
+        finalidade=(
+            "Documenta a extração de dados feita em sistema interno, no "
+            "momento em que ela acontece. É a ferramenta de quem **atende** "
+            "ao pedido de auditoria, não de quem o formula.\n\n"
+            "O problema que ela resolve: a corregedoria pede à área de "
+            "tecnologia os registros de um sistema, a área extrai e envia "
+            "pelo processo, e o servidor apurado contesta a cadeia de "
+            "custódia. O resumo criptográfico prova que o arquivo não mudou "
+            "depois — mas não diz de onde saiu nem com que consulta. Aqui, "
+            "cada passo fica registrado, e o arquivo recebido é resumido no "
+            "instante em que chega, antes de tocar qualquer pasta de "
+            "trabalho."),
+        quando=(
+            "A área de tecnologia vai extrair dados a pedido da "
+            "corregedoria e a origem precisa ficar demonstrada.",
+            "Uma consulta em sistema interno vai fundamentar peça e pode "
+            "ser contestada.",
+            "É preciso demonstrar quais foram exatamente os parâmetros da "
+            "consulta que produziu determinado arquivo.",
+        ),
+        passos=(
+            "Preencha <b>Processo</b>, <b>Solicitação atendida</b>, "
+            "<b>Operador</b>, <b>Sistema</b> e <b>Objeto da extração</b>. "
+            "Sistema e objeto são obrigatórios: são eles que dizem, no "
+            "termo, o que se foi buscar e onde.",
+            "Deixe <b>Gravar a tela junto</b> marcado — o termo cruza o "
+            "vídeo com a relação dos atos pelo tempo decorrido.",
+            "Clique em <b>Iniciar diligência</b>. A partir daí tudo é "
+            "registrado, e você vê na linha do tempo à direita o que está "
+            "sendo anotado a seu respeito.",
+            "Digite o endereço do sistema e clique em <b>Abrir</b>. "
+            "Autentique-se normalmente — campo de senha nunca é registrado.",
+            "Faça a consulta. O clique, o formulário submetido e seus "
+            "parâmetros entram na linha do tempo sozinhos.",
+            "Baixe o arquivo pelo próprio sistema. Ele é gravado na pasta "
+            "da diligência e resumido em SHA-256 ao chegar.",
+            "Use <b>Anotar</b> para registrar o que a tela não mostra — o "
+            "total conferido, uma observação sobre o resultado.",
+            "Clique em <b>Encerrar diligência</b> e depois em <b>Gerar "
+            "termo</b>.",
+        ),
+        limites=(
+            "O registro alcança os passos desta sessão e o que foi "
+            "recebido em resposta. Não alcança o funcionamento interno do "
+            "sistema consultado nem a correção dos dados que ele mantém.",
+            "O resumo criptográfico atesta que o arquivo juntado é o mesmo "
+            "que foi recebido — não atesta que o conteúdo extraído esteja "
+            "correto ou completo.",
+            "Campo de senha não é registrado, e valor de parâmetro de "
+            "endereço cujo nome indique credencial sai como “[suprimido]”. "
+            "Os demais campos, inclusive os ocultos, constam por serem os "
+            "parâmetros da consulta.",
+            "O navegador embutido é um Chromium sem extensões. Sistema que "
+            "exija componente próprio, certificado em máquina ou navegador "
+            "homologado pode não abrir aqui — nesse caso, use a Gravação "
+            "de Tela.",
+            "As datas e horas são as do relógio da estação, não atestadas "
+            "por terceiro.",
+        ),
+    ),
+
+    "gravacao": Guia(
+        finalidade=(
+            "Registra em vídeo o que se faz no computador, com a "
+            "identificação do processo, do operador e da estação impressa "
+            "no próprio quadro, junto ao relógio e ao tempo decorrido.\n\n"
+            "O uso que a motivou é a extração de dados em sistema interno: "
+            "quando a corregedoria pede à área de tecnologia registros de "
+            "auditoria e o servidor apurado contesta a cadeia de custódia, "
+            "o hash do arquivo prova que ele não mudou, mas não mostra de "
+            "onde saiu. O vídeo da extração mostra o sistema, a consulta, "
+            "os parâmetros e o momento em que o arquivo foi gerado."),
+        quando=(
+            "A área de tecnologia vai extrair dados de um sistema a pedido "
+            "da corregedoria, e a origem precisa ficar documentada.",
+            "Uma consulta em sistema que não guarda comprovante precisa "
+            "ser registrada.",
+            "Uma diligência feita no computador — conferência, "
+            "verificação, coleta — precisa acompanhar os autos.",
+        ),
+        passos=(
+            "Preencha o <b>Número do processo</b>, o <b>Operador</b> e o "
+            "<b>Objeto da diligência</b>. Os três saem no vídeo e no termo.",
+            "Escolha a <b>Área</b> — a área de trabalho inteira é a opção "
+            "mais segura, porque não deixa de fora o que estava no outro "
+            "monitor.",
+            "Se for narrar o que está fazendo, escolha o microfone em "
+            "<b>Narração pelo microfone</b>.",
+            "Clique em <b>Iniciar gravação</b> e escolha onde gravar. A "
+            "janela do sistema é recolhida e fica um painel pequeno, sobre "
+            "tudo, com o tempo decorrido — arraste-o se atrapalhar.",
+            "Faça a diligência normalmente. Diga em voz alta o que está "
+            "fazendo, se houver microfone: narração vale mais que legenda.",
+            "Clique em <b>Encerrar</b> no painel. O sistema calcula o "
+            "SHA-256 do vídeo e o acrescenta à lista.",
+            "Clique em <b>Gerar termo</b>, complete a qualificação de quem "
+            "assina e salve em PDF ou HTML.",
+        ),
+        limites=(
+            "A faixa impressa no vídeo é para leitura, não é prova: são "
+            "pixels, e qualquer um monta um vídeo com uma tarja dizendo o "
+            "que quiser. O que permite aferir o arquivo é o SHA-256 do "
+            "termo.",
+            "A hora exibida é a do relógio da estação, não atestada por "
+            "terceiro. Onde a precisão temporal for controvertida, cabe "
+            "carimbo do tempo de autoridade credenciada.",
+            "O registro alcança o que estava na área capturada, no período "
+            "gravado. Não alcança o que ficou fora do quadro nem o que "
+            "acontecia dentro dos sistemas.",
+            "Com a opção “Resistir a interrupção”, uma queda de energia "
+            "custa os últimos dez a quinze segundos em vez do registro "
+            "inteiro — mas o arquivo fica cerca de três vezes maior.",
+            "A tela pode exibir dados pessoais de terceiros. Confira o "
+            "vídeo antes de juntá-lo, e use a Tarja Preta no que precisar "
+            "ser preservado.",
+        ),
+    ),
+
     # ── preparo e apoio ───────────────────
     "tarja": Guia(
         finalidade=(

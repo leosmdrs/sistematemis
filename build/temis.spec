@@ -9,7 +9,9 @@ Uso (a partir da raiz do projeto):
 
 import os
 
-from PyInstaller.utils.hooks import collect_dynamic_libs, collect_submodules
+from PyInstaller.utils.hooks import (collect_data_files,
+                                     collect_dynamic_libs,
+                                     collect_submodules)
 
 ROOT = os.path.abspath(os.getcwd())
 ICON = os.path.join(ROOT, "build", "temis.ico")
@@ -34,6 +36,22 @@ WINRT = [
 #: O pacote traz o runtime do Visual C++ de que suas extensões dependem.
 WINRT_BINARIOS = collect_dynamic_libs("winrt")
 
+# O PyInstaller coleta **código**, não dados. Uma biblioteca que carrega
+# um modelo de dentro do próprio pacote sai do forno sem ele, e o erro só
+# aparece na hora de usar, na máquina de quem instalou.
+#
+# Foi o que aconteceu com a Degravação na 1.3.0: o faster-whisper guarda
+# o detector de voz em `faster_whisper/assets/silero_vad_v6.onnx` e o
+# procura por `os.path.dirname(__file__)`. Sem ele, a transcrição morria
+# com "NO_SUCHFILE: Load model ... failed. File doesn't exist".
+#
+# Varreram-se todas as dependências atrás do mesmo problema. Só esta
+# tinha dado de verdade faltando: o resto era stub de tipo, cabeçalho C e
+# licença, que não pesam na execução. As DLLs do sherpa-onnx pareciam
+# faltar, mas escondê-las do interpretador não impediu o import — estão
+# ligadas estaticamente ao módulo compilado.
+DADOS_DE_PACOTE = collect_data_files("faster_whisper")
+
 # FFmpeg vai junto, na pasta "ffmpeg": a Edição de Vídeo depende dele e as
 # estações onde o Têmis roda não têm como instalar pré-requisitos.
 # video_core.localizar() procura exatamente aqui antes de tentar o PATH.
@@ -53,7 +71,7 @@ a = Analysis(
     [os.path.join(ROOT, "run_temis.py")],
     pathex=[ROOT],
     binaries=WINRT_BINARIOS,
-    datas=FFMPEG,
+    datas=FFMPEG + DADOS_DE_PACOTE,
     hiddenimports=WINRT,
     hookspath=[],
     hooksconfig={},

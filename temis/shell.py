@@ -139,27 +139,37 @@ class ToolTile(QFrame):
 #  PORTAL
 # ─────────────────────────────────────────
 
+def enumerar(nomes: list[str]) -> str:
+    """Lista nomes em português: "A", "A e B", "A, B e C"."""
+    if not nomes:
+        return ""
+    if len(nomes) == 1:
+        return nomes[0]
+    return ", ".join(nomes[:-1]) + " e " + nomes[-1]
+
+
 def fileiras(total: int, maximo: int = 4) -> list[int]:
     """Como repartir os ladrilhos em fileiras.
 
-    A disposição é uma pirâmide: uma peça no alto, duas abaixo, três,
-    quatro. Não é ornamento — o vértice é a ferramenta que dá sentido às
-    outras, e a leitura desce do procedimento para os instrumentos que o
-    instruem.
+    Fileiras cheias, de quatro. Doze ferramentas saem quatro, quatro e
+    quatro — um bloco, e não uma escada.
 
-    Com dez ferramentas a pirâmide fecha exata. Se o número não for
-    triangular, as fileiras crescem enquanto cabem e o que sobrar forma
-    a última — cada fileira é centrada por conta própria, de modo que
-    uma incompleta continua equilibrada.
+    Houve uma pirâmide aqui, de uma a quatro peças, e ela fazia sentido
+    com dez ferramentas. Com doze parou de fazer: ou virava cinco
+    fileiras, que estouram a tela de catorze polegadas, ou uma escada
+    torta de 1, 3, 4, 4. O bloco de quatro é mais firme de ler e cabe em
+    três fileiras.
+
+    A sobra, quando houver, fica na **última** fileira, que é a única
+    incompleta — e como cada fileira é centrada por conta própria, ela
+    aparece centrada sob as demais.
     """
-    linhas: list[int] = []
-    restante = total
-    largura = 1
-    while restante > 0:
-        cabe = min(largura, restante, maximo)
-        linhas.append(cabe)
-        restante -= cabe
-        largura += 1
+    if total <= 0:
+        return []
+    cheias, resto = divmod(total, maximo)
+    linhas = [maximo] * cheias
+    if resto:
+        linhas.append(resto)
     return linhas
 
 
@@ -259,8 +269,14 @@ class PortalPage(QWidget):
         texto = ("Os arquivos não saem desta máquina: tudo é lido e "
                  "processado aqui.")
         if online:
-            texto += (f"  A ferramenta {', '.join(online)} abre uma página "
-                      "oficial externa e requer internet.")
+            # Plural correto e redação que serve às duas: uma abre página
+            # externa, a outra o sistema que o operador indicar. Dizer
+            # "página oficial externa" das duas seria impreciso.
+            texto += ("  A ferramenta " if len(online) == 1
+                      else "  As ferramentas ")
+            texto += enumerar(online)
+            texto += (" acessa a rede." if len(online) == 1
+                      else " acessam a rede.")
         # A verificação de atualização é acesso à rede, e a promessa acima
         # ficaria pela metade se ela não fosse dita no mesmo lugar.
         texto += ("  Ao abrir, o sistema consulta se há versão nova, sem "
