@@ -1,65 +1,32 @@
-EXTRAÇÃO REGISTRADA — a diligência em sistema interno, documentada
+QUADRO DE EVIDÊNCIAS — dois defeitos corrigidos
 
-Feita para quem atende ao pedido de auditoria, não para quem o formula.
-Quando a corregedoria pede à área de tecnologia os registros de um
-sistema, a área extrai e envia pelo processo, e o servidor apurado
-contesta a cadeia de custódia, o resumo criptográfico prova que o
-arquivo não mudou depois — mas não diz de onde saiu nem com que
-consulta.
+Colar imagem fechava o programa. A conversão da imagem para PNG entregava
+ao buffer um vetor de bytes temporário, do qual ele guardava apenas o
+endereço; o coletor de lixo recolhia o vetor e a gravação escrevia em
+memória já liberada. Como dependia do instante em que o coletor passava,
+o defeito era intermitente — daí acontecer "muitas vezes" e não sempre.
 
-Aqui quem extrai abre o sistema no navegador do próprio Têmis e cada
-passo fica registrado: o endereço visitado, o que se clicou, o
-formulário submetido com seus parâmetros — inclusive os campos ocultos,
-que é onde os sistemas guardam o parâmetro de verdade — e o arquivo
-recebido, resumido em SHA-256 no instante em que chega, antes de tocar
-qualquer pasta de trabalho.
-
-Campo de senha nunca é registrado, e valor de parâmetro de endereço cujo
-nome indique credencial sai como "[suprimido]".
-
-A gravação de tela corre junto, e o termo cruza o vídeo com a relação
-dos atos pelo tempo decorrido.
+Navegar segurando a barra de espaço não funcionava. A mãozinha aparecia,
+mas o quadro não se movia: o item sob o ponteiro consumia o clique antes
+de a rolagem começar. Funcionava apenas quando se clicava em área vazia,
+o que num quadro com conteúdo é quase nunca. O mesmo valia para o botão
+Mover. Durante a navegação a cena deixa de receber o clique, o que
+também impede arrastar sem querer a anotação que estava embaixo.
 
 
-GRAVAÇÃO DE TELA — registro audiovisual de diligência
+CONSTATAÇÃO WEB — por que o vídeo não toca
 
-Funciona com qualquer tela do Windows: sistema legado, aplicativo de
-mesa, página que não abre no navegador embutido. Imprime no próprio
-vídeo o processo, o operador, a estação, o relógio e o tempo decorrido —
-em faixa acrescentada abaixo da imagem, de modo que nada do que está
-sendo registrado fica coberto.
+O navegador embutido não reproduz os formatos H.264 e AAC, usados pelo
+Instagram, pelo TikTok e pela maior parte do vídeo na web. É uma
+característica de como o componente é distribuído, ligada ao
+licenciamento de patentes desses formatos, e não algo que se corrija do
+lado do programa.
 
-Ao iniciar, a janela do sistema se recolhe e fica um painel pequeno
-sobre tudo, arrastável, com o tempo decorrido e o botão de encerrar.
+Antes, a página carregava e o vídeo mostrava o erro do próprio site, sem
+explicação. Agora, quando a página tem vídeo que o navegador não sabe
+reproduzir, aparece uma faixa dizendo isso e apontando o caminho: a
+captura registra a página, o texto, a legenda e a imagem; para registrar
+o vídeo em movimento, reproduza-o no navegador do sistema e grave com a
+Gravação de Tela. As duas peças se complementam nos autos.
 
-Lê da máquina o usuário do Windows, o nome e o número de série do
-equipamento, os endereços de rede e o fuso horário. Ao encerrar, calcula
-o SHA-256 e emite o termo.
-
-As duas ferramentas dizem, no termo, o que o registro não prova: a faixa
-impressa é para leitura e não constitui prova por si; a hora é a do
-relógio da estação e não foi atestada por terceiro.
-
-
-DEGRAVAÇÃO CORRIGIDA
-
-A transcrição não funcionava na versão instalada, embora funcionasse ao
-rodar pelo código-fonte. Faltava no pacote o detector de voz que o
-faster-whisper carrega de dentro de si mesmo — o empacotador leva o
-código das bibliotecas, não os dados que elas guardam. Quem abrisse a
-Degravação recebia erro de arquivo de modelo ausente.
-
-Varreram-se todas as dependências atrás do mesmo problema. Era o único
-dado de verdade faltando; o restante eram declarações de tipo,
-cabeçalhos e licenças, que não pesam na execução.
-
-O autoteste passou a conferir o arquivo do modelo e a carregar a
-separação de locutores, de modo que essa classe de falha apareça em
-`SistemaTemis.exe --autoteste` e não na mão de quem instalou.
-
-
-PORTAL EM TRÊS FILEIRAS
-
-As doze ferramentas passaram a ocupar três fileiras de quatro. A
-pirâmide fazia sentido com dez; com doze viraria escada torta ou cinco
-fileiras, que não cabem em notebook de catorze polegadas.
+O guia da ferramenta passou a trazer a mesma ressalva.

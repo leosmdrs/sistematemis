@@ -185,6 +185,13 @@ GUIAS: dict[str, Guia] = {
             "Conteúdo atrás de login é capturado como você o vê, com a sua "
             "sessão. O termo registra essa circunstância porque ela é "
             "relevante para quem for avaliar a peça.",
+            "<b>Vídeo não toca aqui.</b> O navegador embutido não traz os "
+            "formatos H.264 e AAC, usados por Instagram, TikTok e pela "
+            "maior parte do vídeo na web. A página, o texto, a legenda e a "
+            "imagem são registrados normalmente; o vídeo em movimento, "
+            "não. Para registrá-lo, reproduza-o no navegador do sistema e "
+            "grave com a <b>Gravação de Tela</b> — as duas peças se "
+            "complementam nos autos.",
             "Não há carimbo de tempo de terceiro: a data é a do "
             "computador. Para conteúdo que se pretenda contestar, vale "
             "considerar ata notarial.",

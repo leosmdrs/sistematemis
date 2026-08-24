@@ -319,6 +319,7 @@ class ConstatacaoTool(ToolPage):
         coluna.setContentsMargins(0, 0, 0, 0)
         coluna.setSpacing(0)
         coluna.addWidget(self._build_barra())
+        coluna.addWidget(self._build_aviso_video())
 
         if WEBVIEW_DISPONIVEL:
             # Perfil anônimo: nada em disco, sessão nova a cada abertura.
@@ -488,10 +489,80 @@ class ConstatacaoTool(ToolPage):
             else "Conexão sem cifra — o conteúdo pode ter sido alterado no "
                  "caminho")
 
+    def _build_aviso_video(self) -> QFrame:
+        """Faixa que explica por que um vídeo pode não tocar aqui.
+
+        Fica escondida e só aparece quando a página tem vídeo. O usuário
+        não tem como adivinhar que o erro exibido pelo próprio site vem
+        de um codec ausente no navegador embutido.
+        """
+        faixa = QFrame()
+        faixa.setStyleSheet(
+            f"background: {PALETTE['surface2']}; "
+            f"border-bottom: 1px solid {PALETTE['warning']};")
+        linha = QHBoxLayout(faixa)
+        linha.setContentsMargins(14, 8, 12, 8)
+        linha.setSpacing(10)
+
+        icone = QLabel()
+        icone.setPixmap(draw_icon("info", 16, PALETTE["warning"]).pixmap(16, 16))
+        icone.setFixedSize(16, 16)
+        linha.addWidget(icone)
+
+        texto = QLabel(
+            "Esta página tem vídeo. O navegador embutido não reproduz os "
+            "formatos H.264 e AAC, usados pela maior parte das redes "
+            "sociais — a captura registra a página, o texto e a imagem, "
+            "mas não o vídeo em movimento. Para registrar a reprodução, "
+            "use a <b>Gravação de Tela</b> com o navegador do sistema.")
+        texto.setObjectName("subtext")
+        texto.setWordWrap(True)
+        linha.addWidget(texto, 1)
+
+        fechar = QPushButton("Entendi")
+        fechar.setCursor(Qt.CursorShape.PointingHandCursor)
+        fechar.clicked.connect(lambda: faixa.setVisible(False))
+        linha.addWidget(fechar)
+
+        faixa.setVisible(False)
+        self._faixa_video = faixa
+        #: Uma vez dispensada, não volta a incomodar nesta sessão.
+        self._aviso_video_dispensado = False
+        fechar.clicked.connect(
+            lambda: setattr(self, "_aviso_video_dispensado", True))
+        return faixa
+
+    #: Pergunta ao próprio navegador se há vídeo na página e se ele sabe
+    #: tocar o formato mais comum. Perguntar é melhor que presumir: se um
+    #: dia o componente vier com os codecs, o aviso deixa de aparecer
+    #: sozinho, sem ninguém precisar lembrar de removê-lo.
+    _SONDA_VIDEO = """
+        (function () {
+          var temVideo = document.getElementsByTagName('video').length > 0;
+          var v = document.createElement('video');
+          var toca = v.canPlayType('video/mp4; codecs="avc1.42E01E"') !== '';
+          return (temVideo ? '1' : '0') + (toca ? '1' : '0');
+        })();
+    """
+
     def _ao_carregar(self, ok: bool):
         self._btn_capturar.setEnabled(bool(ok) and not self._capturando)
         if not ok:
             self.status_msg.emit("Não foi possível carregar o endereço.")
+            return
+        if self._aviso_video_dispensado or not WEBVIEW_DISPONIVEL:
+            return
+        try:
+            self._pagina.runJavaScript(self._SONDA_VIDEO, self._ao_sondar_video)
+        except Exception:                               # noqa: BLE001
+            pass
+
+    def _ao_sondar_video(self, resposta):
+        """Mostra a faixa quando há vídeo e o formato não é suportado."""
+        if not isinstance(resposta, str) or len(resposta) != 2:
+            return
+        tem_video, sabe_tocar = resposta[0] == "1", resposta[1] == "1"
+        self._faixa_video.setVisible(tem_video and not sabe_tocar)
 
     # ── captura ──────────────────────────────────
     def _capturar(self):

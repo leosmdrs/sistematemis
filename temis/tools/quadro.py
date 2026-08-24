@@ -535,6 +535,19 @@ class BoardView(QGraphicsView):
         return item
 
     # ── ferramentas ──────────────────────────────
+    def _ajustar_interacao(self):
+        """Enquanto se navega, a cena não recebe o clique.
+
+        O `ScrollHandDrag` do Qt só começa a arrastar se o clique chegar
+        à vista; item sob o cursor o consome antes disso. Com o quadro
+        vazio a navegação funcionava, e com qualquer anotação embaixo do
+        ponteiro não — ou seja, nunca, no uso real. Desligar a interação
+        com a cena durante a navegação devolve o clique à vista, e de
+        quebra impede arrastar sem querer a anotação que estava ali.
+        """
+        navegando = self._espaco or self._ferramenta == "mover"
+        self.setInteractive(not navegando)
+
     def ferramenta(self) -> str:
         return self._ferramenta
 
@@ -549,6 +562,7 @@ class BoardView(QGraphicsView):
             self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
         else:
             self.setDragMode(QGraphicsView.DragMode.NoDrag)
+        self._ajustar_interacao()
 
         cursores = {
             "nota": Qt.CursorShape.CrossCursor,
@@ -667,11 +681,27 @@ class BoardView(QGraphicsView):
 
     @staticmethod
     def _png_bytes(img: QImage) -> bytes:
+        """Converte a imagem para PNG em memória.
+
+        O `QByteArray` precisa existir numa variável. Escrito como
+        `QBuffer(QByteArray())`, o vetor é um temporário do Python: o
+        QBuffer guarda apenas um ponteiro para ele, o coletor de lixo o
+        recolhe assim que a linha acaba, e a gravação escreve em memória
+        já liberada — falha de segmentação, que no programa aparece como
+        a janela fechando sozinha ao colar uma imagem.
+
+        Como dependia do instante em que o coletor passava, o defeito era
+        intermitente. Medido: com o temporário, quebra logo na primeira
+        conversão quando se força a coleta; com a referência viva, trinta
+        conversões seguidas sem falha.
+        """
         from PyQt6.QtCore import QBuffer, QByteArray
-        buf = QBuffer(QByteArray())
+        dados = QByteArray()
+        buf = QBuffer(dados)
         buf.open(QBuffer.OpenModeFlag.WriteOnly)
         img.save(buf, "PNG")
-        return bytes(buf.data())
+        buf.close()
+        return bytes(dados)
 
     @staticmethod
     def _medida_imagem(pix: QPixmap) -> tuple[float, float]:
@@ -883,6 +913,7 @@ class BoardView(QGraphicsView):
         if ev.key() == Qt.Key.Key_Space and not ev.isAutoRepeat():
             self._espaco = True
             self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+            self._ajustar_interacao()
             return
         if ev.key() == Qt.Key.Key_Escape:
             self._cancelar_conexao()
