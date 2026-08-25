@@ -145,6 +145,41 @@ texto nem insere caractere invisível no hash, que alguém vai copiar para
 conferir.
 
 
+TARJA PRETA — tarjar selecionando o texto
+
+Havia uma forma só de tarjar à mão: arrastar um retângulo sobre a página.
+Ela continua, e continua sendo o padrão — serve ao que não é texto, como
+assinatura digitalizada, fotografia e carimbo, e ao PDF que não tem camada
+de texto nenhuma.
+
+Ao lado dela entra a seleção de texto. Marcam-se as palavras como num
+editor e elas viram tarja ao soltar o mouse. A tarja acompanha o contorno
+das palavras, sem depender do pulso de quem arrasta: o nome sai coberto
+rente, sem sobra por cima da linha de cima nem falta no fim.
+
+Enquanto se arrasta, a seleção aparece em dourado translúcido, e não em
+preto — é preciso continuar lendo o que está sendo marcado para saber onde
+soltar. Palavras vizinhas na mesma linha viram uma barra só: uma barra por
+palavra deixaria frestas, e pelas frestas se leem as letras que sobram.
+
+A seleção segue a ordem de leitura, e não a área entre os dois pontos.
+Quem marca da metade de uma linha até a metade da seguinte quer as duas
+metades inteiras, como em qualquer editor.
+
+
+TARJA PRETA — o sinal que delimita o trecho pode ser escolhido
+
+A marcação automática só reconhecia colchetes. Agora se escolhe entre
+colchetes, chaves e parênteses.
+
+O colchete continua em primeiro lugar porque é o que não aparece em texto
+corrente: quem escreve "[Fulano]" no rascunho está marcando de propósito.
+O parêntese está disponível, mas é o mais arriscado dos três — peça
+jurídica é cheia de parênteses legítimos, e escolhê-lo tarja todos. A tela
+avisa disso ao selecioná-lo, e a pré-visualização existe justamente para
+conferir antes.
+
+
 PORTAL
 
 Catorze ferramentas agora. As medidas dos ladrilhos foram refeitas para

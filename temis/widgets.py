@@ -338,10 +338,14 @@ class ViewerToolbar(QFrame):
     def add_widget(self, w: QWidget):
         self._lay.addWidget(w)
 
-    def add_hint(self, text: str):
+    def add_hint(self, text: str) -> QLabel:
+        """Dica discreta na barra. Devolve o rótulo, para quem precisa
+        reescrevê-lo depois — a Tarja Preta troca a dica conforme o modo
+        do mouse."""
         lbl = QLabel(text)
         lbl.setObjectName("muted")
         self._lay.addWidget(lbl)
+        return lbl
 
     def add_stretch(self):
         self._lay.addStretch()
