@@ -48,6 +48,40 @@ def _novo_id() -> str:
 #  OBSERVAÇÃO DA REDE
 # ─────────────────────────────────────────
 
+#: Cargo e órgão de quem assina.
+#:
+#: Vinham escritos no código, como "Policial Rodoviário Federal": o
+#: sistema nasceu na PRF, mas não é dela. Agora saem da Identificação
+#: guardada na estação, e continuam editáveis no próprio termo — o campo
+#: da tela vale mais que a configuração, sempre.
+def _do_perfil(campo: str) -> str:
+    from .. import perfil
+    try:
+        return getattr(perfil.ler(), campo, "") or ""
+    except Exception:                                       # noqa: BLE001
+        return ""
+
+
+def cargo_padrao() -> str:
+    return _do_perfil("cargo")
+
+
+def orgao_padrao() -> str:
+    return _do_perfil("orgao")
+
+
+def _com_cargo(t) -> str:
+    """"Cargo Nome", ou só o nome quando não há cargo informado.
+
+    Sem isto, quem não preenchesse o cargo teria termos abrindo com "eu,
+    ,  Fulano" — dois espaços e uma vírgula órfã numa peça que vai ao
+    processo.
+    """
+    cargo = (getattr(t, "cargo", "") or "").strip()
+    nome = (getattr(t, "nome", "") or "").strip()
+    return " ".join(x for x in (cargo, nome) if x)
+
+
 @dataclass
 class Certificado:
     """O que o servidor apresentou como identidade."""
@@ -287,7 +321,8 @@ class Declarante:
     nome: str = ""
     matricula: str = ""
     lotacao: str = ""
-    cargo: str = "Policial Rodoviário Federal"
+    cargo: str = field(default_factory=cargo_padrao)
+    orgao: str = field(default_factory=orgao_padrao)
 
 
 @dataclass
@@ -391,6 +426,7 @@ def _bloco_captura(c: Captura, numero: int, total: int) -> str:
 def build_html(sessao: Sessao, decl: Declarante | None = None,
                proc: Procedimento | None = None) -> str:
     """Termo de constatação em HTML, para exibir e exportar."""
+    from ..impressao import cabecalho_html
     import html as _html
 
     e = _html.escape
@@ -398,7 +434,7 @@ def build_html(sessao: Sessao, decl: Declarante | None = None,
     proc = proc or Procedimento()
     total = len(sessao.capturas)
 
-    quem = (f"eu, PRF {e(decl.nome)}, matrícula {e(decl.matricula)}, "
+    quem = (f"eu, {e(_com_cargo(decl))}, matrícula {e(decl.matricula)}, "
             f"lotado(a) no(a) {e(decl.lotacao)}, " if decl.nome else "")
     vinculo = (f"para instruir os autos {'da' if proc.tipo == 'IPS' else 'do'} "
                f"{e(proc.tipo)} nº {e(proc.numero)}, " if proc.numero else "")
@@ -447,6 +483,7 @@ def build_html(sessao: Sessao, decl: Declarante | None = None,
 
     return f"""
 <html><body style="font-family:'Segoe UI',Arial,sans-serif; color:{INK};">
+{cabecalho_html()}
 <div align="center" style="margin-bottom:16px;">
   <b style="font-size:14pt; letter-spacing:0.5px;">Termo de Constatação de Conteúdo em Meio Eletrônico</b>
 </div>

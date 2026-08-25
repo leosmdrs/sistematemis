@@ -13,21 +13,21 @@ partir de `tools.REGISTRY` e apenas encaminha os sinais de status.
 
 import math
 
-from PyQt6.QtCore import QPoint, Qt, pyqtSignal
+from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (QColor, QKeySequence, QPainter, QPen,
                          QShortcut)
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFrame, QLabel, QVBoxLayout,
     QHBoxLayout, QStackedWidget, QPushButton, QScrollArea, QMessageBox,
-    QCheckBox, QDialog,
+    QCheckBox, QDialog, QLineEdit,
 )
 
 from . import (__appname__, __author__, __org__, __version__,
-               atualizacao)
+               atualizacao, perfil)
 from .icons import draw_icon, temis_pixmap, app_icon
 from .theme import PALETTE, stylesheet
 from .tools import REGISTRY, build_tool, ToolMeta
-from .widgets import fit_to_screen, hsep
+from .widgets import field_label, fit_to_screen, hsep
 
 
 # ─────────────────────────────────────────
@@ -43,21 +43,25 @@ CHAVE_CENTRAL = "ips"
 #: de catorze polegadas — que, medido, entrega 1310×520 ao portal, seja a
 #: 1366×768, seja a 1920×1080 com escala de 150% do Windows.
 #:
-#: Os números saíram de medição, não de estimativa. A altura mínima em
-#: que nenhuma das treze frases perde a última linha é 133, achada por
-#: busca binária; a folga até 145 é respiro. A largura é o que deixa a
-#: volta se fechar nas três áreas que a janela realmente produz —
-#: 1224×650 no tamanho de abertura, 1310×520 no notebook de catorze
-#: polegadas e 1220×500 numa janela solta entre as duas. A 172 de
-#: largura a última delas já não fecha: oito pares se tocam. Doze
-#: ladrilhos de largura fixa sobre uma elipse se encostam bem antes do
-#: que o olho supõe.
+#: Os números saíram de medição, não de estimativa, e são revistos a
+#: cada ferramenta nova — a décima quarta obrigou a refazer a conta, e
+#: foi o autoteste quem avisou.
+#:
+#: A altura é a menor em que nenhum dos catorze nomes ou frases perde a
+#: última linha, achada por busca binária. A largura é a que deixa a
+#: volta se fechar nas três áreas que a janela realmente produz: 1224×650
+#: no tamanho de abertura, 1310×520 no notebook de catorze polegadas
+#: maximizado, e 1224×520 numa janela solta entre as duas.
+#:
+#: A margem é estreita dos dois lados, e por isso medida em vez de
+#: arredondada: a 154 de largura o nome quebra numa linha a mais e a
+#: altura salta para 159, que aperta a vertical; a 162 dois pares se
+#: tocam na janela solta. Entre um e outro, 156 sobra folga de nove
+#: pixels no pior caso e treze nos demais.
 #:
 #: O do centro é maior porque é o procedimento, e os demais o instruem —
-#: a diferença de tamanho diz isso sem precisar de legenda. Não pode
-#: crescer muito: passando de uns 170 de altura, ele alcança o satélite
-#: que fica logo acima.
-LADRILHO = (152, 145)
+#: a diferença de tamanho diz isso sem precisar de legenda.
+LADRILHO = (156, 147)
 LADRILHO_CENTRO = (200, 166)
 
 #: Proporções internas, acompanhando o tamanho de cada ladrilho.
@@ -217,15 +221,22 @@ class ConstelacaoPortal(QWidget):
 
     #: Menor área em que a volta ainda se fecha com folga de verdade.
     #:
-    #: Medido por busca binária, não estimado: a 500 pixels de altura a
-    #: órbita se fecha a partir de 1117 de largura, mas raspando — um
-    #: pixel entre dois ladrilhos. Em 1200×500 sobra a folga pedida.
+    #: Com catorze ferramentas — treze em volta —, a volta ainda se
+    #: fecha em 1224×500, com quatro pixels entre os dois ladrilhos mais
+    #: próximos; em 1224×510 sobram nove.
+    #:
+    #: O piso é o segundo, e não o primeiro, porque ele tem de caber no
+    #: que a tela realmente entrega. O notebook de catorze polegadas
+    #: maximizado dá ao portal 1300×506 — medido —, e um piso de 520 de
+    #: altura, que parecia folgado, punha barra de rolagem justamente
+    #: nessa tela. Piso alto demais é tão defeito quanto piso baixo
+    #: demais: um sobrepõe ladrilho, o outro faz rolar.
     #:
     #: Declarar o mínimo faz com que, numa janela menor que isso, o
     #: portal role — feio, mas honesto — em vez de sobrepor os ladrilhos,
     #: que seria defeito calado. O notebook de catorze polegadas entrega
     #: 1310×520 ao portal, logo acima deste piso.
-    MINIMO = (1200, 500)
+    MINIMO = (1224, 500)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -442,6 +453,7 @@ class PortalPage(QWidget):
 
     tool_requested = pyqtSignal(str)
     about_requested = pyqtSignal()
+    perfil_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -494,6 +506,14 @@ class PortalPage(QWidget):
 
         layout.addLayout(titles)
         layout.addStretch()
+
+        identidade = QPushButton("  Identificação")
+        identidade.setIcon(draw_icon("cracha", 16, PALETTE["text2"]))
+        identidade.setCursor(Qt.CursorShape.PointingHandCursor)
+        identidade.setToolTip(
+            "Guarda nome, matrícula e lotação para não digitar a cada termo")
+        identidade.clicked.connect(self.perfil_requested)
+        layout.addWidget(identidade)
 
         about = QPushButton("  Sobre")
         about.setIcon(draw_icon("info", 16, PALETTE["text2"]))
@@ -657,6 +677,238 @@ class ToolFrame(QWidget):
 
 
 # ─────────────────────────────────────────
+#  IDENTIFICAÇÃO DO OPERADOR
+# ─────────────────────────────────────────
+
+def subtexto_perfil(texto: str) -> QLabel:
+    """Explicação curta sob um campo, que quebra e informa a altura certa."""
+    rotulo = QLabel(texto)
+    rotulo.setObjectName("subtext")
+    rotulo.setWordWrap(True)
+    politica = rotulo.sizePolicy()
+    politica.setHeightForWidth(True)
+    rotulo.setSizePolicy(politica)
+    return rotulo
+
+class PerfilDialog(QDialog):
+    """Onde se guarda nome, matrícula e lotação de quem opera.
+
+    A tela diz, em letras, o que o código garante: isto **preenche**, não
+    **assina**. O campo de cada ferramenta continua aberto, e o que valer
+    no termo é o que estiver lá na hora de gerar. Sem essa frase, guardar
+    a identificação num lugar central pareceria vincular os termos a ela
+    — e alguém, com razão, perguntaria depois quem de fato assinou.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Identificação do operador")
+        # A altura cresceu com os campos de cargo, órgão e brasão; a
+        # área rolável abaixo garante que ela caiba numa tela baixa sem
+        # cortar nada — o que já aconteceu aqui uma vez.
+        fit_to_screen(self, 560, 700)
+
+        atual = perfil.ler()
+        externo = QVBoxLayout(self)
+        externo.setContentsMargins(0, 0, 0, 0)
+        externo.setSpacing(0)
+
+        rolagem = QScrollArea()
+        rolagem.setWidgetResizable(True)
+        rolagem.setFrameShape(QFrame.Shape.NoFrame)
+        corpo = QWidget()
+        lay = QVBoxLayout(corpo)
+        lay.setContentsMargins(24, 20, 24, 18)
+        lay.setSpacing(10)
+
+        titulo = QLabel("Identificação do operador")
+        titulo.setObjectName("heading")
+        lay.addWidget(titulo)
+
+        aviso = QLabel(
+            "Estes dados são guardados nesta máquina e oferecidos às "
+            "ferramentas que pedem identificação, para poupar a digitação "
+            "a cada termo.<br><br>"
+            "<b>Nada fica preso a eles.</b> Na hora de gerar um termo, o "
+            "campo continua aberto: apague e escreva outro nome sempre que "
+            "for o caso. O que valer no documento é o que estiver no campo "
+            "naquele momento — e um campo já preenchido nunca é alterado "
+            "por esta tela.")
+        aviso.setObjectName("subtext")
+        aviso.setWordWrap(True)
+        # Rótulo que quebra só informa a altura certa quando lhe
+        # perguntam junto com a largura. Sem esta política o empilhamento
+        # reservava a altura de uma linha e cortava o resto do aviso —
+        # justamente a parte que diz que a pessoa pode escrever outro
+        # nome.
+        politica = aviso.sizePolicy()
+        politica.setHeightForWidth(True)
+        aviso.setSizePolicy(politica)
+        lay.addWidget(aviso)
+
+        lay.addSpacing(6)
+
+        self._campos = {}
+        for chave, rotulo, exemplo in (
+                ("nome", "Nome", "Ex.: João da Silva"),
+                ("cargo", "Cargo", "Ex.: Policial Rodoviário Federal"),
+                ("matricula", "Matrícula", "Ex.: 1234567"),
+                ("lotacao", "Lotação", "Ex.: CGCOR — Brasília/DF"),
+                ("orgao", "Órgão", "Ex.: Polícia Rodoviária Federal")):
+            lay.addWidget(field_label(rotulo))
+            campo = QLineEdit(getattr(atual, chave))
+            campo.setPlaceholderText(exemplo)
+            self._campos[chave] = campo
+            lay.addWidget(campo)
+
+        lay.addSpacing(8)
+        lay.addWidget(field_label("Brasão do órgão"))
+        lay.addWidget(subtexto_perfil(
+            "Opcional. Se houver, sai no alto de cada termo e relatório, "
+            "ao lado do nome do órgão. Não havendo, a peça sai sem ele — "
+            "a marca do Sistema Têmis aparece sempre."))
+
+        linha_brasao = QHBoxLayout()
+        self._vista_brasao = QLabel()
+        self._vista_brasao.setFixedSize(96, 64)
+        self._vista_brasao.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._vista_brasao.setStyleSheet(
+            f"border: 1px dashed {PALETTE['border']}; border-radius: 6px;")
+        linha_brasao.addWidget(self._vista_brasao)
+
+        coluna = QVBoxLayout()
+        self._b_escolher = QPushButton("  Escolher imagem…")
+        self._b_escolher.setIcon(draw_icon("open", 16, PALETTE["text2"]))
+        self._b_escolher.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._b_escolher.clicked.connect(self._escolher_brasao)
+        coluna.addWidget(self._b_escolher)
+
+        self._b_tirar = QPushButton("  Remover o brasão")
+        self._b_tirar.setIcon(draw_icon("trash", 16, PALETTE["text2"]))
+        self._b_tirar.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._b_tirar.clicked.connect(self._remover_brasao)
+        coluna.addWidget(self._b_tirar)
+        coluna.addStretch()
+        linha_brasao.addLayout(coluna, 1)
+        lay.addLayout(linha_brasao)
+
+        self._mostrar_brasao()
+
+        lay.addStretch()
+        rolagem.setWidget(corpo)
+        externo.addWidget(rolagem, 1)
+
+        rodape = QWidget()
+        lay = QVBoxLayout(rodape)
+        lay.setContentsMargins(24, 10, 24, 16)
+        lay.setSpacing(10)
+        lay.addWidget(hsep())
+
+        acoes = QHBoxLayout()
+        limpar = QPushButton("  Limpar")
+        limpar.setIcon(draw_icon("trash", 16, PALETTE["text2"]))
+        limpar.setCursor(Qt.CursorShape.PointingHandCursor)
+        limpar.setToolTip("Apaga a identificação guardada nesta máquina")
+        limpar.clicked.connect(self._limpar)
+        acoes.addWidget(limpar)
+        acoes.addStretch()
+
+        cancelar = QPushButton("Cancelar")
+        cancelar.setCursor(Qt.CursorShape.PointingHandCursor)
+        cancelar.clicked.connect(self.reject)
+        acoes.addWidget(cancelar)
+
+        guardar = QPushButton("  Guardar")
+        guardar.setObjectName("primary")
+        guardar.setIcon(draw_icon("save", 16, PALETTE["surface"]))
+        guardar.setCursor(Qt.CursorShape.PointingHandCursor)
+        guardar.setDefault(True)
+        guardar.clicked.connect(self._guardar)
+        acoes.addWidget(guardar)
+        lay.addLayout(acoes)
+        externo.addWidget(rodape)
+
+    # ── o brasão ─────────────────────────────
+    #: Caixa em que o brasão é guardado, em pixels.
+    #:
+    #: O dobro da caixa em que o documento o desenha, para que a
+    #: impressão em 300 dpi não o veja pixelado. Mais do que isso é peso
+    #: à toa: cada termo carrega esta imagem embutida, e um brasão de
+    #: dois megabytes viraria dois megabytes em cada peça dos autos.
+    #:
+    #: Encaixa preservando a proporção, e não força altura: brasão
+    #: redondo, faixa larga e escudo alto têm de sair todos no mesmo peso
+    #: visual.
+    CAIXA_BRASAO = (300, 144)
+
+    def _mostrar_brasao(self):
+        from PyQt6.QtGui import QPixmap
+        if perfil.tem_brasao():
+            pix = QPixmap(str(perfil.caminho_brasao()))
+            if not pix.isNull():
+                self._vista_brasao.setPixmap(pix.scaled(
+                    92, 60, Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation))
+                self._b_tirar.setEnabled(True)
+                return
+        self._vista_brasao.setPixmap(QPixmap())
+        self._vista_brasao.setText("sem brasão")
+        self._vista_brasao.setStyleSheet(
+            f"border: 1px dashed {PALETTE['border']}; border-radius: 6px; "
+            f"color: {PALETTE['text3']}; font-size: 10px;")
+        self._b_tirar.setEnabled(False)
+
+    def _escolher_brasao(self):
+        from PyQt6.QtCore import QBuffer, QByteArray, QIODevice
+        from PyQt6.QtGui import QPixmap
+        from PyQt6.QtWidgets import QFileDialog
+
+        caminho, _ = QFileDialog.getOpenFileName(
+            self, "Escolher o brasão do órgão", "",
+            "Imagens (*.png *.jpg *.jpeg *.bmp *.gif *.webp)")
+        if not caminho:
+            return
+        pix = QPixmap(caminho)
+        if pix.isNull():
+            QMessageBox.warning(
+                self, "Imagem não reconhecida",
+                "Não foi possível ler esse arquivo como imagem.")
+            return
+        # Reduzido e convertido para PNG aqui, uma vez, e não a cada
+        # termo: o que fica guardado já é exatamente o que vai ao
+        # documento.
+        pix = pix.scaled(
+            *self.CAIXA_BRASAO, Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation)
+        bytes_ = QByteArray()
+        buffer = QBuffer(bytes_)
+        buffer.open(QIODevice.OpenModeFlag.WriteOnly)
+        pix.save(buffer, "PNG")
+        buffer.close()
+        try:
+            perfil.gravar_brasao(bytes(bytes_.data()))
+        except OSError as e:                                # noqa: BLE001
+            QMessageBox.warning(self, "Não foi possível guardar",
+                                f"{type(e).__name__}: {e}")
+            return
+        self._mostrar_brasao()
+
+    def _remover_brasao(self):
+        perfil.remover_brasao()
+        self._mostrar_brasao()
+
+    # ── ações ────────────────────────────────
+    def _limpar(self):
+        for campo in self._campos.values():
+            campo.clear()
+
+    def _guardar(self):
+        perfil.gravar(perfil.Perfil(
+            **{c: w.text().strip() for c, w in self._campos.items()}))
+        self.accept()
+
+
+# ─────────────────────────────────────────
 #  JANELA PRINCIPAL
 # ─────────────────────────────────────────
 
@@ -784,8 +1036,32 @@ class TemisWindow(QMainWindow):
         self._pages: dict[str, int] = {}
         self._tools: dict[str, object] = {}
 
+        # O registro da sessão começa aqui, antes de qualquer ferramenta:
+        # ele documenta a execução do sistema, e não o uso de uma tela.
+        # Se falhar, o sistema abre assim mesmo — registro é acessório
+        # ao trabalho, e não pode impedi-lo.
+        self._registrador = None
+        try:
+            from .tools import atividades_core
+            self._registrador = atividades_core.Registrador()
+            self._registrador.iniciar()
+        except Exception:                                   # noqa: BLE001
+            pass
+
         self._build_ui()
         self.go_portal()
+
+        # Regravação periódica, além da que acompanha cada anotação: numa
+        # sessão longa e sem eventos, é o que garante que a duração em
+        # disco não fique parada na hora em que o sistema abriu.
+        if self._registrador is not None:
+            from .tools import atividades_core
+            self._pulso_registro = QTimer(self)
+            self._pulso_registro.setInterval(
+                int(atividades_core.INTERVALO_GRAVACAO * 1000))
+            self._pulso_registro.timeout.connect(
+                lambda: self._registrador.gravar())
+            self._pulso_registro.start()
 
     def _build_ui(self):
         self._stack = QStackedWidget()
@@ -794,6 +1070,7 @@ class TemisWindow(QMainWindow):
         self._portal = PortalPage()
         self._portal.tool_requested.connect(self.open_tool)
         self._portal.about_requested.connect(self._show_about)
+        self._portal.perfil_requested.connect(self._editar_perfil)
         self._pages[self.PORTAL] = self._stack.addWidget(self._portal)
 
         bar = self.statusBar()
@@ -818,6 +1095,19 @@ class TemisWindow(QMainWindow):
         tool = getattr(current, "tool", None)
         if tool is not None:
             tool.on_deactivated()
+        if self._registrador is not None:
+            try:
+                self._registrador.fechou()
+            except Exception:                               # noqa: BLE001
+                pass
+
+    def _anotar_atividade(self, ferramenta: str, texto: str):
+        if self._registrador is None:
+            return
+        try:
+            self._registrador.anotar(ferramenta, texto)
+        except Exception:                                   # noqa: BLE001
+            pass
 
     def open_tool(self, key: str):
         entry = next((e for e in REGISTRY if e[0].key == key), None)
@@ -830,6 +1120,18 @@ class TemisWindow(QMainWindow):
         if key not in self._tools:
             tool = build_tool(meta, cls)
             tool.status_msg.connect(self.statusBar().showMessage)
+            # A mesma mensagem que informa a barra de status alimenta o
+            # relatório de atividades. Sai de graça e é o que há de mais
+            # fiel: é a própria ferramenta dizendo o que concluiu, sem
+            # que nenhuma delas precise saber que existe um relatório.
+            tool.status_msg.connect(
+                lambda texto, nome=meta.name: self._anotar_atividade(
+                    nome, texto))
+
+            # A tela do relatório precisa do registrador para mostrar a
+            # sessão em curso; as demais ferramentas não sabem dele.
+            if hasattr(tool, "registrador"):
+                tool.registrador = self._registrador
 
             frame = ToolFrame(tool)
             frame.back_requested.connect(self.go_portal)
@@ -837,6 +1139,19 @@ class TemisWindow(QMainWindow):
 
             self._tools[key] = tool
             self._pages[key] = self._stack.addWidget(frame)
+
+        # O perfil é oferecido a cada abertura, e não só na primeira:
+        # quem preenche a identificação depois de já ter aberto uma
+        # ferramenta encontra os campos preenchidos ao voltar. Campo com
+        # conteúdo nunca é tocado — quem apagou e escreveu outra coisa
+        # continua com o que escreveu.
+        perfil.aplicar(self._tools[key])
+
+        if self._registrador is not None:
+            try:
+                self._registrador.abriu(key, meta.name)
+            except Exception:                               # noqa: BLE001
+                pass
 
         self._stack.setCurrentIndex(self._pages[key])
         self._tools[key].on_activated()
@@ -847,6 +1162,19 @@ class TemisWindow(QMainWindow):
 
     def _show_about(self):
         SobreDialog(self).exec()
+
+    def _editar_perfil(self):
+        if PerfilDialog(self).exec() != QDialog.DialogCode.Accepted:
+            return
+        # Vale já para as ferramentas abertas nesta sessão, sem esperar
+        # que sejam reabertas — mas só nos campos ainda vazios.
+        p = perfil.ler()
+        alcancadas = sum(bool(perfil.aplicar(t, p))
+                         for t in self._tools.values())
+        self.statusBar().showMessage(
+            "Identificação guardada nesta máquina."
+            + (f"  Preenchida em {alcancadas} ferramenta(s) já aberta(s)."
+               if alcancadas else ""), 6000)
 
     # ─────────────────────────────────────
     #  ENCERRAMENTO
@@ -859,4 +1187,14 @@ class TemisWindow(QMainWindow):
                 return
         for tool in self._tools.values():
             tool.shutdown()
+
+        # Por último, e dentro de um `try`: o relatório é o registro do
+        # que se fez, mas uma falha ao compô-lo não pode impedir o
+        # sistema de fechar.
+        if self._registrador is not None:
+            try:
+                self._registrador.encerrar()
+            except Exception:                               # noqa: BLE001
+                pass
+
         ev.accept()

@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
     QTextEdit, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
+from .. import perfil
 from ..icons import draw_icon
 from ..impressao import (documento_html, imprimir_documento,
                          limpar_para_sei, preparar_escritor)
@@ -191,6 +192,16 @@ class TermoDialog(QDialog):
         layout.addWidget(hsep())
         layout.addWidget(self._montar_acoes())
         self._remontar()
+        # Por último, e não junto do formulário: preencher um campo
+        # dispara `textChanged`, que remonta a prévia do termo — e a
+        # prévia só existe depois. Chamado antes, isto derrubava o
+        # programa inteiro, sem mensagem: exceção dentro de sinal do Qt
+        # não vira erro em Python, vira encerramento do processo.
+        #
+        # Só os campos vazios são tocados. O que veio do termo anterior,
+        # ou o que a pessoa escrever depois, vale mais que o perfil: ele
+        # poupa digitação, não decide quem assina.
+        perfil.aplicar(self)
 
     def _montar_formulario(self) -> QWidget:
         caixa = QWidget()

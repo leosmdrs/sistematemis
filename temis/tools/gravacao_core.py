@@ -104,6 +104,28 @@ QUALIDADES = (
 #  CONTEXTO DA ESTAÇÃO
 # ─────────────────────────────────────────
 
+#: Cargo e órgão de quem assina.
+#:
+#: Vinham escritos no código, como "Policial Rodoviário Federal": o
+#: sistema nasceu na PRF, mas não é dela. Agora saem da Identificação
+#: guardada na estação, e continuam editáveis no próprio termo — o campo
+#: da tela vale mais que a configuração, sempre.
+def _do_perfil(campo: str) -> str:
+    from .. import perfil
+    try:
+        return getattr(perfil.ler(), campo, "") or ""
+    except Exception:                                       # noqa: BLE001
+        return ""
+
+
+def cargo_padrao() -> str:
+    return _do_perfil("cargo")
+
+
+def orgao_padrao() -> str:
+    return _do_perfil("orgao")
+
+
 @dataclass
 class Contexto:
     """O que identifica a máquina e quem operava no momento da gravação."""
@@ -313,7 +335,21 @@ def montar_faixa(pasta: str | Path, identificacao: str,
 
     Só o relógio continua embutido, porque precisa da expansão ligada
     para ser reavaliado a cada quadro. E o que ele contém é fixo.
+
+    O corte de um pixel que abre a sequência não é capricho. O H.264 em
+    yuv420p exige largura e altura pares, e a área de trabalho de quem
+    tem dois monitores de alturas diferentes quase sempre é ímpar: o
+    Windows alinha as telas pelo meio, e a sobra vertical do alinhamento
+    entra na conta. Numa estação com 1280×720 ao lado de 1920×1080, a
+    área virtual mede 3840×1339. O codificador recusava abrir — "height
+    not divisible by 2" —, nada era escrito e sobrava um arquivo de zero
+    byte, sem aviso. Com um monitor só, a conta dava par e ninguém
+    percebia. Um pixel a menos na borda não muda o que se vê; o arquivo
+    vazio muda tudo.
     """
+    # Par também aqui: se a faixa tivesse altura ímpar, ela devolveria o
+    # problema depois do corte.
+    altura += altura % 2
     pasta = Path(pasta)
     pasta.mkdir(parents=True, exist_ok=True)
     arq_ident = pasta / "faixa_identificacao.txt"
@@ -330,6 +366,7 @@ def montar_faixa(pasta: str | Path, identificacao: str,
     relogio = "%{localtime\\:%X}"
     decorrido = "%{pts\\:hms}"
     return (
+        f"crop=trunc(iw/2)*2:trunc(ih/2)*2:0:0,"
         f"pad=iw:ih+{altura}:0:0:color={fundo},"
         f"drawtext=fontfile='{fonte}':textfile='{ident}':expansion=none"
         f":fontcolor=white:fontsize=18:x=14:y=h-{altura}+8,"
@@ -340,6 +377,40 @@ def montar_faixa(pasta: str | Path, identificacao: str,
         f"drawtext=fontfile='{fonte}':textfile='{marca}':expansion=none"
         f":fontcolor=white@0.6:fontsize=17:x=w-tw-14:y=h-{altura}+33"
     )
+
+
+#: Falhas conhecidas do codificador, ditas em português. A chave é o
+#: trecho que o FFmpeg imprime; o valor, o que a pessoa precisa saber
+#: para resolver. O que não estiver aqui vai cru, que é melhor do que
+#: uma mensagem genérica: o texto do FFmpeg ao menos pode ser pesquisado.
+_FALHAS = (
+    ("not divisible by 2",
+     "A área a gravar tem largura ou altura ímpar, e o formato de vídeo "
+     "exige medidas pares. Costuma acontecer com dois monitores de "
+     "alturas diferentes."),
+    ("Could not find audio only device",
+     "O microfone escolhido não foi encontrado. Ele pode ter sido "
+     "desconectado, ou estar em uso por outro programa."),
+    ("I/O error",
+     "O microfone escolhido não pôde ser aberto. Ele pode estar em uso "
+     "por outro programa."),
+    ("Permission denied",
+     "O sistema não deixou gravar no arquivo de destino."),
+    ("No such file or directory",
+     "A pasta de destino não existe ou não pôde ser criada."),
+)
+
+
+def _explicar_falha(erro: str) -> str:
+    """Traduz o que o codificador disse, sem esconder o que ele disse."""
+    for marca, explicacao in _FALHAS:
+        if marca.lower() in erro.lower():
+            return f"{explicacao}\n\nO codificador informou: {marca}"
+    linhas = [x.strip() for x in erro.splitlines() if x.strip()]
+    if linhas:
+        return ("A gravação não começou. O codificador informou:\n\n"
+                + "\n".join(linhas[-4:]))
+    return "A gravação não começou, e o codificador não disse por quê."
 
 
 # ─────────────────────────────────────────
@@ -491,6 +562,38 @@ class Gravador:
         self._processo = subprocess.Popen(
             self.comando(), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, creationflags=_SEM_JANELA)
+        self._conferir_partida()
+
+    #: Quanto se espera para saber se o codificador ficou de pé.
+    #:
+    #: Medido, não estimado: o FFmpeg que recusa a configuração morre em
+    #: torno de quatro décimos de segundo — abrir a captura e montar o
+    #: filtro é tudo o que ele faz antes de desistir. Um segundo e meio
+    #: cobre isso com margem, e é o que a diligência atrasa para começar.
+    PARTIDA = 1.5
+
+    def _conferir_partida(self):
+        """Confere se a gravação de fato começou, em vez de supor.
+
+        Abrir o processo sempre dá certo: quem recusa a configuração é o
+        codificador, um instante depois, e o programa só olhava para isso
+        ao encerrar. O operador conduzia a diligência inteira acreditando
+        estar sendo gravado e encontrava, no fim, um arquivo de zero
+        byte. Falhar aqui, na cara de quem começou, é a diferença entre
+        um contratempo e uma diligência perdida.
+        """
+        limite = time.time() + self.PARTIDA
+        while time.time() < limite:
+            if self._processo.poll() is None:
+                time.sleep(0.05)
+                continue
+            try:
+                erro = self._processo.stderr.read().decode("utf-8", "replace")
+            except (OSError, ValueError, AttributeError):
+                erro = ""
+            self._processo = None
+            self._inicio = 0.0
+            raise RuntimeError(_explicar_falha(erro))
 
     def encerrar(self, espera: float = 25.0) -> Resultado:
         """Fecha a gravação e devolve o que ela produziu."""
@@ -651,7 +754,8 @@ class TermoGravacao:
     nome: str = ""
     matricula: str = ""
     lotacao: str = ""
-    cargo: str = "Policial Rodoviário Federal"
+    cargo: str = field(default_factory=cargo_padrao)
+    orgao: str = field(default_factory=orgao_padrao)
     # a que autos
     tipo_processo: str = "IPS"
     numero_processo: str = ""
@@ -751,12 +855,14 @@ def _quadro_registros(t: TermoGravacao) -> str:
 
 def build_html(t: TermoGravacao) -> str:
     """Termo em HTML, para exibir e exportar."""
+    from ..impressao import cabecalho_html
     import html as _html
     e = _html.escape
 
     partes = [
         "<html><body style=\"font-family:'Segoe UI',Arial,sans-serif; "
         'color:#16233a;">',
+        cabecalho_html(),
         '<div align="center" style="margin-bottom:18px;">'
         '<b style="font-size:14pt; letter-spacing:0.5px;">'
         "Termo de Registro Audiovisual de Diligência em Meio Eletrônico"

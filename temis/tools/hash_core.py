@@ -30,6 +30,40 @@ CHUNK = 1024 * 1024
 #  ARQUIVO
 # ─────────────────────────────────────────
 
+#: Cargo e órgão de quem assina.
+#:
+#: Vinham escritos no código, como "Policial Rodoviário Federal": o
+#: sistema nasceu na PRF, mas não é dela. Agora saem da Identificação
+#: guardada na estação, e continuam editáveis no próprio termo — o campo
+#: da tela vale mais que a configuração, sempre.
+def _do_perfil(campo: str) -> str:
+    from .. import perfil
+    try:
+        return getattr(perfil.ler(), campo, "") or ""
+    except Exception:                                       # noqa: BLE001
+        return ""
+
+
+def cargo_padrao() -> str:
+    return _do_perfil("cargo")
+
+
+def orgao_padrao() -> str:
+    return _do_perfil("orgao")
+
+
+def _com_cargo(t) -> str:
+    """"Cargo Nome", ou só o nome quando não há cargo informado.
+
+    Sem isto, quem não preenchesse o cargo teria termos abrindo com "eu,
+    ,  Fulano" — dois espaços e uma vírgula órfã numa peça que vai ao
+    processo.
+    """
+    cargo = (getattr(t, "cargo", "") or "").strip()
+    nome = (getattr(t, "nome", "") or "").strip()
+    return " ".join(x for x in (cargo, nome) if x)
+
+
 @dataclass
 class FileEntry:
     path: str
@@ -90,6 +124,8 @@ class TermoData:
     nome: str = ""
     matricula: str = ""
     lotacao: str = ""
+    cargo: str = field(default_factory=cargo_padrao)
+    orgao: str = field(default_factory=orgao_padrao)
     tipo_processo: str = "IPS"
     numero_processo: str = ""
     dia: int = 1
@@ -111,7 +147,7 @@ def build_intro(d: TermoData) -> str:
         else f"Aos {d.dia} dias do mês de {mes} de {d.ano}"
     )
     return (
-        f"{quando}, eu, PRF {d.nome}, matrícula {d.matricula}, "
+        f"{quando}, eu, {_com_cargo(d)}, matrícula {d.matricula}, "
         f"lotado(a) no(a) {d.lotacao}, visando instruir os autos "
         f"{artigo} {d.tipo_processo} nº {d.numero_processo}, declaro que "
         f"foi realizada a juntada dos arquivos abaixo."
@@ -123,6 +159,7 @@ ENCERRAMENTO = "Sem mais a relatar, encerro o presente termo."
 
 def build_html(d: TermoData) -> str:
     """Termo em HTML, para exibir e exportar em PDF."""
+    from ..impressao import cabecalho_html
     e = html.escape
     # A cor vai explícita em cada célula: o motor de texto do Qt não
     # propaga o `color` do <body> para dentro da tabela, e ainda trata
@@ -142,6 +179,7 @@ def build_html(d: TermoData) -> str:
 
     return f"""
 <html><body style="font-family:'Segoe UI',Arial,sans-serif; color:#16233a;">
+{cabecalho_html()}
 <div align="center" style="margin-bottom:18px;">
   <b style="font-size:14pt; letter-spacing:0.5px;">Termo de Juntada de Arquivo(s) Digital(is)</b>
 </div>
@@ -163,7 +201,7 @@ def build_html(d: TermoData) -> str:
 <div align="center" style="margin-top:36px;">
   ______________________________________<br/>
   <b>{e(d.nome)}</b><br/>
-  <span style="font-size:10pt;">Policial Rodoviário Federal</span>
+  <span style="font-size:10pt;">{e(d.cargo)}</span>
 </div>
 </body></html>
 """
@@ -187,7 +225,8 @@ def build_text(d: TermoData) -> str:
     L.append("")
     L.append("_" * 40)
     L.append(d.nome)
-    L.append("Policial Rodoviário Federal")
+    if d.cargo.strip():
+        L.append(d.cargo)
     return "\n".join(L)
 
 

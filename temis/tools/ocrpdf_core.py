@@ -98,6 +98,40 @@ ROTULO_SITUACAO = {
 #  MODELO
 # ─────────────────────────────────────────
 
+#: Cargo e órgão de quem assina.
+#:
+#: Vinham escritos no código, como "Policial Rodoviário Federal": o
+#: sistema nasceu na PRF, mas não é dela. Agora saem da Identificação
+#: guardada na estação, e continuam editáveis no próprio termo — o campo
+#: da tela vale mais que a configuração, sempre.
+def _do_perfil(campo: str) -> str:
+    from .. import perfil
+    try:
+        return getattr(perfil.ler(), campo, "") or ""
+    except Exception:                                       # noqa: BLE001
+        return ""
+
+
+def cargo_padrao() -> str:
+    return _do_perfil("cargo")
+
+
+def orgao_padrao() -> str:
+    return _do_perfil("orgao")
+
+
+def _com_cargo(t) -> str:
+    """"Cargo Nome", ou só o nome quando não há cargo informado.
+
+    Sem isto, quem não preenchesse o cargo teria termos abrindo com "eu,
+    ,  Fulano" — dois espaços e uma vírgula órfã numa peça que vai ao
+    processo.
+    """
+    cargo = (getattr(t, "cargo", "") or "").strip()
+    nome = (getattr(t, "nome", "") or "").strip()
+    return " ".join(x for x in (cargo, nome) if x)
+
+
 @dataclass
 class Opcoes:
     """Ajustes do reconhecimento."""
@@ -526,6 +560,8 @@ class TermoOCR:
     nome: str = ""
     matricula: str = ""
     lotacao: str = ""
+    cargo: str = field(default_factory=cargo_padrao)
+    orgao: str = field(default_factory=orgao_padrao)
     tipo_processo: str = "IPS"
     numero_processo: str = ""
     dia: int = 1
@@ -557,7 +593,7 @@ def intro_ocr(t: TermoOCR) -> str:
     quantos = len(t.convertidos)
     plural = "documento" if quantos == 1 else "documentos"
     return (
-        f"{quando}, eu, PRF {t.nome}, matrícula {t.matricula}, "
+        f"{quando}, eu, {_com_cargo(t)}, matrícula {t.matricula}, "
         f"lotado(a) no(a) {t.lotacao}, visando instruir os autos "
         f"{artigo} {t.tipo_processo} nº {t.numero_processo}, declaro que "
         f"submeti a reconhecimento óptico de caracteres {quantos} "
@@ -616,12 +652,14 @@ def _quadro_documentos(t: TermoOCR) -> str:
 
 def build_html(t: TermoOCR) -> str:
     """Termo em HTML, para exibir e exportar."""
+    from ..impressao import cabecalho_html
     import html as _html
     e = _html.escape
 
     partes = [
         "<html><body style=\"font-family:'Segoe UI',Arial,sans-serif; "
         'color:#16233a;">',
+        cabecalho_html(),
         '<div align="center" style="margin-bottom:18px;">'
         '<b style="font-size:14pt; letter-spacing:0.5px;">'
         "Termo de Reconhecimento Óptico de Documento Digitalizado</b></div>",
@@ -675,7 +713,7 @@ def build_html(t: TermoOCR) -> str:
         '<br/><br/><div align="center" style="margin-top:36px;">'
         "______________________________________<br/>"
         f"<b>{e(t.nome)}</b><br/>"
-        '<span style="font-size:10pt;">Policial Rodoviário Federal</span>'
+        f'<span style="font-size:10pt;">{e(t.cargo)}</span>'
         "</div></body></html>")
     return "\n".join(partes)
 
@@ -705,5 +743,5 @@ def build_text(t: TermoOCR) -> str:
     L += ["2. MÉTODO", ""] + [f"  - {linha}" for linha in t.opcoes.resumo()]
     L += ["", "3. RESSALVAS", ""] + [f"  - {linha}" for linha in RESSALVAS]
     L += ["", ENCERRAMENTO, "", "_" * 40, t.nome,
-          "Policial Rodoviário Federal"]
+          t.cargo]
     return "\n".join(L)

@@ -31,10 +31,144 @@ from PyQt6.QtGui import (
 #: Cor da letra no papel. O tema da tela é escuro; o documento, não.
 TINTA = "#16233A"
 
+#: Azul-marinho da marca, para o nome do sistema e o do órgão no timbre.
+#: É o mesmo da identidade visual — o cabeçalho é o único lugar do
+#: documento em que a cor da instituição aparece.
+MARINHO = "#0A2442"
+
 #: Margens em milímetros (esquerda, topo, direita, base). Estreitas de
 #: propósito: peças com quadros largos ficam apertadas com as margens
 #: generosas que o Qt usa por padrão.
 MARGENS = (15, 18, 15, 15)
+
+
+# ─────────────────────────────────────────
+#  CABEÇALHO DAS PEÇAS
+# ─────────────────────────────────────────
+
+#: Lado da marca do Têmis no cabeçalho, em pixels de documento.
+ALTURA_CABECALHO = 58
+
+#: Caixa em que qualquer brasão é encaixado: largura e altura máximas.
+#:
+#: Existe porque brasão não tem formato: o da PRF é um círculo, o de uma
+#: procuradoria costuma ser uma faixa larga e baixa, e o de um tribunal
+#: um escudo alto. Fixando só a altura, como se fazia aqui, o redondo
+#: saía miúdo ao lado do nome do órgão. Encaixando na caixa e preservando
+#: a proporção, qualquer um dos três chega ao documento no mesmo peso
+#: visual — que é o que se quer de um timbre.
+CAIXA_BRASAO = (150, 72)
+
+
+def _medida_do_brasao() -> tuple[int, int]:
+    """Quanto o brasão vai medir no documento, encaixado na caixa.
+
+    Devolve (0, 0) quando não há brasão ou quando o arquivo não informa
+    as próprias dimensões — e aí ele sai sem medida declarada, no
+    tamanho natural, que é melhor do que sair esticado.
+    """
+    from . import perfil
+
+    largura, altura = perfil.dimensoes_brasao()
+    if largura <= 0 or altura <= 0:
+        return (0, 0)
+    caixa_l, caixa_a = CAIXA_BRASAO
+    escala = min(caixa_l / largura, caixa_a / altura)
+    return (max(1, round(largura * escala)), max(1, round(altura * escala)))
+
+
+def _marca_em_dados(altura: int = ALTURA_CABECALHO) -> str:
+    """A balança do Têmis como URI de dados.
+
+    Desenhada na hora e embutida no documento. Se o desenho falhar — sem
+    ambiente gráfico, por exemplo —, devolve vazio e o cabeçalho sai só
+    com o nome: peça sem marca é peça feia, peça que não abre é peça
+    perdida.
+    """
+    try:
+        import base64
+
+        from PyQt6.QtCore import QBuffer, QByteArray, QIODevice
+
+        from .icons import temis_pixmap
+
+        pixmap = temis_pixmap(altura * 2)
+        # O QByteArray precisa sobreviver ao QBuffer: um temporário aqui
+        # deixa o buffer com um ponteiro solto, e o processo morre na
+        # gravação. Já custou uma vez, no Quadro de Evidências.
+        bytes_ = QByteArray()
+        buffer = QBuffer(bytes_)
+        buffer.open(QIODevice.OpenModeFlag.WriteOnly)
+        pixmap.save(buffer, "PNG")
+        buffer.close()
+        return ("data:image/png;base64,"
+                + base64.b64encode(bytes(bytes_.data())).decode("ascii"))
+    except Exception:                                       # noqa: BLE001
+        return ""
+
+
+def cabecalho_html() -> str:
+    """O timbre que abre toda peça do sistema.
+
+    Três colunas: à esquerda o sistema, que assina sempre — foi ele quem
+    produziu a peça, e isso não depende de configuração; ao centro o
+    órgão; à direita o brasão dele. Órgão e brasão só aparecem se tiverem
+    sido informados em Identificação, e a ausência de um não desarruma o
+    outro: sem brasão, o nome do órgão fica centrado no espaço que sobra;
+    sem nenhum dos dois, resta o bloco do sistema, à esquerda, como
+    sempre foi.
+
+    Vai em tabela, e não em `flex`: o destino destas peças é o editor do
+    SEI e o QTextDocument do Qt, e nenhum dos dois entende folha de
+    estilo moderna. Tabela de três células os dois entendem desde
+    sempre.
+    """
+    from . import perfil
+
+    p = perfil.ler()
+    orgao = p.orgao.strip()
+    brasao = perfil.brasao_em_dados()
+    marca = _marca_em_dados()
+
+    # O nome fica ao lado da balança, em duas linhas, e não embaixo:
+    # embaixo ele alargava a coluna da esquerda e empurrava o nome do
+    # órgão para fora do centro da folha.
+    nome_sistema = (
+        f'<span style="font-size:13pt; font-weight:bold; color:{MARINHO}; '
+        f'line-height:110%;">Sistema<br/>Têmis</span>')
+    esquerda = (
+        '<table cellspacing="0" cellpadding="0"><tr>'
+        + (f'<td valign="middle"><img src="{marca}" '
+           f'width="{ALTURA_CABECALHO}" height="{ALTURA_CABECALHO}"/></td>'
+           f'<td width="8"></td>' if marca else "")
+        + f'<td valign="middle">{nome_sistema}</td>'
+        "</tr></table>")
+
+    if not orgao and not brasao:
+        return (f'<table width="100%" cellspacing="0" cellpadding="0">'
+                f'<tr><td align="left" valign="middle">{esquerda}</td>'
+                f"</tr></table><hr/>")
+
+    centro = (f'<span style="font-size:15pt; font-weight:bold; '
+              f'color:{MARINHO};">{_html.escape(orgao)}</span>'
+              if orgao else "")
+    largura_brasao, altura_brasao = _medida_do_brasao()
+    if brasao and largura_brasao:
+        direita = (f'<img src="{brasao}" width="{largura_brasao}" '
+                   f'height="{altura_brasao}"/>')
+    elif brasao:
+        direita = f'<img src="{brasao}"/>'
+    else:
+        direita = ""
+
+    return (
+        '<table width="100%" cellspacing="0" cellpadding="0">'
+        '<tr>'
+        f'<td width="27%" align="left" valign="middle">{esquerda}</td>'
+        f'<td width="46%" align="center" valign="middle">{centro}</td>'
+        f'<td width="27%" align="right" valign="middle">{direita}</td>'
+        "</tr></table><hr/>"
+    )
 
 
 def preparar_escritor(caminho: str, titulo: str = "",

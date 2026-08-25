@@ -169,6 +169,18 @@ def draw_icon(kind: str, size: int = 16, color: str = None, width: float = 1.8) 
         p.drawEllipse(QPointF(c, c), c - m * 0.5, c - m * 0.5)
         p.drawLine(QPointF(c, c - s * 0.04), QPointF(c, c + s * 0.16))
         p.drawPoint(QPointF(c, c - s * 0.17))
+    elif kind == "cracha":
+        # cartão de identificação: a moldura, o retrato à esquerda e duas
+        # linhas de dados à direita
+        p.drawRoundedRect(QRectF(m * 0.7, m, s - m * 1.4, s - m * 2),
+                          s * 0.06, s * 0.06)
+        p.drawEllipse(QPointF(c - s * 0.14, c - s * 0.06), s * 0.06, s * 0.06)
+        p.drawArc(QRectF(c - s * 0.24, c + s * 0.01, s * 0.2, s * 0.16),
+                  0, 180 * 16)
+        p.drawLine(QPointF(c + s * 0.03, c - s * 0.06),
+                   QPointF(s - m * 1.2, c - s * 0.06))
+        p.drawLine(QPointF(c + s * 0.03, c + s * 0.06),
+                   QPointF(s - m * 1.7, c + s * 0.06))
     elif kind == "home":
         poly((m, c), (c, m * 0.8), (s - m, c))
         poly((m + s * 0.06, c), (m + s * 0.06, s - m), (s - m - s * 0.06, s - m),
@@ -298,6 +310,18 @@ def draw_icon(kind: str, size: int = 16, color: str = None, width: float = 1.8) 
         p.drawEllipse(centro, raio, raio)
         p.drawLine(QPointF(centro.x() + raio * 0.72, centro.y() + raio * 0.72),
                    QPointF(s - m * 0.7, s - m * 0.7))
+    elif kind == "tool_atividades":
+        # folha de relatório com um relógio no canto: o que se fez, e quando
+        poly((m * 0.8, s - m * 0.7), (m * 0.8, m * 0.7), (s - m * 1.4, m * 0.7),
+             (s - m * 1.4, c + s * 0.02))
+        p.drawLine(QPointF(m * 1.5, m * 1.5), QPointF(s - m * 2.1, m * 1.5))
+        p.drawLine(QPointF(m * 1.5, c - s * 0.04), QPointF(s - m * 2.1, c - s * 0.04))
+        p.drawLine(QPointF(m * 1.5, c + s * 0.08), QPointF(c - s * 0.02, c + s * 0.08))
+        p.drawEllipse(QPointF(s - m * 0.9, s - m * 0.9), s * 0.17, s * 0.17)
+        p.drawLine(QPointF(s - m * 0.9, s - m * 0.9),
+                   QPointF(s - m * 0.9, s - m * 0.9 - s * 0.1))
+        p.drawLine(QPointF(s - m * 0.9, s - m * 0.9),
+                   QPointF(s - m * 0.9 + s * 0.08, s - m * 0.9))
     elif kind == "tool_quadro":
         # alfinetes ligados por barbante — o mural de investigação
         a = (s * 0.24, s * 0.26)

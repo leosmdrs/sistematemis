@@ -41,6 +41,7 @@ except ImportError:                                     # pragma: no cover
     QWebEnginePage = object                             # type: ignore
     QWebEngineUrlRequestInterceptor = object            # type: ignore
 
+from .. import perfil
 from ..icons import draw_icon
 from ..impressao import (documento_html, imprimir_documento,
                          limpar_para_sei, preparar_escritor)
@@ -157,6 +158,16 @@ class TermoDialog(QDialog):
         layout.addWidget(hsep())
         layout.addWidget(self._montar_acoes())
         self._remontar()
+        # Por último, e não junto do formulário: preencher um campo
+        # dispara `textChanged`, que remonta a prévia do termo — e a
+        # prévia só existe depois. Chamado antes, isto derrubava o
+        # programa inteiro, sem mensagem: exceção dentro de sinal do Qt
+        # não vira erro em Python, vira encerramento do processo.
+        #
+        # Só os campos vazios são tocados. O que veio do termo anterior,
+        # ou o que a pessoa escrever depois, vale mais que o perfil: ele
+        # poupa digitação, não decide quem assina.
+        perfil.aplicar(self)
 
     def _montar_formulario(self) -> QWidget:
         caixa = QWidget()
@@ -511,6 +522,13 @@ class ExtracaoTool(ToolPage):
 
         self._lista_atos = QListWidget()
         self._lista_atos.setWordWrap(True)
+        # Nada de reticências nem de rolagem lateral: o que este painel
+        # mostra é o que a gravação de vídeo registra, e um dado cortado
+        # ali é um dado que não foi filmado. Se algo não couber, que
+        # desça de linha — nunca que suma para o lado.
+        self._lista_atos.setTextElideMode(Qt.TextElideMode.ElideNone)
+        self._lista_atos.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         coluna.addWidget(self._lista_atos, 1)
 
         self._rot_resumo = QLabel("")
@@ -708,13 +726,48 @@ class ExtracaoTool(ToolPage):
             self._registrar(core.ANOTACAO, texto.strip())
 
     # ── linha do tempo na tela ───────────────────
+    #: Maior sequência sem espaço que cabe na largura do painel.
+    #:
+    #: Medido: a linha do SHA-256 pedia 484 pixels num painel de 334
+    #: úteis, e saía cortada com reticências. Trinta e dois divide o
+    #: hash exatamente ao meio, e cada metade sobra folga.
+    LARGURA_EM_CARACTERES = 32
+
+    @classmethod
+    def _dobrar(cls, texto: str) -> str:
+        """Quebra sequências longas demais para caberem no painel.
+
+        A quebra automática do Qt só corta em espaço, e nem hash nem
+        endereço têm um. O resultado era o pior possível para o que esta
+        ferramenta existe: o hash **estava** registrado, ia inteiro para
+        o termo, e mesmo assim a tela mostrava só o começo dele — de modo
+        que a gravação de vídeo, que é o ponto da ferramenta, filmava um
+        hash pela metade.
+
+        A emenda é um espaço de largura zero, e não um espaço comum. Com
+        espaço comum o endereço aparecia na tela como
+        `logs-audi toria.csv`: quem lesse a filmagem veria um caractere
+        que o endereço não tem. Num registro que existe para provar
+        autenticidade, exibir o dado alterado é pior do que exibi-lo
+        cortado. O de largura zero é ponto de quebra para o Qt e não
+        imprime nada.
+        """
+        EMENDA = "​"
+        pedacos = []
+        for palavra in texto.split(" "):
+            while len(palavra) > cls.LARGURA_EM_CARACTERES:
+                pedacos.append(palavra[:cls.LARGURA_EM_CARACTERES] + EMENDA)
+                palavra = palavra[cls.LARGURA_EM_CARACTERES:]
+            pedacos.append(palavra)
+        return " ".join(pedacos).replace(EMENDA + " ", EMENDA)
+
     def _item(self, e: core.Evento) -> QListWidgetItem:
         linhas = [f"[{e.relogio}]  {e.rotulo}", e.descricao]
         if e.url:
             linhas.append(e.url)
         if e.detalhe:
             linhas.append(e.detalhe)
-        item = QListWidgetItem("\n".join(linhas))
+        item = QListWidgetItem("\n".join(self._dobrar(x) for x in linhas))
         cores = {core.DOWNLOAD: PALETTE["gold"],
                  core.FORMULARIO: PALETTE["info"],
                  core.FALHA: PALETTE["danger"],

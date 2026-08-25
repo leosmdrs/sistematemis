@@ -10,6 +10,7 @@ desenvolvimento".
 
 from .base import ToolMeta, ToolPage, PlaceholderPage
 from .antiinj import AntiInjectionTool
+from .atividades import AtividadesTool
 from .constatacao import ConstatacaoTool
 from .ips import IPSTool
 from .metadados import MetadadosTool
@@ -52,6 +53,8 @@ REGISTRY: list[tuple[ToolMeta, type | None]] = [
     (AntiInjectionTool.meta, AntiInjectionTool),
     (QuadroTool.meta,        QuadroTool),
     (VideoTool.meta,         VideoTool),
+    # o registro do próprio trabalho, que corre sozinho
+    (AtividadesTool.meta,    AtividadesTool),
 ]
 
 

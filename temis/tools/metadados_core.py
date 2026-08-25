@@ -38,6 +38,28 @@ from .video_core import _SEM_JANELA, ffprobe_path
 GRUPOS = ("Arquivo", "Documento", "Origem", "Localização", "Técnico")
 
 
+#: Cargo e órgão de quem assina.
+#:
+#: Vinham escritos no código, como "Policial Rodoviário Federal": o
+#: sistema nasceu na PRF, mas não é dela. Agora saem da Identificação
+#: guardada na estação, e continuam editáveis no próprio termo — o campo
+#: da tela vale mais que a configuração, sempre.
+def _do_perfil(campo: str) -> str:
+    from .. import perfil
+    try:
+        return getattr(perfil.ler(), campo, "") or ""
+    except Exception:                                       # noqa: BLE001
+        return ""
+
+
+def cargo_padrao() -> str:
+    return _do_perfil("cargo")
+
+
+def orgao_padrao() -> str:
+    return _do_perfil("orgao")
+
+
 @dataclass
 class Campo:
     """Um dado extraído do arquivo."""
@@ -635,7 +657,8 @@ class Declarante:
     nome: str = ""
     matricula: str = ""
     lotacao: str = ""
-    cargo: str = "Policial Rodoviário Federal"
+    cargo: str = field(default_factory=cargo_padrao)
+    orgao: str = field(default_factory=orgao_padrao)
 
 
 @dataclass
@@ -843,6 +866,7 @@ def build_html(arquivos: list[Arquivo], quando: str,
     quadros; há juntada em que a lista de metadados só atrapalha a
     leitura.
     """
+    from ..impressao import cabecalho_html
     import html as _html
 
     e = _html.escape
@@ -922,6 +946,7 @@ def build_html(arquivos: list[Arquivo], quando: str,
 
     return f"""
 <html><body style="font-family:'Segoe UI',Arial,sans-serif; color:{INK};">
+{cabecalho_html()}
 <div align="center" style="margin-bottom:16px;">
   <b style="font-size:14pt; letter-spacing:0.5px;">{
     "Termo de Juntada de Arquivo(s) Digital(is)" if not com_metadados

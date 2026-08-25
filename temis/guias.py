@@ -672,6 +672,57 @@ GUIAS: dict[str, Guia] = {
             "hora da cena importa, registre-a no termo.",
         ),
     ),
+
+    # ── o registro do próprio trabalho ────
+    "atividades": Guia(
+        finalidade=(
+            "Documenta cada execução do sistema, do momento em que ele abre "
+            "até o momento em que fecha: quais ferramentas foram usadas, em "
+            "que ordem, por quanto tempo, o que cada uma relatou ao "
+            "concluir, e a identificação completa da estação e da rede em "
+            "que se trabalhou.\n\n"
+            "Resolve dois problemas de naturezas diferentes. O primeiro é de "
+            "prestação de contas: mostrar o que foi feito num período, sem "
+            "depender de memória nem de anotação manual. O segundo é de "
+            "cadeia de custódia: quando se questiona em que máquina, em que "
+            "dia e por quanto tempo determinada peça foi produzida, existe "
+            "registro contemporâneo ao ato, gravado enquanto ele acontecia."
+        ),
+        quando=(
+            "Ao prestar contas do trabalho de um período — o relatório "
+            "reúne o que foi feito, sessão por sessão.",
+            "Quando se questiona onde e quando uma peça foi produzida.",
+            "Para conferir, a qualquer momento, o que o sistema registrou a "
+            "respeito do próprio uso.",
+        ),
+        passos=(
+            "Nada precisa ser feito para registrar: o registro começa "
+            "quando o sistema abre e se encerra quando ele fecha.",
+            "Abra a ferramenta para ver a sessão em curso e as anteriores. "
+            "A lista traz a mais recente no alto.",
+            "Selecione uma sessão para ler o relatório dela, e use "
+            "<b>Salvar em PDF</b> para levá-la aos autos.",
+            "<b>Apagar esta sessão</b> remove o registro do disco; "
+            "<b>Abrir a pasta</b> mostra onde tudo está guardado.",
+        ),
+        limites=(
+            "O registro fica apenas nesta máquina, e nada é enviado a "
+            "servidor algum. Quem opera pode lê-lo e apagá-lo por inteiro — "
+            "não é um controle a que ele esteja submetido sem saber.",
+            "Não são anotados o conteúdo dos arquivos examinados, o texto "
+            "digitado, os endereços visitados nem nomes de investigados. "
+            "Registra-se que uma ferramenta foi usada e o que ela própria "
+            "informou ao concluir. O material da apuração está nos termos "
+            "de cada ferramenta, que são as peças dos autos.",
+            "A qualificação que aparece no relatório é a guardada em "
+            "Identificação no início da sessão. Ela descreve a configuração "
+            "da estação, não prova quem praticou os atos: a autoria de cada "
+            "peça é a que consta do respectivo termo.",
+            "Sessão encerrada à força — queda de energia, término pelo "
+            "gerenciador de tarefas — gera relatório marcado como "
+            "interrompido, com o que havia sido gravado até então.",
+        ),
+    ),
 }
 
 

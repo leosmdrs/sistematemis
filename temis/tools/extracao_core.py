@@ -512,6 +512,7 @@ def _quadro_baixados(s: Sessao) -> str:
 
 def build_html(t: TermoExtracao) -> str:
     """Termo em HTML, para exibir e exportar."""
+    from ..impressao import cabecalho_html
     import html as _html
     e = _html.escape
     s = t.sessao or Sessao()
@@ -519,6 +520,7 @@ def build_html(t: TermoExtracao) -> str:
     partes = [
         "<html><body style=\"font-family:'Segoe UI',Arial,sans-serif; "
         'color:#16233a;">',
+        cabecalho_html(),
         '<div align="center" style="margin-bottom:18px;">'
         '<b style="font-size:14pt; letter-spacing:0.5px;">'
         "Termo de Extração de Dados em Sistema Informatizado</b></div>",

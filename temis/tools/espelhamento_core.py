@@ -135,6 +135,28 @@ def _rodar(argumentos: list[str], tempo: int = 30) -> str:
 #  APARELHOS
 # ─────────────────────────────────────────
 
+#: Cargo e órgão de quem assina.
+#:
+#: Vinham escritos no código, como "Policial Rodoviário Federal": o
+#: sistema nasceu na PRF, mas não é dela. Agora saem da Identificação
+#: guardada na estação, e continuam editáveis no próprio termo — o campo
+#: da tela vale mais que a configuração, sempre.
+def _do_perfil(campo: str) -> str:
+    from .. import perfil
+    try:
+        return getattr(perfil.ler(), campo, "") or ""
+    except Exception:                                       # noqa: BLE001
+        return ""
+
+
+def cargo_padrao() -> str:
+    return _do_perfil("cargo")
+
+
+def orgao_padrao() -> str:
+    return _do_perfil("orgao")
+
+
 @dataclass
 class Aparelho:
     """Um celular ligado ao computador."""
@@ -507,7 +529,8 @@ class TermoEspelhamento:
     nome: str = ""
     matricula: str = ""
     lotacao: str = ""
-    cargo: str = "Policial Rodoviário Federal"
+    cargo: str = field(default_factory=cargo_padrao)
+    orgao: str = field(default_factory=orgao_padrao)
     tipo_processo: str = "IPS"
     numero_processo: str = ""
     dia: int = 1
@@ -576,6 +599,7 @@ def _quadro(linhas, largura: str = "36%") -> str:
 
 def build_html(t: TermoEspelhamento) -> str:
     """Termo em HTML, para exibir e exportar."""
+    from ..impressao import cabecalho_html
     import html as _html
     e = _html.escape
     primeiro = t.bons[0] if t.bons else None
@@ -583,6 +607,7 @@ def build_html(t: TermoEspelhamento) -> str:
     partes = [
         "<html><body style=\"font-family:'Segoe UI',Arial,sans-serif; "
         'color:#16233a;">',
+        cabecalho_html(),
         '<div align="center" style="margin-bottom:18px;">'
         '<b style="font-size:14pt; letter-spacing:0.5px;">'
         "Termo de Espelhamento e Registro de Tela de Aparelho Móvel"

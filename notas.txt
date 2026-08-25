@@ -1,67 +1,115 @@
-ESPELHAMENTO DE CELULAR — ferramenta nova
+RELATÓRIO DE ATIVIDADES — ferramenta nova
 
-Há diligências que precisam registrar o que se vê num aparelho, e não o
-que está num arquivo: a sequência de telas de um aplicativo, uma conversa
-percorrida na frente de quem a apresenta, a navegação de quem entrega o
-celular voluntariamente. Fotografar a tela com outro celular resolve mal
-e documenta pior.
+Documenta cada execução do sistema, do abrir ao fechar, sem que ninguém
+precise ligá-la. Registra as ferramentas usadas e por quanto tempo, o que
+cada uma relatou ao concluir, e a identificação completa da estação e da
+rede em que se trabalhou.
 
-A ferramenta liga o aparelho Android pelo cabo USB, mostra a tela dele
-dentro do sistema e grava tudo o que acontece, com a identificação da
-diligência marcada na própria imagem. Ao fim, gera o termo com a relação
-das gravações, os hashes e a declaração do que foi alterado no aparelho
-para que o espelhamento fosse possível — a depuração habilitada, a
-estação autorizada, o componente transferido. Declarar isso é o que
-sustenta a cadeia de custódia depois.
+Resolve duas coisas de naturezas diferentes. A prestação de contas do
+trabalho de um período, que deixa de depender de memória e de anotação
+manual. E a cadeia de custódia: quando se questiona em que máquina, em
+que dia e por quanto tempo determinada peça foi produzida, passa a haver
+registro contemporâneo ao ato, gravado enquanto ele acontecia.
 
-O espelho não controla o aparelho: o sistema apenas vê e grava. Quem
-navega é a pessoa que está com o celular na mão.
+Grava enquanto a sessão corre, e não só no fim. Queda de energia,
+travamento ou encerramento à força não levam junto o que já havia sido
+feito — o relatório dessa sessão sai marcado como interrompido, e não se
+faz passar por sessão encerrada.
 
-Havia ainda um problema de sequência: terminada uma diligência e gerado o
-termo, ao voltar à ferramenta as gravações anteriores continuavam ali e o
-termo seguinte repetia o que já se tinha juntado. A opção Limpar encerra
-a diligência e deixa a ferramenta pronta para a próxima.
-
-
-METADADOS E HASH — exame avançado
-
-O que um arquivo declara sobre si mesmo é apenas parte do que ele
-carrega. O modo Avançado procura o resto: fluxos de dados alternativos do
-sistema de arquivos — inclusive a marca que o Windows grava com o
-endereço de onde o arquivo foi baixado —, revisões anteriores preservadas
-dentro do próprio documento, propriedades que o programa de edição não
-exibe, comentários e alterações controladas, macros, e dados anexados
-depois do fim do formato.
-
-Os achados saem em quadro próprio no termo, separados dos metadados e
-graduados por relevância, com as ressalvas impressas junto: o exame
-constata a existência do que encontra, mas não recupera o conteúdo — diz
-que há revisão anterior dentro do documento, não a extrai; e a ausência
-de achados não prova que o arquivo não foi alterado, prova apenas que as
-marcas procuradas não estavam lá. Extração é perícia.
+O registro fica apenas nesta máquina. Nada é enviado a servidor algum,
+quem opera lê e apaga o que quiser, e não são anotados o conteúdo dos
+arquivos examinados, o texto digitado, os endereços visitados nem nomes
+de investigados. Registra-se que uma ferramenta foi usada e o que ela
+própria informou ao concluir; o material da apuração está nos termos de
+cada ferramenta, que são as peças dos autos.
 
 
-PORTAL — a disposição das ferramentas
+IDENTIFICAÇÃO DO OPERADOR — o sistema deixa de ser só da PRF
 
-As doze ferramentas existem em função da peça que instruem, e três
-fileiras iguais diziam o contrário: que eram treze coisas equivalentes.
-Agora o Encarregado de IPS ocupa o centro, em cor própria e maior, e as
-demais se distribuem em volta, cada uma ligada a ele.
+Um botão no alto do portal guarda nome, cargo, matrícula, lotação e órgão
+de quem opera. As ferramentas passam a oferecer esses dados nos campos
+que pedem identificação, poupando a digitação a cada termo.
+
+Nada fica preso a eles: o campo de cada termo continua aberto, e um campo
+já preenchido nunca é alterado pela configuração. O que vale no documento
+é o que estiver no campo no momento de gerá-lo.
+
+O cargo é a razão principal desta mudança. Ele estava escrito no código
+como "Policial Rodoviário Federal", em sete termos, e cinco frases de
+abertura diziam "eu, PRF Fulano". O sistema nasceu na PRF, mas não é
+dela: agora o cargo vem da identificação, e quem assina por outra
+instituição emite as mesmas peças com a própria qualificação.
+
+É possível informar também o brasão do órgão. Havendo, ele sai no alto de
+cada peça; não havendo, a peça sai sem ele.
 
 
-DOIS DEFEITOS QUE A MEDIÇÃO DA TELA NOVA REVELOU
+CABEÇALHO PADRÃO EM TODAS AS PEÇAS
 
-A frase de cada ladrilho tinha altura fixa de duas linhas, para que os
-ícones ficassem alinhados ao longo da fileira. Onze das treze frases
-precisavam de mais que isso e perdiam a última linha — inclusive nas
-versões anteriores. Agora cada frase toma as linhas de que precisa.
+Toda peça que o sistema emite passa a abrir com o mesmo timbre: à
+esquerda a marca do Sistema Têmis, que assina sempre — foi ele quem
+produziu o documento, e isso não depende de configuração; ao centro o
+nome do órgão; à direita o brasão dele. Abaixo, o título da peça e o
+conteúdo, como antes.
 
-A linha que diz o que sai e o que não sai da máquina não quebrava em mais
-de uma linha. A cada ferramenta acrescentada ela ficava mais comprida, e
-ao chegar a treze exigia do portal quase o dobro da largura de um
-notebook, o que punha barra de rolagem horizontal na tela inicial.
+O brasão é encaixado numa caixa de tamanho fixo, preservando a proporção.
+Brasão não tem formato — o da PRF é um círculo, o de uma procuradoria
+costuma ser uma faixa larga, o de um tribunal um escudo alto —, e fixar
+apenas a altura fazia o redondo sair miúdo ao lado do nome do órgão.
+Encaixado na caixa, qualquer um dos três chega ao documento no mesmo peso
+visual.
 
-Para que isso não volte a acontecer sem aviso, a verificação de
-integridade da instalação passou a conferir a geometria do portal: monta
-a tela na menor área prevista e reprova se houver ladrilho sobreposto,
-ladrilho fora da área ou texto cortado.
+
+GRAVAÇÃO DE TELA — o defeito dos dois monitores
+
+Com dois monitores de alturas diferentes, a gravação produzia um arquivo
+de zero byte, e sem aviso nenhum. A causa: o Windows alinha telas de
+alturas diferentes pelo meio, e a sobra desse alinhamento entra na conta
+da área de trabalho virtual, que fica com altura ímpar. O formato de
+vídeo exige medidas pares; o codificador recusava abrir e nada era
+escrito. Com um monitor só a conta dava par, e por isso funcionava.
+
+A captura passa a ser ajustada para medida par quando necessário. Um
+pixel a menos na borda não muda o que se vê; o arquivo vazio muda tudo.
+
+Junto veio a correção do silêncio. Abrir o processo de gravação sempre dá
+certo — quem recusa a configuração é o codificador, meio segundo depois,
+e isso só era lido no encerramento. O operador conduziria a diligência
+inteira acreditando estar gravando. Agora a falha aparece na hora, dita
+em português, com o que o codificador informou. A diligência demora um
+segundo e meio a mais para começar, que é o tempo de confirmar que a
+gravação de fato ficou de pé.
+
+
+EXTRAÇÃO REGISTRADA — o hash aparecia cortado
+
+A ferramenta baixa arquivos e calcula o resumo criptográfico sobre os
+bytes recebidos, na própria máquina que os pediu. Isso ia inteiro para o
+termo — mas o painel lateral, que a gravação de tela filma, mostrava
+apenas o começo do hash: a linha pedia mais largura do que o painel tem e
+era cortada com reticências.
+
+Numa ferramenta cuja razão de ser é filmar a chegada do arquivo junto com
+o seu hash, isso é o defeito mais caro possível. O painel passa a dobrar
+o que não couber, e nada mais some para o lado. A quebra é feita com
+espaço de largura zero: exibir o endereço com um espaço que ele não tem
+seria pior do que exibi-lo cortado.
+
+
+PORTAL
+
+Catorze ferramentas agora. As medidas dos ladrilhos foram refeitas para
+que a volta se feche sem sobreposição e sem barra de rolagem nos tamanhos
+de janela que as telas realmente produzem.
+
+
+CONFERÊNCIAS AUTOMÁTICAS
+
+A verificação de integridade da instalação ganhou três exames novos, e o
+primeiro deles já achou defeito real na primeira execução:
+
+  · a geometria do portal, que reprova ladrilho sobreposto, ladrilho fora
+    da área ou texto cortado na menor tela prevista;
+  · a identificação do operador, que reprova ferramenta cujos campos
+    fujam da convenção ou que esqueça de aproveitar a configuração;
+  · o cabeçalho das peças, que reprova peça emitida sem o timbre.

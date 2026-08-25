@@ -132,6 +132,94 @@ def autoteste() -> int:
         from temis.tools import REGISTRY
         return f"{len(REGISTRY)} ferramentas registradas"
 
+    def identificacao():
+        # O perfil chega às ferramentas por convenção de nome: os campos
+        # se chamam `_in_nome`/`_e_nome` e afins, e cada diálogo de termo
+        # chama `perfil.aplicar(self)` no fim do construtor. Convenção
+        # que ninguém confere é convenção que se perde na ferramenta
+        # seguinte — e o sintoma seria mudo: o campo simplesmente não
+        # viria preenchido, e ninguém saberia que deveria vir.
+        import ast
+        import pathlib
+
+        from temis import perfil
+
+        raiz = pathlib.Path(__file__).resolve().parent / "temis" / "tools"
+        conhecidos = {p + c for p in perfil.PREFIXOS for c in perfil.CAMPOS}
+        faltando, fora_do_padrao = [], []
+
+        def chama_aplicar(classe) -> bool:
+            return any(
+                isinstance(no, ast.Attribute) and no.attr == "aplicar"
+                and isinstance(no.value, ast.Name) and no.value.id == "perfil"
+                for no in ast.walk(classe))
+
+        def e_pagina(classe) -> bool:
+            # Páginas de ferramenta são atendidas pelo casco, que aplica o
+            # perfil a cada abertura; só os diálogos precisam se servir.
+            return any(getattr(b, "id", getattr(b, "attr", "")) == "ToolPage"
+                       for b in classe.bases)
+
+        for arquivo in sorted(raiz.glob("*.py")):
+            if arquivo.name.endswith("_core.py"):
+                continue
+            arvore = ast.parse(arquivo.read_text(encoding="utf-8"))
+            for no in ast.walk(arvore):
+                if not isinstance(no, ast.ClassDef):
+                    continue
+                campos = {
+                    alvo.attr
+                    for atrib in ast.walk(no)
+                    if isinstance(atrib, ast.Assign)
+                    for alvo in atrib.targets
+                    if isinstance(alvo, ast.Attribute)
+                    and any(alvo.attr.endswith("_" + c)
+                            for c in perfil.CAMPOS)
+                }
+                if not campos:
+                    continue
+                estranhos = campos - conhecidos
+                if estranhos:
+                    fora_do_padrao.append(
+                        f"{arquivo.name}:{no.name} {sorted(estranhos)}")
+                if not chama_aplicar(no) and not e_pagina(no):
+                    faltando.append(f"{arquivo.name}:{no.name}")
+        if fora_do_padrao or faltando:
+            raise RuntimeError(
+                "campos fora da convenção do perfil: "
+                f"{fora_do_padrao or 'nenhum'}; sem aplicar o perfil: "
+                f"{faltando or 'nenhum'}")
+        return "todas as ferramentas aproveitam a identificação guardada"
+
+    def timbre():
+        # Toda peça que o sistema emite abre com o mesmo cabeçalho: a
+        # marca do Têmis à esquerda, o órgão ao centro e o brasão dele à
+        # direita. Ferramenta nova que monte o documento à mão sairia sem
+        # ele, e o defeito só apareceria quando alguém comparasse duas
+        # peças do mesmo processo lado a lado. Aqui se confere no código.
+        import ast
+        import pathlib
+
+        raiz = pathlib.Path(__file__).resolve().parent / "temis" / "tools"
+        sem_timbre = []
+        for arquivo in sorted(raiz.glob("*_core.py")):
+            fonte = arquivo.read_text(encoding="utf-8")
+            arvore = ast.parse(fonte)
+            for no in arvore.body:
+                if not isinstance(no, ast.FunctionDef):
+                    continue
+                if no.name not in ("build_html", "relatorio_html"):
+                    continue
+                chama = any(
+                    isinstance(x, ast.Name) and x.id == "cabecalho_html"
+                    for x in ast.walk(no))
+                if not chama:
+                    sem_timbre.append(f"{arquivo.name}:{no.name}")
+        if sem_timbre:
+            raise RuntimeError(
+                f"peça(s) sem o cabeçalho do sistema: {sem_timbre}")
+        return "todas as peças abrem com o mesmo cabeçalho"
+
     def portal():
         # A constelação do portal reparte os ladrilhos numa elipse, e o
         # que cabe ali depende do tamanho do ladrilho, do tamanho da
@@ -186,6 +274,8 @@ def autoteste() -> int:
         ("reconhecimento óptico", ocr),
         ("espelhamento de celular", espelhamento),
         ("registro de ferramentas", ferramentas),
+        ("identificação do operador", identificacao),
+        ("cabeçalho das peças", timbre),
         ("geometria do portal", portal),
     ):
         conferir(rotulo, funcao)

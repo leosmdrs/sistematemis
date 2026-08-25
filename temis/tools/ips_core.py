@@ -33,6 +33,15 @@ def _novo_id() -> str:
 #  SEÇÕES DA INFORMAÇÃO
 # ─────────────────────────────────────────
 
+def _do_perfil(campo: str) -> str:
+    """Lê um campo da Identificação guardada; vazio se não houver."""
+    from .. import perfil
+    try:
+        return getattr(perfil.ler(), campo, "") or ""
+    except Exception:                                       # noqa: BLE001
+        return ""
+
+
 @dataclass(frozen=True)
 class Campo:
     """Um dado isolado dentro de uma parte.
@@ -284,6 +293,12 @@ class CasoIPS:
     encarregado: str = ""
     matricula: str = ""
     unidade: str = ""
+    #: Vêm da Identificação guardada na estação, e continuam editáveis.
+    #: Estavam escritos no código como "Policial Rodoviário Federal": a
+    #: peça é a mesma em qualquer corregedoria, o cargo de quem assina
+    #: não.
+    cargo: str = field(default_factory=lambda: _do_perfil("cargo"))
+    orgao: str = field(default_factory=lambda: _do_perfil("orgao"))
     partes: dict[str, Parte] = field(default_factory=dict)
     criado: float = field(default_factory=time.time)
     atualizado: float = field(default_factory=time.time)
@@ -586,6 +601,7 @@ def titulo_secao(numero: int, titulo: str) -> str:
 def build_html(caso: CasoIPS, quando: str = "",
                pasta_imagens: Path | None = None) -> str:
     """Documento final, pronto para a importação de HTML do SEI."""
+    from ..impressao import cabecalho_html
     e = html.escape
     # Sem cabeçalho: no SEI o timbre, o nome do documento e o número do
     # processo são gerados pelo próprio sistema. O documento importado
@@ -620,8 +636,8 @@ def build_html(caso: CasoIPS, quando: str = "",
         partes.append(
             '<p style="text-align:center; margin:0;">'
             "______________________________________<br/>"
-            f"<b>{e(caso.encarregado)}</b><br/>"
-            "Policial Rodoviário Federal"
+            f"<b>{e(caso.encarregado)}</b>"
+            + (f"<br/>{e(caso.cargo)}" if caso.cargo.strip() else "")
             + (f"<br/><span style=\"font-size:10pt;\">{vinculo}</span>"
                if vinculo else "")
             + "</p>")
@@ -630,6 +646,7 @@ def build_html(caso: CasoIPS, quando: str = "",
         "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\">"
         f"<title>Informação — {e(caso.nome)}</title></head>\n"
         f'<body style="{_ESTILO_CORPO}">\n'
+        + cabecalho_html()
         + "\n".join(partes)
         + "\n</body></html>\n"
     )
