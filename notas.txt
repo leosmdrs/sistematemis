@@ -180,6 +180,40 @@ avisa disso ao selecioná-lo, e a pré-visualização existe justamente para
 conferir antes.
 
 
+TERMO DE CENSURA E TERMO DE EDIÇÃO — peças novas
+
+A Tarja Preta e a Edição de Vídeo produzem um arquivo novo a partir de um
+existente. Faltava a peça que amarra um ao outro, e ela passa a existir
+nas duas.
+
+O termo diz, em resumo: este arquivo, com este resumo criptográfico, foi
+produzido a partir daquele, com aquele resumo, por esta operação, nesta
+data, por mim. É o par de resumos que dá utilidade à peça — o do original
+prova de que arquivo se partiu; o do resultado prova que o material
+juntado aos autos é exatamente o que saiu da operação, e não algo
+alterado depois.
+
+Por isso o termo só é oferecido **depois de gravar** o arquivo: o resumo
+é calculado sobre os bytes finais, e antes de existir arquivo não há
+bytes a resumir. O botão fica ao lado da ação que salva, e acende quando
+há o que declarar.
+
+Na censura, o termo registra quantas áreas foram cobertas e em quantas
+páginas. Na edição, registra o que só a operação sabe: a qualidade e a
+resolução na compactação; o trecho, as durações e o tipo de corte no
+recorte; a ordem dos arquivos e o tratamento dos fluxos na mesclagem.
+Mesclagem junta vários num só, e cada original entra no termo com o seu
+próprio resumo.
+
+As peças declaram os próprios limites, que é o que as torna defensáveis.
+A censura diz que o conteúdo é removido e não ocultado, que o arquivo
+produzido não carrega metadado algum do original, e que perde a camada de
+texto pesquisável — recuperável pela ferramenta PDF Pesquisável. A edição
+diz que o material produzido não é cópia fiel, que o original deve ser
+preservado, e que, havendo recorte, a hora que aparece na cena deixa de
+corresponder ao tempo decorrido do arquivo.
+
+
 PORTAL
 
 Catorze ferramentas agora. As medidas dos ladrilhos foram refeitas para

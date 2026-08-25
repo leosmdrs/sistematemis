@@ -31,6 +31,8 @@ from ..widgets import (
     NoScrollComboBox, SidebarPanel, ViewerToolbar, danger_button,
     output_button, primary_button, subtext,
 )
+from . import derivado_core as derivado
+from .derivado_dialogo import TermoDerivadoDialog
 from .base import ToolPage, ToolMeta
 
 
@@ -334,6 +336,10 @@ class TarjaPretaTool(ToolPage):
 
         self._doc: fitz.Document | None = None
         self._tarjas_por_pagina: dict[int, list] = {}
+        #: De onde veio o PDF aberto, e para onde foi o tarjado. O termo
+        #: precisa dos dois: ele existe para amarrar um ao outro.
+        self._caminho_origem = ""
+        self._ultimo_salvo = ""
         #: Palavras já lidas, por página. Ver `_palavras_da`.
         self._palavras_por_pagina: dict[int, list] = {}
 
@@ -429,6 +435,24 @@ class TarjaPretaTool(ToolPage):
         self._btn_save.clicked.connect(self._save_pdf)
         self._btn_save.setEnabled(False)
         panel.footer.addWidget(self._btn_save)
+
+        # No rodapé, e não no corpo: o corpo rola, e com três grupos de
+        # controles o botão caía abaixo da dobra — existia, estava
+        # habilitado, e não era encontrado. Aqui ele fica ao lado da ação
+        # que o antecede, que é onde se olha depois de salvar.
+        #
+        # Nasce desligado porque o termo cita o resumo criptográfico do
+        # arquivo tarjado, e esse resumo só existe depois de gravar: é
+        # calculado sobre os bytes finais.
+        self._btn_termo = QPushButton("  Gerar termo de censura")
+        self._btn_termo.setIcon(draw_icon("save", 16, PALETTE["text"]))
+        self._btn_termo.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_termo.setEnabled(False)
+        self._btn_termo.setToolTip(
+            "Disponível depois de salvar o PDF tarjado — o termo cita os "
+            "resumos criptográficos do original e do arquivo produzido")
+        self._btn_termo.clicked.connect(self._gerar_termo)
+        panel.footer.addWidget(self._btn_termo)
         panel.add_note("O texto é removido permanentemente, não apenas ocultado.")
         return panel
 
@@ -567,6 +591,7 @@ class TarjaPretaTool(ToolPage):
         self._lbl_tarja_count = QLabel("0 tarjas em 0 páginas")
         self._lbl_tarja_count.setObjectName("subtext")
         lay.addWidget(self._lbl_tarja_count)
+
         return grp
 
     def _scope_row(self, attr: str) -> QHBoxLayout:
@@ -676,6 +701,12 @@ class TarjaPretaTool(ToolPage):
             if self._doc:
                 self._doc.close()
             self._doc = fitz.open(path)
+            self._caminho_origem = path
+            # Um arquivo novo apaga o termo do anterior: emitir a peça do
+            # PDF de antes, com o documento de agora aberto, seria trocar
+            # os autos de lugar.
+            self._ultimo_salvo = ""
+            self._btn_termo.setEnabled(False)
             self._tarjas_por_pagina = {}
             # Palavras do arquivo anterior não servem ao novo: sem
             # esvaziar, a seleção de texto marcaria onde as palavras
@@ -936,11 +967,60 @@ class TarjaPretaTool(ToolPage):
 
     def _on_save_done(self, path: str, progress: QProgressDialog):
         progress.close()
+        self._ultimo_salvo = path
+        self._btn_termo.setEnabled(bool(self._caminho_origem))
         QMessageBox.information(
             self, "Salvo com sucesso",
             f"PDF tarjado salvo em:\n{path}\n\n"
-            "O texto nas áreas tarjadas foi removido permanentemente.")
+            "O texto nas áreas tarjadas foi removido permanentemente, e o "
+            "arquivo gerado não carrega metadado algum do original.\n\n"
+            "O termo de censura já pode ser gerado — ele cita os resumos "
+            "criptográficos do original e do arquivo produzido.")
         self.status_msg.emit(f"Salvo: {Path(path).name}")
+
+    # ─────────────────────────────────────
+    #  TERMO DE CENSURA
+    # ─────────────────────────────────────
+
+    #: O que a operação faz e o que ela não faz. Vai impresso na peça:
+    #: uma ferramenta que se cala sobre os próprios limites convida a que
+    #: se lhe atribua alcance que ela não tem.
+    RESSALVAS = (
+        "A censura não oculta o conteúdo: remove-o. Cada página do "
+        "documento produzido é uma imagem, sobre a qual as áreas "
+        "protegidas foram cobertas antes da gravação — não há texto por "
+        "baixo da tarja a ser recuperado por seleção, cópia ou extração.",
+        "O arquivo produzido não carrega metadado algum do original: nem "
+        "título, autor, assunto, palavras-chave, programa de origem ou "
+        "bloco XMP. Ele é composto do zero, e não descende do arquivo de "
+        "entrada.",
+        "Como cada página passa a ser imagem, o documento produzido não "
+        "tem camada de texto pesquisável — tampouco no que não foi "
+        "censurado. Havendo necessidade de pesquisa no documento "
+        "censurado, ele pode ser submetido à ferramenta PDF Pesquisável, "
+        "que devolve a camada de texto por reconhecimento óptico.",
+        "O arquivo original permanece inalterado. Este termo o identifica "
+        "pelo resumo criptográfico justamente para que a correspondência "
+        "entre um e outro possa ser conferida a qualquer tempo.",
+    )
+
+    def _gerar_termo(self):
+        if not (self._ultimo_salvo and self._caminho_origem):
+            return
+        contagem = sum(len(v) for v in self._tarjas_por_pagina.values())
+        paginas = len([p for p, v in self._tarjas_por_pagina.items() if v])
+        item = derivado.medir(
+            self._caminho_origem, self._ultimo_salvo,
+            detalhes=[
+                ("Áreas censuradas", str(contagem)),
+                ("Páginas com censura", f"{paginas} de {len(self._doc)}"),
+            ])
+        termo = derivado.TermoDerivado(
+            titulo="Termo de Censura em Dados e Informações Protegidas",
+            operacao="tarjamento de dados e informações protegidas",
+            ressalvas=self.RESSALVAS,
+            itens=[item])
+        TermoDerivadoDialog(termo, self).exec()
 
     def _on_save_error(self, err: str, progress: QProgressDialog):
         progress.close()

@@ -25,6 +25,8 @@ from ..widgets import (
     NoScrollComboBox, SidebarPanel, TOOLBAR_HEIGHT, danger_button,
     field_label, group_title, output_button, primary_button, subtext, vsep,
 )
+from . import derivado_core as derivado
+from .derivado_dialogo import TermoDerivadoDialog
 from .base import ToolPage, ToolMeta
 from . import video_core as core
 
@@ -253,6 +255,17 @@ class VideoTool(ToolPage):
         panel.body.addWidget(self._painel_fatiar())
         panel.body.addWidget(self._painel_mesclar())
         panel.body.addStretch()
+
+        # O termo depende do resumo criptográfico do arquivo produzido, e
+        # esse resumo só existe depois de o arquivo ser gravado. Por isso
+        # o botão nasce desligado e acende ao fim do processamento.
+        self._btn_termo = output_button("Gerar termo de edição")
+        self._btn_termo.setEnabled(False)
+        self._btn_termo.setToolTip(
+            "Disponível depois de processar — o termo cita os resumos "
+            "criptográficos do original e do arquivo produzido")
+        self._btn_termo.clicked.connect(self._gerar_termo)
+        panel.footer.addWidget(self._btn_termo)
 
         self._btn_processar = output_button("Processar")
         self._btn_processar.clicked.connect(self._processar)
@@ -604,12 +617,20 @@ class VideoTool(ToolPage):
         sem_audio = self._chk_sem_audio.isChecked()
 
         tarefas = []
+        self._derivacoes = []
         for v in self._videos:
             saida = str(Path(pasta) / f"{Path(v.nome).stem}-compactado.mp4")
             tarefas.append((
                 core.cmd_compactar(v.caminho, saida, preset, altura,
                                    sem_audio, v.codec_audio),
                 v.duracao, v.nome, saida))
+            self._derivacoes.append((
+                [v.caminho], saida,
+                [("Operação", "compactação"),
+                 ("Qualidade", preset.rotulo),
+                 ("Resolução de saída",
+                  self._cb_escala.currentText()),
+                 ("Áudio", "removido" if sem_audio else "preservado")]))
         return tarefas
 
     def _tarefas_fatiar(self) -> list:
@@ -633,6 +654,17 @@ class VideoTool(ToolPage):
             saida += ".mp4"
         cmd = core.cmd_fatiar(v.caminho, saida, inicio, fim,
                               self._chk_preciso.isChecked())
+        self._derivacoes = [(
+            [v.caminho], saida,
+            [("Operação", "recorte de trecho"),
+             ("Trecho recortado",
+              f"de {core.formatar_tempo(inicio)} a "
+              f"{core.formatar_tempo(fim)}"),
+             ("Duração do trecho", core.formatar_tempo(fim - inicio)),
+             ("Duração do original", core.formatar_tempo(v.duracao)),
+             ("Corte", "no quadro exato (recodificado)"
+              if self._chk_preciso.isChecked()
+              else "no quadro-chave mais próximo (sem recodificar)")])]
         return [(cmd, fim - inicio, f"{v.nome} ({core.formatar_tempo(inicio)}"
                  f"–{core.formatar_tempo(fim)})", saida)]
 
@@ -652,8 +684,54 @@ class VideoTool(ToolPage):
             Path(self._tmpdir.name) / "lista.txt")
         recodificar = core.precisa_recodificar(self._videos)
         duracao = sum(v.duracao for v in self._videos)
+        self._derivacoes = [(
+            [v.caminho for v in self._videos], saida,
+            [("Operação", "mesclagem"),
+             ("Arquivos unidos", str(len(self._videos))),
+             ("Ordem", " → ".join(v.nome for v in self._videos)),
+             ("Duração somada", core.formatar_tempo(duracao)),
+             ("Fluxos", "recodificados para compatibilizar"
+              if recodificar else "copiados sem recodificação")])]
         return [(core.cmd_mesclar(lista, saida, recodificar), duracao,
                  f"{len(self._videos)} vídeos", saida)]
+
+    #: O que a edição faz ao material, dito na peça. Vídeo editado é
+    #: vídeo alterado, e o termo que o acompanha tem de dizer isso com
+    #: todas as letras — é o que separa uma peça honesta de uma que
+    #: convida à alegação de adulteração.
+    RESSALVAS = (
+        "O arquivo produzido é resultado de processamento e não é cópia "
+        "fiel do original: compactar reduz a qualidade da imagem e do "
+        "som; recortar altera a duração e desloca as marcas de tempo; "
+        "mesclar reúne gravações que eram distintas num único fluxo "
+        "contínuo.",
+        "O arquivo original permanece inalterado e deve ser preservado. "
+        "Este termo o identifica pelo resumo criptográfico justamente "
+        "para que a correspondência entre ele e o material produzido "
+        "possa ser conferida a qualquer tempo.",
+        "Quando há recorte, a hora que aparece na cena deixa de "
+        "corresponder ao tempo decorrido desde o início do arquivo. "
+        "Importando a hora dos fatos, ela deve ser buscada no material "
+        "original ou consignada expressamente.",
+    )
+
+    def _gerar_termo(self):
+        produzidas = getattr(self, "_produzidas", [])
+        if not produzidas:
+            return
+        itens = [derivado.medir(origens, saida, detalhes)
+                 for origens, saida, detalhes in produzidas]
+        operacao = {
+            "compactar": "compactação",
+            "fatiar": "recorte",
+            "mesclar": "mesclagem",
+        }.get(self._modo, "edição")
+        termo = derivado.TermoDerivado(
+            titulo="Termo de Edição de Material Audiovisual",
+            operacao=f"{operacao} audiovisual",
+            ressalvas=self.RESSALVAS,
+            itens=itens)
+        TermoDerivadoDialog(termo, self).exec()
 
     def _ao_iniciar_etapa(self, atual: int, total: int, rotulo: str):
         self._progresso.setLabelText(
@@ -679,6 +757,14 @@ class VideoTool(ToolPage):
             self.status_msg.emit("Operação cancelada")
             return
 
+        # Só as derivações cujo arquivo de fato saiu: uma etapa que
+        # falhou não pode virar linha de termo dizendo que produziu algo.
+        self._produzidas = [
+            (origens, saida, detalhes)
+            for origens, saida, detalhes in getattr(self, "_derivacoes", [])
+            if saida in saidas
+        ]
+        self._btn_termo.setEnabled(bool(self._produzidas))
         self._relatar(saidas)
 
     def _relatar(self, saidas: list[str]):
