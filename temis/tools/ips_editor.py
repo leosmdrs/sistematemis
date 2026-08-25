@@ -17,7 +17,8 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt, QUrl, pyqtSignal
 from PyQt6.QtGui import (QColor, QFont, QImage, QStandardItem,
-                         QStandardItemModel, QTextCursor, QTextDocument)
+                         QStandardItemModel, QTextCharFormat, QTextCursor,
+                         QTextDocument, QTextDocumentFragment)
 from PyQt6.QtWidgets import (
     QWidget, QLabel, QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton,
     QFrame,
@@ -68,6 +69,95 @@ def _modelo_estilos() -> QStandardItemModel:
     return _MODELO_ESTILOS
 
 
+#: O que sobrevive de uma colagem, e nada mais.
+#:
+#: Texto colado de fora — de um ofício em Word, de uma página, de um
+#: e-mail — chega carregado: fonte da origem, corpo maior ou menor, cor,
+#: realce, recuo de lista. Colado cru, o parágrafo da Informação passa a
+#: ter três tipografias e a peça denuncia de onde cada trecho veio.
+#:
+#: Do que vem de fora guarda-se só o que carrega sentido jurídico:
+#: negrito, itálico e sublinhado. Um destaque desses foi posto por
+#: alguém de propósito. Já o corpo 14 do documento de origem não quer
+#: dizer nada aqui.
+GRIFOS_QUE_FICAM = ("negrito", "itálico", "sublinhado")
+
+
+def normalizar_colagem(doc: QTextDocument) -> None:
+    """Põe o documento colado na tipografia da peça, no lugar.
+
+    Três coisas acontecem em cada parágrafo:
+
+    **A tipografia vira a do sistema.** Família e corpo do parágrafo,
+    preservando apenas negrito, itálico e sublinhado. Cor de letra,
+    realce de fundo e tachado caem.
+
+    **O link some, o texto fica.** Colar de uma página traz o endereço
+    embutido; numa peça que vai a processo isso vira texto azul
+    sublinhado que ninguém pode clicar. O que interessa é o que está
+    escrito.
+
+    **Marcador e numeração são ignorados.** A Informação numera os
+    próprios parágrafos, calculando o marcador a partir do nível — um
+    `1.` vindo de fora concorreria com essa numeração e a peça sairia com
+    duas contagens. O texto do item entra como parágrafo comum, e o
+    recuo que a lista impunha vai junto.
+
+    Tabela continua tabela: ali a estrutura carrega significado, e
+    desmontá-la em parágrafos perderia a relação entre coluna e valor. O
+    que se ajusta dentro dela é a tipografia, como no resto.
+    """
+    padrao = fonte_paragrafo()
+    doc.setDefaultFont(padrao)
+
+    # Recolhe antes de alterar: mexer na lista de um bloco enquanto se
+    # percorre o documento é pedir para perder o passo.
+    blocos = []
+    bloco = doc.begin()
+    while bloco.isValid():
+        blocos.append(bloco)
+        bloco = bloco.next()
+
+    for bloco in blocos:
+        lista = bloco.textList()
+        if lista is not None:
+            lista.remove(bloco)
+
+        formato = bloco.blockFormat()
+        formato.setIndent(0)
+        formato.setLeftMargin(0)
+        formato.setRightMargin(0)
+        formato.setTextIndent(0)
+        cursor = QTextCursor(bloco)
+        cursor.setBlockFormat(formato)
+
+        pedaco = bloco.begin()
+        while not pedaco.atEnd():
+            trecho = pedaco.fragment()
+            if trecho.isValid():
+                antigo = trecho.charFormat()
+                # Formato novo em folha, e não o antigo remendado: assim
+                # o que não for explicitamente recolocado — cor, realce,
+                # tachado, endereço do link — desaparece por construção,
+                # em vez de depender de uma lista de coisas a limpar que
+                # alguém teria de manter em dia.
+                novo = QTextCharFormat()
+                novo.setFont(padrao)
+                novo.setFontWeight(
+                    QFont.Weight.Bold
+                    if antigo.fontWeight() >= QFont.Weight.Bold
+                    else QFont.Weight.Normal)
+                novo.setFontItalic(antigo.fontItalic())
+                novo.setFontUnderline(antigo.fontUnderline())
+
+                seleção = QTextCursor(doc)
+                seleção.setPosition(trecho.position())
+                seleção.setPosition(trecho.position() + trecho.length(),
+                                    QTextCursor.MoveMode.KeepAnchor)
+                seleção.setCharFormat(novo)
+            pedaco += 1
+
+
 class _EditorParagrafo(QTextEdit):
     """Caixa de texto de um bloco, que cresce com o conteúdo."""
 
@@ -105,6 +195,28 @@ class _EditorParagrafo(QTextEdit):
             # nome basta.
             self.style().unpolish(self)
             self.style().polish(self)
+
+    def insertFromMimeData(self, fonte):
+        """Tudo o que entra por colagem ou arrasto passa por aqui.
+
+        Imagem segue pelo caminho de sempre — ela não tem tipografia a
+        corrigir, e o editor já sabe guardá-la na pasta do caso.
+        """
+        if fonte.hasImage() or fonte.hasUrls():
+            super().insertFromMimeData(fonte)
+            return
+        if fonte.hasHtml():
+            doc = QTextDocument()
+            doc.setHtml(fonte.html())
+            normalizar_colagem(doc)
+            # Fragmento, e não texto: é o que preserva a tabela e os
+            # grifos que sobreviveram à normalização.
+            self.textCursor().insertFragment(QTextDocumentFragment(doc))
+            return
+        if fonte.hasText():
+            self.textCursor().insertText(fonte.text())
+            return
+        super().insertFromMimeData(fonte)
 
     def loadResource(self, tipo: int, nome: QUrl):
         """Resolve `imagens/<arquivo>` na pasta do caso.

@@ -96,6 +96,27 @@ espaço de largura zero: exibir o endereço com um espaço que ele não tem
 seria pior do que exibi-lo cortado.
 
 
+ENCARREGADO DE IPS — colar texto de fora
+
+Texto colado de um ofício em Word, de uma página ou de um e-mail chegava
+carregado: a fonte da origem, o corpo maior ou menor, cor de letra,
+realce de fundo, recuo de lista. O parágrafo da Informação passava a ter
+três tipografias, e a peça denunciava de onde cada trecho veio.
+
+O que entra agora vem na tipografia da peça. Do que veio de fora
+sobrevivem apenas negrito, itálico e sublinhado — destaques que alguém
+pôs de propósito, e que carregam sentido. Cor, realce e tachado caem.
+
+Marcador e numeração são ignorados: a Informação numera os próprios
+parágrafos, calculando o marcador a partir do nível, e um "1." vindo de
+fora concorreria com essa numeração. O texto do item entra como parágrafo
+comum. Hiperlink também sai, e o texto dele fica.
+
+Tabela continua tabela: ali a estrutura carrega significado, e
+desmontá-la em parágrafos perderia a relação entre coluna e valor. O que se ajusta
+dentro dela é a tipografia, como no resto.
+
+
 PORTAL
 
 Catorze ferramentas agora. As medidas dos ladrilhos foram refeitas para
