@@ -1,23 +1,14 @@
 """
-Gravação de Tela — registro audiovisual de diligência em meio eletrônico.
+Espelhamento de Celular — a tela do aparelho, registrada.
 
-Serve a qualquer tela do Windows: sistema legado, aplicativo de mesa,
-página que não abre no navegador embutido. Registra o que se fez, com a
-identificação do processo, do operador e da estação impressa no próprio
-vídeo, e encerra calculando o resumo criptográfico.
+A tela responde à sequência da diligência: ligar o cabo, reconhecer o
+aparelho, identificar o processo, espelhar e gravar. O celular aparece
+em janela própria do espelhador, ao lado; aqui ficam a identificação do
+aparelho, o tempo decorrido e o encerramento.
 
-A janela some enquanto grava
-----------------------------
-
-A primeira versão disto era inutilizável: a tela do Têmis aparecia no
-vídeo e, minimizada, não havia como encerrar a gravação. Ao iniciar, a
-janela principal é recolhida e fica um painel pequeno, acima de tudo,
-com o tempo decorrido e o botão de encerrar — arrastável, para sair da
-frente do que se está registrando.
-
-Que ele apareça no vídeo é proposital: mostra que a gravação estava em
-curso e por quanto tempo, e não esconde nada do que se registrou, porque
-ocupa um canto e pode ser movido.
+O padrão é **somente observação**: o computador não repassa toque nem
+digitação ao aparelho. Ligar o controle é ato do operador, e o termo
+registra que foi ligado.
 """
 
 from __future__ import annotations
@@ -27,8 +18,8 @@ import os
 import subprocess
 from pathlib import Path
 
-from PyQt6.QtCore import QDate, QPoint, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QGuiApplication, QPainter
+from PyQt6.QtCore import QDate, Qt, QThread, QTimer, pyqtSignal
+from PyQt6.QtGui import QColor, QFont, QGuiApplication
 from PyQt6.QtWidgets import (
     QCheckBox, QDateEdit, QDialog, QFileDialog, QFrame, QGridLayout,
     QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPlainTextEdit,
@@ -44,121 +35,69 @@ from ..widgets import (
     NoScrollComboBox, SidebarPanel, danger_button, field_label, fit_to_screen, hsep,
     output_button, primary_button, subtext,
 )
-from . import gravacao_core as core
+from . import espelhamento_core as core
 from .base import ToolMeta, ToolPage
 
 META = ToolMeta(
-    key="gravacao",
-    name="Gravação de Tela",
-    icon="tool_gravacao",
-    tagline="Registra a diligência feita no computador",
+    key="espelhamento",
+    name="Espelhamento de Celular",
+    icon="tool_espelhamento",
+    tagline="Registra a tela de um aparelho Android",
     description=(
-        "Grava o que acontece na tela com a identificação do processo, do "
-        "operador e da estação impressa no próprio vídeo, junto ao "
-        "relógio e ao tempo decorrido. Lê da máquina o usuário do "
-        "Windows, o nome e o número de série do equipamento e os "
-        "endereços de rede. Ao encerrar, calcula o SHA-256 do arquivo e "
-        "emite termo de registro audiovisual, com as ressalvas do que a "
-        "gravação prova e do que não prova."
+        "Liga um celular Android por cabo USB, espelha a tela no "
+        "computador e grava a sessão em resolução nativa, com a "
+        "identificação do aparelho — fabricante, modelo, versão do "
+        "Android e número de série — lida do próprio dispositivo. Por "
+        "padrão não repassa toque nem digitação: observa. Emite termo "
+        "com o resumo criptográfico do vídeo e a declaração das "
+        "alterações que o método provoca no aparelho."
     ),
 )
 
-#: Onde as gravações são guardadas por padrão.
-PASTA_PADRAO = Path.home() / "Documents" / "Sistema Têmis" / "Gravações"
+PASTA_PADRAO = Path.home() / "Documents" / "Sistema Têmis" / "Espelhamentos"
 
 
 # ─────────────────────────────────────────
-#  PAINEL FLUTUANTE
+#  PROCURA DE APARELHOS
 # ─────────────────────────────────────────
 
-class PainelGravando(QWidget):
-    """Controle mínimo que fica sobre tudo enquanto se grava."""
+class ProcurarThread(QThread):
+    """Consulta o adb fora da interface.
 
-    encerrar_pedido = pyqtSignal()
+    A primeira chamada sobe o processo de fundo do adb e pode levar
+    segundos; feita na thread da janela, ela congela a tela.
+    """
 
-    def __init__(self, parent=None):
-        super().__init__(None)
-        self.setWindowFlags(
-            Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.WindowStaysOnTopHint
-            | Qt.WindowType.Tool)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setFixedSize(268, 56)
-        self._arrastando: QPoint | None = None
+    pronto = pyqtSignal(list)
 
-        linha = QHBoxLayout(self)
-        linha.setContentsMargins(14, 8, 10, 8)
-        linha.setSpacing(10)
+    def run(self):
+        try:
+            self.pronto.emit(core.listar())
+        except Exception:                               # noqa: BLE001
+            self.pronto.emit([])
 
-        self._ponto = QLabel("●")
-        self._ponto.setStyleSheet(
-            f"color: {PALETTE['danger']}; font-size: 17px;")
-        linha.addWidget(self._ponto)
 
-        self._tempo = QLabel("00:00:00")
-        self._tempo.setStyleSheet(
-            f"color: {PALETTE['text']}; font-size: 17px; font-weight: 700;"
-            "font-family: Consolas, monospace;")
-        linha.addWidget(self._tempo)
-        linha.addStretch()
+class EncerrarThread(QThread):
+    """Encerra a sessão e aplica a faixa, que exige recodificar.
 
-        parar = QPushButton("Encerrar")
-        parar.setCursor(Qt.CursorShape.PointingHandCursor)
-        parar.setStyleSheet(
-            f"QPushButton {{ background: {PALETTE['danger']}; color: white; "
-            f"border: none; border-radius: 6px; padding: 7px 14px; "
-            f"font-weight: 700; }}"
-            f"QPushButton:hover {{ background: #FF7A88; }}")
-        parar.clicked.connect(self.encerrar_pedido)
-        linha.addWidget(parar)
+    Numa diligência de vinte minutos essa etapa leva o seu tempo; a
+    janela precisa continuar respondendo e dizendo o que está fazendo.
+    """
 
-        # O ponto pisca: numa gravação longa é o que diz, de relance, que
-        # o registro continua correndo.
-        self._pisca = QTimer(self)
-        self._pisca.setInterval(700)
-        self._pisca.timeout.connect(self._alternar)
-        self._aceso = True
+    andamento = pyqtSignal(str)
+    concluido = pyqtSignal(object)
 
-    def paintEvent(self, _ev):
-        pintor = QPainter(self)
-        pintor.setRenderHint(QPainter.RenderHint.Antialiasing)
-        pintor.setBrush(QColor(PALETTE["surface"]))
-        pintor.setPen(QColor(PALETTE["border"]))
-        pintor.drawRoundedRect(self.rect().adjusted(0, 0, -1, -1), 10, 10)
+    def __init__(self, espelhador: core.Espelhador):
+        super().__init__()
+        self._espelhador = espelhador
 
-    def _alternar(self):
-        self._aceso = not self._aceso
-        self._ponto.setStyleSheet(
-            f"color: {PALETTE['danger'] if self._aceso else 'transparent'};"
-            "font-size: 17px;")
-
-    def mostrar(self):
-        tela = QGuiApplication.primaryScreen().availableGeometry()
-        self.move(tela.right() - self.width() - 28, tela.top() + 28)
-        self.show()
-        self._pisca.start()
-
-    def esconder(self):
-        self._pisca.stop()
-        self.hide()
-
-    def atualizar(self, segundos: float):
-        s = int(segundos)
-        self._tempo.setText(
-            f"{s // 3600:02d}:{(s % 3600) // 60:02d}:{s % 60:02d}")
-
-    # arrastável: precisa sair da frente do que está sendo registrado
-    def mousePressEvent(self, ev):
-        if ev.button() == Qt.MouseButton.LeftButton:
-            self._arrastando = (ev.globalPosition().toPoint()
-                                - self.frameGeometry().topLeft())
-
-    def mouseMoveEvent(self, ev):
-        if self._arrastando is not None:
-            self.move(ev.globalPosition().toPoint() - self._arrastando)
-
-    def mouseReleaseEvent(self, _ev):
-        self._arrastando = None
+    def run(self):
+        try:
+            self.concluido.emit(
+                self._espelhador.encerrar(progresso=self.andamento.emit))
+        except Exception as e:                          # noqa: BLE001
+            r = core.Resultado(erro=f"{type(e).__name__}: {e}")
+            self.concluido.emit(r)
 
 
 # ─────────────────────────────────────────
@@ -168,23 +107,23 @@ class PainelGravando(QWidget):
 class TermoDialog(QDialog):
     """A peça pronta para os autos, editável antes de salvar."""
 
-    def __init__(self, termo: core.TermoGravacao, parent=None):
+    def __init__(self, termo: core.TermoEspelhamento, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Termo de Registro Audiovisual")
+        self.setWindowTitle("Termo de Espelhamento de Aparelho Móvel")
         self._termo = termo
-        fit_to_screen(self, 960, 820)
+        fit_to_screen(self, 960, 830)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 18, 20, 16)
         layout.setSpacing(10)
 
-        titulo = QLabel("Termo de Registro Audiovisual")
+        titulo = QLabel("Termo de Espelhamento")
         titulo.setObjectName("heading")
         layout.addWidget(titulo)
         layout.addWidget(subtext(
-            "O documento já traz a estação onde se gravou, o período, a "
-            "duração e o resumo criptográfico de cada arquivo. Confira a "
-            "abertura e o objeto antes de salvar.", wrap=True))
+            "O documento já traz a identificação do aparelho, a estação, o "
+            "período e o resumo criptográfico do vídeo — e declara as "
+            "alterações que o método provoca no dispositivo.", wrap=True))
         layout.addWidget(self._montar_formulario())
         layout.addWidget(hsep())
 
@@ -204,14 +143,14 @@ class TermoDialog(QDialog):
         grade.setContentsMargins(0, 4, 0, 4)
         grade.setHorizontalSpacing(10)
         grade.setVerticalSpacing(4)
-
         t = self._termo
+
         self._e_nome = QLineEdit(t.nome)
         self._e_nome.setPlaceholderText("Ex.: João da Silva")
         self._e_matricula = QLineEdit(t.matricula)
         self._e_matricula.setPlaceholderText("Ex.: 1234567")
         self._e_lotacao = QLineEdit(t.lotacao)
-        self._e_lotacao.setPlaceholderText("Ex.: DTIC — Divisão de Sistemas")
+        self._e_lotacao.setPlaceholderText("Ex.: CGCOR - PRF/DF")
         for coluna, (rotulo, campo) in enumerate((
                 ("Nome do servidor", self._e_nome),
                 ("Matrícula", self._e_matricula),
@@ -220,40 +159,37 @@ class TermoDialog(QDialog):
             grade.addWidget(campo, 1, coluna)
             campo.textChanged.connect(self._remontar)
 
-        # O cargo é editável porque esta ferramenta não é só da
-        # corregedoria: quem grava a extração costuma ser de outra área.
-        self._e_cargo = QLineEdit(t.cargo)
         self._e_tipo = NoScrollComboBox()
         for x in ("IPS", "PAD"):
             self._e_tipo.addItem(x)
         self._e_tipo.currentIndexChanged.connect(self._remontar)
         self._e_processo = QLineEdit(t.numero_processo)
         self._e_processo.setPlaceholderText("Ex.: 08650.000123/2026-11")
+        self._e_processo.textChanged.connect(self._remontar)
         self._e_data = QDateEdit()
         self._e_data.setCalendarPopup(True)
         self._e_data.setDisplayFormat("dd/MM/yyyy")
         self._e_data.setDate(QDate.currentDate())
         self._e_data.dateChanged.connect(self._remontar)
         for coluna, (rotulo, campo) in enumerate((
-                ("Cargo de quem assina", self._e_cargo),
                 ("Procedimento", self._e_tipo),
+                ("Número do processo", self._e_processo),
                 ("Data do termo", self._e_data))):
             grade.addWidget(field_label(rotulo), 2, coluna)
             grade.addWidget(campo, 3, coluna)
-        self._e_cargo.textChanged.connect(self._remontar)
-        self._e_processo.textChanged.connect(self._remontar)
 
-        grade.addWidget(field_label("Número do processo"), 4, 0)
-        grade.addWidget(self._e_processo, 5, 0)
-        self._e_sistema = QLineEdit(t.sistema_consultado)
-        self._e_sistema.setPlaceholderText(
-            "Ex.: Sistema de Registro de Ocorrências — módulo de auditoria")
-        self._e_sistema.textChanged.connect(self._remontar)
-        grade.addWidget(field_label("Sistema consultado (opcional)"), 4, 1, 1, 2)
-        grade.addWidget(self._e_sistema, 5, 1, 1, 2)
+        # Quem apresentou o aparelho, e a que título: é o que sustenta a
+        # licitude do acesso, e sem isso a peça fica no ar.
+        self._e_detentor = QLineEdit(t.detentor)
+        self._e_detentor.setPlaceholderText(
+            "Ex.: Fulano de Tal, denunciante, que o apresentou "
+            "espontaneamente")
+        self._e_detentor.textChanged.connect(self._remontar)
+        grade.addWidget(field_label("Quem apresentou o aparelho"), 4, 0, 1, 3)
+        grade.addWidget(self._e_detentor, 5, 0, 1, 3)
 
         grade.setColumnStretch(0, 3)
-        grade.setColumnStretch(1, 2)
+        grade.setColumnStretch(1, 1)
         grade.setColumnStretch(2, 2)
         grade.setRowMinimumHeight(2, 10)
         grade.setRowMinimumHeight(4, 10)
@@ -300,16 +236,15 @@ class TermoDialog(QDialog):
         linha.addWidget(fechar)
         return acoes
 
-    def _atualizado(self) -> core.TermoGravacao:
+    def _atualizado(self) -> core.TermoEspelhamento:
         t = self._termo
         d = self._e_data.date()
         t.nome = self._e_nome.text().strip()
         t.matricula = self._e_matricula.text().strip()
         t.lotacao = self._e_lotacao.text().strip()
-        t.cargo = self._e_cargo.text().strip() or "Servidor"
         t.tipo_processo = self._e_tipo.currentText()
         t.numero_processo = self._e_processo.text().strip()
-        t.sistema_consultado = self._e_sistema.text().strip()
+        t.detentor = self._e_detentor.text().strip()
         t.dia, t.mes, t.ano = d.day(), d.month(), d.year()
         return t
 
@@ -322,7 +257,7 @@ class TermoDialog(QDialog):
 
     def _salvar_html(self):
         caminho, _ = QFileDialog.getSaveFileName(
-            self, "Salvar termo em HTML", "termo-gravacao.html",
+            self, "Salvar termo em HTML", "termo-espelhamento.html",
             "Página HTML (*.html)")
         if not caminho:
             return
@@ -331,8 +266,8 @@ class TermoDialog(QDialog):
         try:
             corpo = limpar_para_sei(self._vista.toHtml())
             Path(caminho).write_text(
-                documento_html(corpo, "Termo de Registro Audiovisual de "
-                                      "Diligência em Meio Eletrônico"),
+                documento_html(corpo, "Termo de Espelhamento e Registro de "
+                                      "Tela de Aparelho Móvel"),
                 encoding="utf-8")
             self._aviso.setText("✓ HTML salvo")
         except OSError as e:
@@ -341,7 +276,7 @@ class TermoDialog(QDialog):
 
     def _salvar_pdf(self):
         caminho, _ = QFileDialog.getSaveFileName(
-            self, "Salvar termo", "termo-gravacao.pdf",
+            self, "Salvar termo", "termo-espelhamento.pdf",
             "Arquivos PDF (*.pdf)")
         if not caminho:
             return
@@ -349,8 +284,8 @@ class TermoDialog(QDialog):
             caminho += ".pdf"
         try:
             escritor = preparar_escritor(
-                caminho, "Termo de Registro Audiovisual de Diligência em "
-                         "Meio Eletrônico")
+                caminho, "Termo de Espelhamento e Registro de Tela de "
+                         "Aparelho Móvel")
             doc = self._vista.document().clone()
             doc.setDefaultFont(QFont("Segoe UI", 10))
             imprimir_documento(doc, escritor)
@@ -364,23 +299,24 @@ class TermoDialog(QDialog):
 #  FERRAMENTA
 # ─────────────────────────────────────────
 
-class GravacaoTool(ToolPage):
+class EspelhamentoTool(ToolPage):
     meta = META
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._gravador: core.Gravador | None = None
+        self._aparelhos: list[core.Aparelho] = []
+        self._espelhador: core.Espelhador | None = None
         self._resultados: list[core.Resultado] = []
-        self._contexto = core.ler_contexto()
-        self._painel = PainelGravando()
-        self._painel.encerrar_pedido.connect(self._encerrar)
+        self._procura: ProcurarThread | None = None
+        self._encerramento: EncerrarThread | None = None
 
         self._pulso = QTimer(self)
-        self._pulso.setInterval(500)
+        self._pulso.setInterval(1000)
         self._pulso.timeout.connect(self._tique)
 
         self._montar()
         self._atualizar_estado()
+        QTimer.singleShot(400, self._procurar)
 
     # ── montagem ─────────────────────────────────
     def _montar(self):
@@ -393,90 +329,74 @@ class GravacaoTool(ToolPage):
         coluna = QVBoxLayout(principal)
         coluna.setContentsMargins(0, 0, 0, 0)
         coluna.setSpacing(0)
-        coluna.addWidget(self._montar_estado())
+        coluna.addWidget(self._montar_aparelho())
         coluna.addWidget(self._montar_lista(), 1)
         raiz.addWidget(principal, 1)
 
     def _montar_lateral(self) -> QWidget:
         painel = SidebarPanel()
-
         titulo = QLabel("Diligência")
         titulo.setObjectName("heading")
         painel.header.addWidget(titulo)
 
+        b_procurar = primary_button("Procurar aparelho", "reload")
+        b_procurar.clicked.connect(self._procurar)
+        painel.header.addWidget(b_procurar)
+        self._b_procurar = b_procurar
+
+        painel.body.addWidget(field_label("APARELHO"))
+        self._cb_aparelho = NoScrollComboBox()
+        self._cb_aparelho.currentIndexChanged.connect(self._mostrar_aparelho)
+        painel.body.addWidget(self._cb_aparelho)
+
+        painel.body.addWidget(hsep())
         painel.body.addWidget(field_label("IDENTIFICAÇÃO"))
         self._e_processo = QLineEdit()
         self._e_processo.setPlaceholderText("08650.000123/2026-11")
-        self._e_processo.textChanged.connect(self._atualizar_previa)
-        painel.body.addWidget(field_label("Número do processo"))
+        painel.body.addWidget(field_label("Processo"))
         painel.body.addWidget(self._e_processo)
 
         self._e_operador = QLineEdit()
-        self._e_operador.setPlaceholderText("Nome de quem realiza a diligência")
-        self._e_operador.textChanged.connect(self._atualizar_previa)
+        self._e_operador.setPlaceholderText("Quem realiza a diligência")
         painel.body.addWidget(field_label("Operador"))
         painel.body.addWidget(self._e_operador)
 
         self._e_objeto = QPlainTextEdit()
         self._e_objeto.setPlaceholderText(
-            "O que será registrado. Ex.: extração de registros de acesso do "
-            "servidor X, no período de 01/01 a 31/03, no módulo de auditoria.")
-        self._e_objeto.setFixedHeight(78)
+            "O que será registrado. Ex.: exibição, pelo denunciante, das "
+            "conversas mantidas com o servidor apurado.")
+        self._e_objeto.setFixedHeight(74)
         painel.body.addWidget(field_label("Objeto da diligência"))
         painel.body.addWidget(self._e_objeto)
 
         painel.body.addWidget(hsep())
-        painel.body.addWidget(field_label("CAPTURA"))
+        painel.body.addWidget(field_label("MODO"))
+        self._op_observar = QCheckBox("Somente observar")
+        self._op_observar.setChecked(True)
+        self._op_observar.setToolTip(
+            "Marcado, o computador não repassa toque nem digitação ao "
+            "aparelho. Desmarcar permite operá-lo daqui, e o termo "
+            "registra que o controle esteve habilitado.")
+        painel.body.addWidget(self._op_observar)
 
-        self._cb_area = NoScrollComboBox()
-        for m in core.monitores():
-            self._cb_area.addItem(m.rotulo, m.chave)
-        painel.body.addWidget(field_label("Área"))
-        painel.body.addWidget(self._cb_area)
-
-        self._cb_qualidade = NoScrollComboBox()
-        for chave, _q, _c, descricao in core.QUALIDADES:
-            self._cb_qualidade.addItem(f"{chave.capitalize()} — {descricao}",
-                                       chave)
-        painel.body.addWidget(field_label("Qualidade"))
-        painel.body.addWidget(self._cb_qualidade)
-
-        self._cb_microfone = NoScrollComboBox()
-        self._cb_microfone.addItem("Sem áudio", "")
-        for nome in core.microfones():
-            self._cb_microfone.addItem(nome, nome)
-        painel.body.addWidget(field_label("Narração pelo microfone"))
-        painel.body.addWidget(self._cb_microfone)
-
-        self._op_resistente = QCheckBox("Resistir a interrupção")
-        self._op_resistente.setChecked(True)
-        self._op_resistente.setToolTip(
-            "Grava de modo que uma queda de energia não leve o registro "
-            "inteiro — perdem-se os últimos dez a quinze segundos em vez de "
-            "tudo. O arquivo fica cerca de três vezes maior.")
-        painel.body.addWidget(self._op_resistente)
-
-        painel.body.addWidget(hsep())
-        painel.body.addWidget(field_label("ESTAÇÃO"))
-        self._rot_contexto = QLabel()
-        self._rot_contexto.setObjectName("muted")
-        self._rot_contexto.setWordWrap(True)
-        self._rot_contexto.setText("<br/>".join(
-            f"{r}: {v}" for r, v in self._contexto.linhas()[:5]))
-        painel.body.addWidget(self._rot_contexto)
+        self._op_audio = QCheckBox("Captar o áudio do aparelho")
+        self._op_audio.setChecked(True)
+        self._op_audio.setToolTip("Exige Android 11 ou mais recente.")
+        painel.body.addWidget(self._op_audio)
         painel.body.addStretch()
 
-        self._b_gravar = primary_button("Iniciar gravação", "camera")
-        self._b_gravar.clicked.connect(self._iniciar)
-        painel.footer.addWidget(self._b_gravar)
+        self._b_sessao = primary_button("Iniciar espelhamento", "camera")
+        self._b_sessao.clicked.connect(self._alternar)
+        painel.footer.addWidget(self._b_sessao)
 
         self._b_termo = output_button("Gerar termo")
         self._b_termo.clicked.connect(self._gerar_termo)
         painel.footer.addWidget(self._b_termo)
-        painel.add_note("A janela do sistema é recolhida durante a gravação.")
+        painel.add_note("Exige o aparelho destravado e com depuração USB "
+                        "habilitada por quem o detém.")
         return painel
 
-    def _montar_estado(self) -> QWidget:
+    def _montar_aparelho(self) -> QWidget:
         caixa = QFrame()
         caixa.setStyleSheet(
             f"background: {PALETTE['surface']}; "
@@ -485,15 +405,14 @@ class GravacaoTool(ToolPage):
         coluna.setContentsMargins(20, 16, 20, 16)
         coluna.setSpacing(6)
 
-        self._rot_estado = QLabel("Pronto para gravar")
+        self._rot_estado = QLabel("Procurando aparelhos…")
         self._rot_estado.setObjectName("heading")
         coluna.addWidget(self._rot_estado)
 
-        self._rot_previa = QLabel()
-        self._rot_previa.setObjectName("subtext")
-        self._rot_previa.setWordWrap(True)
-        coluna.addWidget(self._rot_previa)
-        self._atualizar_previa()
+        self._rot_aparelho = QLabel()
+        self._rot_aparelho.setObjectName("subtext")
+        self._rot_aparelho.setWordWrap(True)
+        coluna.addWidget(self._rot_aparelho)
         return caixa
 
     def _montar_lista(self) -> QWidget:
@@ -514,7 +433,7 @@ class GravacaoTool(ToolPage):
         for c in (1, 2, 3):
             cabeca.setSectionResizeMode(
                 c, QHeaderView.ResizeMode.ResizeToContents)
-        self._arvore.setColumnWidth(0, 260)
+        self._arvore.setColumnWidth(0, 250)
         self._arvore.itemDoubleClicked.connect(lambda *_: self._abrir())
         self._arvore.currentItemChanged.connect(
             lambda *_: self._atualizar_estado())
@@ -556,129 +475,176 @@ class GravacaoTool(ToolPage):
         coluna.addWidget(acoes)
         return envelope
 
-    # ── prévia da faixa ──────────────────────────
+    # ── procura ──────────────────────────────────
+    def _procurar(self):
+        if not core.disponivel():
+            self._rot_estado.setText("Espelhamento indisponível")
+            self._rot_aparelho.setText(core.diagnostico())
+            return
+        if self._procura is not None and self._procura.isRunning():
+            return
+        self._b_procurar.setEnabled(False)
+        self._rot_estado.setText("Procurando aparelhos…")
+        self._rot_aparelho.setText(
+            "Ligue o celular pelo cabo USB, destrave a tela e mantenha a "
+            "depuração USB habilitada.")
+        self._procura = ProcurarThread()
+        self._procura.pronto.connect(self._achou)
+        self._procura.start()
+
+    def _achou(self, aparelhos: list):
+        self._b_procurar.setEnabled(True)
+        self._aparelhos = aparelhos
+        self._cb_aparelho.blockSignals(True)
+        self._cb_aparelho.clear()
+        for a in aparelhos:
+            self._cb_aparelho.addItem(a.rotulo, a.serie)
+        self._cb_aparelho.blockSignals(False)
+
+        if not aparelhos:
+            self._rot_estado.setText("Nenhum aparelho encontrado")
+            self._rot_aparelho.setText(
+                "Confira: o cabo permite transferência de dados (há cabos "
+                "que só carregam); a tela está destravada; e a depuração "
+                "USB está habilitada em Opções do desenvolvedor.")
+        else:
+            self._mostrar_aparelho()
+        self._atualizar_estado()
+
+    def _aparelho(self) -> core.Aparelho | None:
+        serie = self._cb_aparelho.currentData()
+        return next((a for a in self._aparelhos if a.serie == serie), None)
+
+    def _mostrar_aparelho(self):
+        a = self._aparelho()
+        if a is None:
+            return
+        if not a.pronto:
+            self._rot_estado.setText("Aparelho aguardando autorização")
+            self._rot_aparelho.setText(
+                core.EXPLICACAO_ESTADO.get(a.estado, a.estado)
+                + ".  Depois de autorizar, clique em Procurar aparelho.")
+        else:
+            self._rot_estado.setText(a.rotulo)
+            self._rot_aparelho.setText("  ·  ".join(
+                f"{r}: {v}" for r, v in a.linhas()))
+        self._atualizar_estado()
+
+    # ── sessão ───────────────────────────────────
+    def _alternar(self):
+        if self._espelhador is not None:
+            self._encerrar()
+        else:
+            self._iniciar()
+
     def _identificacao(self) -> str:
+        a = self._aparelho()
         partes = []
         if self._e_processo.text().strip():
             partes.append(self._e_processo.text().strip())
         if self._e_operador.text().strip():
             partes.append(f"Operador {self._e_operador.text().strip()}")
-        partes.append(f"Estação {self._contexto.estacao}")
-        if self._contexto.usuario:
-            partes.append(f"Usuário {self._contexto.usuario}")
-        partes.append(f"Início {datetime.datetime.now():%d/%m/%Y}")
+        if a is not None:
+            nome = " ".join(x for x in (a.fabricante, a.modelo) if x)
+            partes.append(f"Aparelho {nome or a.serie}")
+        partes.append("Somente observação" if self._op_observar.isChecked()
+                      else "COM CONTROLE DO APARELHO")
         return "  •  ".join(partes)
 
-    def _atualizar_previa(self):
-        self._rot_previa.setText(
-            "A faixa impressa no vídeo mostrará:  "
-            f"<b>{self._identificacao()}</b>  —  mais o relógio da estação e "
-            "o tempo decorrido.")
-
-    # ── gravação ─────────────────────────────────
     def _iniciar(self):
-        if self._gravador is not None:
+        a = self._aparelho()
+        if a is None or not a.pronto:
             return
-        if not self._e_processo.text().strip():
+        if not self._e_objeto.toPlainText().strip():
+            QMessageBox.information(
+                self, "Falta o objeto da diligência",
+                "Descreva o que será registrado. É esse campo que diz, no "
+                "termo, o que se foi verificar.")
+            return
+        if not self._op_observar.isChecked():
             resposta = QMessageBox.question(
-                self, "Sem número de processo",
-                "A faixa do vídeo sairá sem o número do processo, que é o "
-                "que liga o registro aos autos.\n\nGravar assim mesmo?")
+                self, "Controle do aparelho habilitado",
+                "Sem a opção “Somente observar”, o computador poderá operar "
+                "o aparelho — tocar, digitar, abrir aplicativos.\n\n"
+                "Operar o telefone de outra pessoa é ato diverso de "
+                "observar o que ela exibe, e o termo registrará que o "
+                "controle esteve habilitado.\n\nProsseguir assim?")
             if resposta != QMessageBox.StandardButton.Yes:
                 return
 
         PASTA_PADRAO.mkdir(parents=True, exist_ok=True)
         agora = datetime.datetime.now()
-        sugestao = PASTA_PADRAO / f"diligencia-{agora:%Y-%m-%d-%H%M%S}.mp4"
+        sugestao = PASTA_PADRAO / f"espelhamento-{agora:%Y-%m-%d-%H%M%S}.mp4"
         destino, _ = QFileDialog.getSaveFileName(
-            self, "Onde gravar o vídeo", str(sugestao),
-            "Vídeo MP4 (*.mp4)")
+            self, "Onde gravar a sessão", str(sugestao), "Vídeo MP4 (*.mp4)")
         if not destino:
             return
         if not destino.lower().endswith(".mp4"):
             destino += ".mp4"
 
         opcoes = core.Opcoes(
-            monitor=self._cb_area.currentData() or "desktop",
-            qualidade=self._cb_qualidade.currentData() or "normal",
-            microfone=self._cb_microfone.currentData() or "",
-            identificacao=self._identificacao(),
-            resistente=self._op_resistente.isChecked())
-
-        self._gravador = core.Gravador(destino, opcoes)
+            somente_observar=self._op_observar.isChecked(),
+            com_audio=self._op_audio.isChecked(),
+            identificacao=self._identificacao())
+        self._espelhador = core.Espelhador(a, destino, opcoes)
         try:
-            self._gravador.iniciar()
+            self._espelhador.iniciar()
         except Exception as e:                          # noqa: BLE001
-            self._gravador = None
-            QMessageBox.critical(self, "Não foi possível gravar", str(e))
+            self._espelhador = None
+            QMessageBox.critical(self, "Não foi possível espelhar", str(e))
             return
-
-        self._rot_estado.setText("Gravando…")
-        self._atualizar_estado()
-        self._painel.mostrar()
         self._pulso.start()
-        self.status_msg.emit("Gravação iniciada.")
-
-        # A janela sai da frente: se ficasse, apareceria no registro e
-        # cobriria o que se quer mostrar.
-        janela = self.window()
-        if janela is not None:
-            janela.showMinimized()
+        self._atualizar_estado()
+        self.status_msg.emit("Espelhamento iniciado.")
 
     def _tique(self):
-        if self._gravador is None:
+        if self._espelhador is None:
             return
-        self._painel.atualizar(self._gravador.decorrido)
-        if not self._gravador.gravando:
-            # O codificador morreu sozinho — melhor encerrar e dizer isso
-            # do que deixar o painel piscando sobre uma gravação parada.
-            self._encerrar(inesperado=True)
+        s = int(self._espelhador.decorrido)
+        self._rot_estado.setText(
+            f"Espelhando — {s // 3600:02d}:{(s % 3600) // 60:02d}:"
+            f"{s % 60:02d}")
+        if not self._espelhador.espelhando:
+            # O espelhador caiu sozinho — cabo solto, aparelho desligado.
+            self.status_msg.emit(
+                "O espelhamento terminou por conta própria; encerrando.")
+            self._encerrar()
 
-    def _encerrar(self, inesperado: bool = False):
-        if self._gravador is None:
+    def _encerrar(self):
+        if self._espelhador is None or self._encerramento is not None:
             return
         self._pulso.stop()
-        self._painel.esconder()
-        janela = self.window()
-        if janela is not None:
-            janela.showNormal()
-            janela.raise_()
-            janela.activateWindow()
+        self._rot_estado.setText("Encerrando a sessão…")
+        self._rot_aparelho.setText("Aplicando a faixa de identificação.")
+        self._atualizar_estado(ocupado=True)
+        self._encerramento = EncerrarThread(self._espelhador)
+        self._encerramento.andamento.connect(self._rot_aparelho.setText)
+        self._encerramento.concluido.connect(self._terminou)
+        self._encerramento.start()
 
-        resultado = self._gravador.encerrar()
-        self._gravador = None
-        self._rot_estado.setText("Pronto para gravar")
-
-        if resultado.erro:
-            self._atualizar_estado()
-            QMessageBox.critical(self, "A gravação falhou", resultado.erro)
-            return
-        self._resultados.append(resultado)
-        self._acrescentar(resultado)
-        # Depois de guardar o resultado, e não antes: o botão do termo
-        # depende de haver gravação na lista, e a ordem invertida o
-        # deixava desligado justamente quando passava a fazer sentido.
+    def _terminou(self, r: core.Resultado):
+        self._encerramento = None
+        self._espelhador = None
         self._atualizar_estado()
-        self.status_msg.emit(
-            f"Gravação encerrada: {resultado.duracao}, "
-            f"{core.formatar_tamanho(resultado.tamanho)}.")
-        if inesperado:
-            QMessageBox.warning(
-                self, "A gravação parou sozinha",
-                "O codificador encerrou antes do comando. O arquivo "
-                "gravado até ali foi mantido e consta da lista, mas o "
-                "registro está incompleto.")
-
-    def _acrescentar(self, r: core.Resultado):
+        self._mostrar_aparelho()
+        if r.erro:
+            QMessageBox.critical(self, "A sessão falhou", r.erro)
+            return
+        self._resultados.append(r)
         item = QTreeWidgetItem([
             Path(r.arquivo).name, core.data_br(r.inicio), r.duracao,
             core.formatar_tamanho(r.tamanho), r.sha256])
         item.setData(0, Qt.ItemDataRole.UserRole, r.arquivo)
-        item.setToolTip(0, r.arquivo)
         item.setForeground(4, QColor(PALETTE["text3"]))
         item.setFont(4, QFont("Consolas", 8))
         self._arvore.addTopLevelItem(item)
         self._arvore.setCurrentItem(item)
+        self.status_msg.emit(
+            f"Sessão encerrada: {r.duracao}, "
+            f"{core.formatar_tamanho(r.tamanho)}.")
+        if r.avisos:
+            QMessageBox.warning(self, "Avisos da sessão",
+                                "\n\n".join(r.avisos[:4]))
 
     # ── ações ────────────────────────────────────
     def _selecionado(self) -> core.Resultado | None:
@@ -760,7 +726,7 @@ class GravacaoTool(ToolPage):
     def _gerar_termo(self):
         if not self._resultados:
             return
-        termo = core.TermoGravacao(
+        termo = core.TermoEspelhamento(
             nome=self._e_operador.text().strip(),
             numero_processo=self._e_processo.text().strip(),
             objeto=self._e_objeto.toPlainText().strip(),
@@ -768,36 +734,46 @@ class GravacaoTool(ToolPage):
         TermoDialog(termo, self).exec()
 
     # ── estado ───────────────────────────────────
-    def _atualizar_estado(self):
-        gravando = self._gravador is not None
-        self._b_gravar.setEnabled(not gravando)
-        self._b_termo.setEnabled(bool(self._resultados) and not gravando)
-        self._b_nova.setEnabled(bool(self._resultados) and not gravando)
+    def _atualizar_estado(self, ocupado: bool = False):
+        a = self._aparelho()
+        espelhando = self._espelhador is not None
+        pode = (a is not None and a.pronto and not ocupado
+                and core.disponivel())
+        self._b_sessao.setEnabled((pode or espelhando) and not ocupado)
+        self._b_sessao.setText(
+            "Encerrar espelhamento" if espelhando else "Iniciar espelhamento")
+        self._b_termo.setEnabled(bool(self._resultados) and not espelhando
+                                 and not ocupado)
+        self._b_nova.setEnabled(bool(self._resultados) and not espelhando
+                                and not ocupado)
         self._b_remover.setEnabled(
-            self._arvore.currentItem() is not None and not gravando)
-        for w in (self._e_processo, self._e_operador, self._e_objeto,
-                  self._cb_area, self._cb_qualidade, self._cb_microfone,
-                  self._op_resistente):
-            w.setEnabled(not gravando)
+            self._arvore.currentItem() is not None and not espelhando
+            and not ocupado)
+        self._b_procurar.setEnabled(not espelhando and not ocupado)
+        for w in (self._cb_aparelho, self._e_processo, self._e_operador,
+                  self._e_objeto, self._op_observar, self._op_audio):
+            w.setEnabled(not espelhando and not ocupado)
 
     # ── ciclo de vida ────────────────────────────
     def can_close(self) -> bool:
-        if self._gravador is not None:
+        if self._espelhador is not None:
             resposta = QMessageBox.question(
-                self, "Gravação em andamento",
-                "Há uma gravação em curso. Sair agora a encerra.\n\n"
-                "Deseja encerrar a gravação e sair?")
+                self, "Espelhamento em andamento",
+                "Há uma sessão em curso. Sair agora a encerra.\n\n"
+                "Deseja encerrar e sair?")
             if resposta != QMessageBox.StandardButton.Yes:
                 return False
             self._encerrar()
         return True
 
     def shutdown(self):
-        # Encerrar pelo comando, e não matando o processo: só assim o
-        # arquivo é fechado com a duração correta.
-        if self._gravador is not None:
-            self._pulso.stop()
-            self._gravador.encerrar()
-            self._gravador = None
-        self._painel.esconder()
-        self._painel.deleteLater()
+        self._pulso.stop()
+        if self._espelhador is not None:
+            self._espelhador.cancelar()
+            self._espelhador = None
+        for t in (self._procura, self._encerramento):
+            if t is not None and t.isRunning():
+                t.wait(6000)
+        # O adb deixa um processo de fundo residente; encerrá-lo evita
+        # deixar no computador um serviço que ninguém pediu.
+        core.encerrar_servidor()

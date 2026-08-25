@@ -121,9 +121,59 @@ def autoteste() -> int:
             raise RuntimeError(ocr_windows.diagnostico())
         return ocr_windows.diagnostico()
 
+    def espelhamento():
+        from temis.tools import espelhamento_core
+        if not espelhamento_core.disponivel():
+            raise RuntimeError(espelhamento_core.diagnostico())
+        return (f"scrcpy e adb em "
+                f"{espelhamento_core.adb_path().parent}")
+
     def ferramentas():
         from temis.tools import REGISTRY
         return f"{len(REGISTRY)} ferramentas registradas"
+
+    def portal():
+        # A constelação do portal reparte os ladrilhos numa elipse, e o
+        # que cabe ali depende do tamanho do ladrilho, do tamanho da
+        # letra e de quantas ferramentas existem. Acrescentar uma
+        # ferramenta pode fazer dois ladrilhos se sobreporem sem que
+        # nada mais quebre — e ninguém repara olhando o código. Aqui se
+        # mede: monta-se o portal na área que o notebook de catorze
+        # polegadas entrega e conferem-se os retângulos.
+        import os as _os
+        _os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PyQt6.QtWidgets import QApplication, QLabel
+
+        from temis import theme
+        from temis.shell import ConstelacaoPortal
+
+        app = QApplication.instance() or QApplication([])
+        app.setStyleSheet(theme.stylesheet())
+        c = ConstelacaoPortal()
+        c.resize(*ConstelacaoPortal.MINIMO)
+        c.show()
+        app.processEvents()
+        c._reposicionar()
+        app.processEvents()
+        colisoes = c.sobreposicoes()
+        fora = c.transbordo()
+        # Nome e frase quebram em linhas, e quantas linhas cada um pede
+        # depende da fonte que o Windows entrega. `sizeHint` mente para
+        # rótulo que quebra — quem responde é `heightForWidth`.
+        cortados = [
+            t._meta.name
+            for t in [c._centro] + c._orbita
+            for lb in t.findChildren(QLabel)
+            if lb.wordWrap() and lb.heightForWidth(lb.width()) > lb.height()
+        ]
+        c.close()
+        if colisoes or fora or cortados:
+            raise RuntimeError(
+                f"{len(colisoes)} sobreposição(ões), {len(fora)} ladrilho(s) "
+                f"fora da área e {len(cortados)} rótulo(s) cortado(s) na "
+                f"menor tela prevista")
+        return (f"{len(c._orbita) + 1} ladrilhos, sem sobreposição nem texto "
+                f"cortado em {c.MINIMO[0]}×{c.MINIMO[1]}")
 
     for rotulo, funcao in (
         ("interface", qt),
@@ -134,7 +184,9 @@ def autoteste() -> int:
         ("leitura de documentos", documentos),
         ("índice de busca", busca),
         ("reconhecimento óptico", ocr),
+        ("espelhamento de celular", espelhamento),
         ("registro de ferramentas", ferramentas),
+        ("geometria do portal", portal),
     ):
         conferir(rotulo, funcao)
 

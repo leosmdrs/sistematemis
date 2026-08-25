@@ -245,6 +245,22 @@ def draw_icon(kind: str, size: int = 16, color: str = None, width: float = 1.8) 
         p.setPen(pen)
         poly((c - s * 0.16, c + s * 0.08), (c - s * 0.04, c + s * 0.19),
              (c + s * 0.19, c - s * 0.08))
+    elif kind == "tool_espelhamento":
+        # celular com a tela espelhada para fora — o que o aparelho
+        # mostra, aparecendo no computador
+        p.drawRoundedRect(QRectF(m * 0.8, m * 0.6, s * 0.30, s - 2 * m * 0.6),
+                          s * 0.05, s * 0.05)
+        p.drawLine(QPointF(m * 0.8 + s * 0.10, m * 0.6 + s * 0.04),
+                   QPointF(m * 0.8 + s * 0.20, m * 0.6 + s * 0.04))
+        p.drawRoundedRect(QRectF(c + s * 0.02, m, s - m - c - s * 0.02 + s * 0.20,
+                                 s * 0.44), s * 0.04, s * 0.04)
+        p.drawLine(QPointF(c + s * 0.24, m + s * 0.44),
+                   QPointF(c + s * 0.24, m + s * 0.56))
+        p.drawLine(QPointF(c + s * 0.10, m + s * 0.56),
+                   QPointF(c + s * 0.38, m + s * 0.56))
+        poly((c - s * 0.04, c + s * 0.20), (c + s * 0.06, c + s * 0.20))
+        poly((c + s * 0.01, c + s * 0.15), (c + s * 0.06, c + s * 0.20),
+             (c + s * 0.01, c + s * 0.25))
     elif kind == "tool_gravacao":
         # monitor com o ponto de gravação — registrar o que está na tela
         p.drawRoundedRect(QRectF(m, m + s * 0.04, s - 2 * m,

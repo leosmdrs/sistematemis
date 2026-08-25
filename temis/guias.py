@@ -130,10 +130,22 @@ GUIAS: dict[str, Guia] = {
             "revelou. O que interessa à apuração sai destacado, e "
             "coordenadas geográficas saem em vermelho.",
             "Preencha o nº SEI de cada arquivo, se já os tiver juntado.",
+            "Para ir além do que o arquivo declara, escolha o modo "
+            "<b>Avançado</b>: ele procura fluxos alternativos do sistema de "
+            "arquivos — inclusive a marca que guarda o endereço de onde o "
+            "arquivo foi baixado —, revisões anteriores preservadas dentro "
+            "do documento, propriedades que o programa de edição não "
+            "mostra, e dados anexados depois do fim do formato.",
             "Clique em <b>Gerar termo</b>, complete a abertura e salve em "
             "PDF ou HTML.",
         ),
         limites=(
+            "O exame avançado constata a existência do que encontra, mas "
+            "não recupera o conteúdo: ele diz que há uma revisão anterior "
+            "dentro do documento, não a extrai. Extração é perícia.",
+            "A ausência de achados no exame avançado não prova que o "
+            "arquivo não foi alterado — prova apenas que as marcas "
+            "procuradas não estavam lá.",
             "Metadado é informação declarada pelo programa que gravou o "
             "arquivo, e pode ser editado. Serve de indício, não de prova "
             "cabal por si só.",
@@ -396,6 +408,67 @@ GUIAS: dict[str, Guia] = {
             "de Tela.",
             "As datas e horas são as do relógio da estação, não atestadas "
             "por terceiro.",
+        ),
+    ),
+
+    "espelhamento": Guia(
+        finalidade=(
+            "Liga um celular Android por cabo, mostra a tela dele no "
+            "computador e grava a sessão inteira, com o aparelho "
+            "identificado no termo — fabricante, modelo, versão do Android "
+            "e número de série, lidos do próprio dispositivo.\n\n"
+            "Serve à diligência em que alguém **exibe** o aparelho: o "
+            "denunciante que mostra as conversas, a demonstração de como um "
+            "aplicativo se comporta, o registro que o detentor apresenta. "
+            "Filmar a tela do celular com uma câmera resolve mal — fica "
+            "ilegível, treme, e não identifica o aparelho."),
+        quando=(
+            "Alguém apresenta espontaneamente o próprio celular e o que "
+            "está nele precisa ir aos autos.",
+            "É preciso demonstrar o comportamento de um aplicativo.",
+            "Um registro exibido na tela do aparelho precisa ser "
+            "documentado com identificação do dispositivo.",
+        ),
+        passos=(
+            "Peça a quem detém o aparelho que o destrave e habilite a "
+            "depuração USB, em Configurações › Opções do desenvolvedor. "
+            "Sem isso nada funciona.",
+            "Ligue o cabo e clique em <b>Procurar aparelho</b>. Se aparecer "
+            "“aguardando autorização”, o celular está mostrando um aviso de "
+            "confiança — peça que toque em Permitir e procure de novo.",
+            "Preencha <b>Processo</b>, <b>Operador</b> e <b>Objeto da "
+            "diligência</b>.",
+            "Deixe <b>Somente observar</b> marcado. Assim o computador "
+            "mostra a tela mas não toca nem digita no aparelho — quem opera "
+            "o celular é o dono dele.",
+            "Clique em <b>Iniciar espelhamento</b> e escolha onde gravar. A "
+            "tela do celular aparece em janela própria, ao lado.",
+            "Conduza a diligência. Ao terminar, clique em <b>Encerrar "
+            "espelhamento</b> — o sistema aplica a faixa de identificação e "
+            "calcula o SHA-256, o que leva algum tempo.",
+            "Clique em <b>Gerar termo</b> e informe quem apresentou o "
+            "aparelho e a que título.",
+        ),
+        limites=(
+            "<b>Não serve para celular apreendido e bloqueado.</b> O método "
+            "exige aparelho destravado e depuração habilitada por quem tem "
+            "a senha. Exame de dispositivo bloqueado é perícia, e tem "
+            "ferramenta própria.",
+            "O método <b>altera o aparelho</b>, em três pontos que o termo "
+            "declara: habilitar a depuração é mudança de configuração; "
+            "autorizar a estação grava a chave do computador no celular; e "
+            "o espelhamento envia ao aparelho um componente que roda "
+            "enquanto dura a sessão.",
+            "Só Android, versão 5.0 ou mais recente. O áudio exige Android "
+            "11. Não funciona com iPhone — não há caminho aberto e "
+            "confiável para isso no Windows.",
+            "O registro alcança o que foi exibido na tela. Não alcança o "
+            "que está guardado no aparelho e não foi mostrado, nem dado "
+            "apagado, nem área protegida.",
+            "Desmarcar “Somente observar” permite operar o celular pelo "
+            "computador. Operar o telefone de outra pessoa é ato diverso de "
+            "observar o que ela exibe — e o termo registra que o controle "
+            "esteve habilitado.",
         ),
     ),
 

@@ -59,6 +59,32 @@ correspondente. Ele está nos endereços acima; na impossibilidade de
 obtê-lo ali, abra uma questão no repositório do Sistema Têmis e ele será
 fornecido.
 
+## scrcpy e Android Debug Bridge
+
+O instalador acompanha o **scrcpy** e o **adb**, usados pelo Espelhamento
+de Celular. São os binários não modificados da versão pública
+`scrcpy-win64-v4.1`, distribuída pelo próprio projeto.
+
+| Componente | Licença | Origem |
+|---|---|---|
+| **scrcpy** | Apache-2.0 | [github.com/Genymobile/scrcpy](https://github.com/Genymobile/scrcpy) |
+| **adb** (Android Debug Bridge) | Apache-2.0 | [Android Open Source Project](https://android.googlesource.com/platform/packages/modules/adb/) |
+| **FFmpeg** (bibliotecas que acompanham o scrcpy) | LGPL-2.1+ | [ffmpeg.org](https://ffmpeg.org/) |
+| **SDL 3** | Zlib | [libsdl.org](https://www.libsdl.org/) |
+| **libusb** | LGPL-2.1+ | [libusb.info](https://libusb.info/) |
+
+Sobre a redistribuição do `adb`: a licença do SDK do Android veda
+redistribuir o conjunto (§3.4), mas ressalva expressamente que os
+componentes sob licença de código aberto são regidos apenas pela própria
+licença (§3.5). O `adb` é do AOSP, sob Apache-2.0. O Debian o empacota
+como `android-platform-tools` na área **main**, que exige licença livre e
+redistribuível, e o próprio scrcpy o distribui em suas versões oficiais.
+
+As bibliotecas do FFmpeg que acompanham o scrcpy **não** são as mesmas
+que o Sistema Têmis usa na Edição de Vídeo: aquelas foram compiladas sem
+`--enable-gpl` — conferido na linha de configuração embutida no binário —
+e portanto são LGPL.
+
 ## Modelos de reconhecimento de fala
 
 Não acompanham o instalador — são baixados na primeira utilização da

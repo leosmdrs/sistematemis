@@ -13,11 +13,16 @@ QUALQUER GARANTIA. Veja a Licença Pública Geral Affero GNU para
 mais detalhes: <https://www.gnu.org/licenses/>.
 """
 
-__version__ = "1.4.1"
+__version__ = "1.5.0"
 __appname__ = "Sistema Têmis"
 #: Linha de apoio sob o nome do sistema. Não nomeia a
 #: instituição: o programa é obra pessoal do autor, e a
 #: assinatura institucional cabe às peças que ele gera, não
 #: a ele próprio.
 __org__ = "Ferramentas de apoio às atividades de investigação"
-__author__ = "Leonardo Medeiros"
+#: Como o autor assina a tela "Sobre". A patente vai junto porque, dentro
+#: da instituição, é por ela que se reconhece quem assina. A titularidade
+#: dos direitos é outra coisa: no cabeçalho da licença, acima, e no
+#: aviso de direitos do executável, o nome vai sem patente — direito
+#: autoral é da pessoa, não do cargo.
+__author__ = "PRF Leonardo Medeiros"

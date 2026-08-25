@@ -13,6 +13,7 @@ from .antiinj import AntiInjectionTool
 from .constatacao import ConstatacaoTool
 from .ips import IPSTool
 from .metadados import MetadadosTool
+from .espelhamento import EspelhamentoTool
 from .extracao import ExtracaoTool
 from .gravacao import GravacaoTool
 from .ocrpdf import OCRPDFTool
@@ -45,6 +46,7 @@ REGISTRY: list[tuple[ToolMeta, type | None]] = [
     (TranscricaoTool.meta,   TranscricaoTool),
     (ExtracaoTool.meta,      ExtracaoTool),
     (GravacaoTool.meta,      GravacaoTool),
+    (EspelhamentoTool.meta,  EspelhamentoTool),
     # preparo e apoio
     (TarjaPretaTool.meta,    TarjaPretaTool),
     (AntiInjectionTool.meta, AntiInjectionTool),

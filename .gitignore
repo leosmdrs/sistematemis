@@ -33,3 +33,12 @@ venv/
 .vscode/
 .idea/
 *.log
+
+# ── Peças de trabalho, fora do repositório ───────────────
+# Este repositório é público. O ofício de apresentação e o anexo técnico
+# são documentos pessoais de quem assina, e os PDFs de teste trazem nomes
+# de pessoas reais. Nada disso é fonte do programa, e a única forma de
+# não publicar por engano é não versionar.
+oficio-*.html
+anexo-*.html
+*.pdf

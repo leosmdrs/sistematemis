@@ -71,6 +71,10 @@ class Arquivo:
     #: Número do documento no SEI, digitado pelo encarregado. Vai para a
     #: coluna do termo de juntada, que é o que amarra o arquivo aos autos.
     sei: str = ""
+    #: Resultado do exame avançado, quando pedido. Fica separado dos
+    #: campos porque é de outra natureza: aquilo são dados declarados
+    #: pelo arquivo, isto são achados sobre ele.
+    analise: object = None
 
     @property
     def nome(self) -> str:
@@ -540,7 +544,8 @@ LEITORES = [
 ]
 
 
-def extrair(caminho: str | Path, com_hash: bool = True) -> Arquivo:
+def extrair(caminho: str | Path, com_hash: bool = True,
+            avancado: bool = False) -> Arquivo:
     """Lê um arquivo e devolve o que ele informa sobre si mesmo."""
     caminho = Path(caminho)
     saida = Arquivo(caminho=str(caminho))
@@ -576,15 +581,23 @@ def extrair(caminho: str | Path, com_hash: bool = True) -> Arquivo:
             saida.sha256 = sha256_file(caminho)
         except OSError:
             pass
+
+    if avancado:
+        from . import metadados_avancado
+        try:
+            saida.analise = metadados_avancado.analisar(caminho)
+        except Exception as e:                          # noqa: BLE001
+            saida.erro = (saida.erro + " | " if saida.erro else "") + \
+                f"análise avançada: {type(e).__name__}: {e}"
     return saida
 
 
 def extrair_varios(caminhos, com_hash: bool = True,
-                   progresso=None) -> list[Arquivo]:
+                   progresso=None, avancado: bool = False) -> list[Arquivo]:
     total = len(caminhos)
     saida = []
     for i, caminho in enumerate(caminhos, 1):
-        saida.append(extrair(caminho, com_hash))
+        saida.append(extrair(caminho, com_hash, avancado))
         if progresso:
             progresso(i, total)
     return saida
@@ -605,11 +618,13 @@ DESTAQUE = "#B3261E"
 SO_HASH = "so_hash"          # termo de juntada puro, sem metadados
 RELEVANTES = "relevantes"    # só o que interessa à apuração
 COMPLETO = "completo"        # tudo o que foi lido
+AVANCADO = "avancado"        # o que o arquivo esconde de si mesmo
 
 MODOS = {
     SO_HASH: "Só hash",
     RELEVANTES: "Relevantes",
     COMPLETO: "Completo",
+    AVANCADO: "Avançado",
 }
 
 
@@ -738,6 +753,84 @@ def _quadro_juntada(arquivos: list[Arquivo]) -> str:
 """
 
 
+#: Cores de cada peso, no quadro de achados.
+COR_RELEVANCIA = {"alerta": DESTAQUE, "atencao": "#8A6D00",
+                  "informativo": CINZA}
+
+
+def _bloco_achados(arquivos: list[Arquivo]) -> str:
+    """Quadro dos achados do exame avançado.
+
+    Sai separado dos metadados de propósito: aqueles são dados que o
+    arquivo declara; estes são conclusões sobre ele, e misturá-los faria
+    parecer que a ferramenta afirma o mesmo grau de certeza sobre as
+    duas coisas.
+    """
+    import html as _html
+    from . import metadados_avancado as av
+
+    e = _html.escape
+    blocos = []
+    for i, a in enumerate(arquivos, 1):
+        analise = a.analise
+        if analise is None:
+            continue
+        blocos.append(
+            f'<p style="font-size:11pt; margin-top:16px;">'
+            f'<b><font color="{INK}">{i}. {e(a.nome)}</font></b></p>')
+        if analise.vazio:
+            blocos.append(
+                f'<p style="font-size:10pt;"><font color="{CINZA}">'
+                f"Nada foi encontrado além dos metadados já relacionados."
+                f"</font></p>")
+            continue
+        linhas = []
+        for ach in analise.ordenados:
+            cor = COR_RELEVANCIA.get(ach.relevancia, CINZA)
+            detalhe = e(ach.detalhe).replace(chr(10), "<br/>")
+            linhas.append(
+                f'<tr><td width="22%" valign="top">'
+                f'<font color="{cor}" size="1">'
+                f"{av.ROTULO_RELEVANCIA.get(ach.relevancia, '').upper()}"
+                f"</font><br/>"
+                f'<font color="{CINZA}" size="1">{e(ach.origem)}</font></td>'
+                f'<td><font color="{INK}"><b>{e(ach.titulo)}</b></font>'
+                + (f'<br/><font color="{CINZA}" size="1">{detalhe}</font>'
+                   if detalhe else "")
+                + "</td></tr>")
+        blocos.append(
+            '<table width="100%" cellspacing="0" cellpadding="5" border="1" '
+            'style="border-collapse:collapse; font-size:9.5pt;">'
+            + "".join(linhas) + "</table>")
+        if analise.erros:
+            blocos.append(
+                f'<p style="font-size:9pt;"><font color="{CINZA}">'
+                f"Falhas durante o exame: {e('; '.join(analise.erros[:4]))}"
+                f"</font></p>")
+    return "".join(blocos)
+
+
+#: O que o exame avançado alcança, e o que não alcança. Vai impresso
+#: junto com os achados.
+RESSALVAS_AVANCADO = (
+    "O exame avançado percorre o próprio arquivo em busca do que a "
+    "leitura comum de metadados não mostra: fluxos de dados alternativos "
+    "do sistema de arquivos, revisões anteriores preservadas na estrutura "
+    "do documento, propriedades não exibidas pelo programa que o criou e "
+    "dados acrescentados após o fim do formato.",
+    "A ausência de achados não significa que o arquivo não tenha sido "
+    "alterado — significa apenas que não foram encontradas as marcas "
+    "procuradas.",
+    "Os achados são indícios e devem ser interpretados no contexto da "
+    "apuração. Marca de origem, tempo de edição e contagem de revisões "
+    "são registros mantidos por programas e sistemas, e como tais podem "
+    "ser incorretos ou manipulados.",
+    "Este exame não recupera o conteúdo das revisões anteriores nem "
+    "extrai os dados ocultos encontrados; limita-se a constatar a sua "
+    "existência. A extração, quando necessária, é objeto de perícia.",
+)
+
+
 def build_html(arquivos: list[Arquivo], quando: str,
                decl: Declarante | None = None,
                modo: str = RELEVANTES,
@@ -785,6 +878,30 @@ def build_html(arquivos: list[Arquivo], quando: str,
         corpo.append("".join(
             _bloco_arquivo(a, i, modo == RELEVANTES)
             for i, a in enumerate(arquivos, 1)))
+
+    if modo == AVANCADO and any(a.analise is not None for a in arquivos):
+        import html as _html2
+        alertas = sum(a.analise.quantos("alerta")
+                      for a in arquivos if a.analise is not None)
+        corpo.append(
+            f'<p align="justify" style="font-size:11pt; line-height:160%; '
+            f'margin-top:22px;">Procedeu-se, por fim, ao exame avançado dos '
+            f"arquivos, em busca do que não é exibido pela leitura comum de "
+            f"metadados. "
+            + (f"Foram identificados <b>{alertas}</b> achado(s) de maior "
+               f"relevância, adiante relacionados."
+               if alertas else
+               "Os achados, quando houve, estão adiante relacionados.")
+            + "</p>")
+        corpo.append(_bloco_achados(arquivos))
+        corpo.append(
+            f'<p style="font-size:11pt; margin-top:16px;">'
+            f'<b><font color="{INK}">Ressalvas quanto ao exame avançado'
+            f"</font></b></p>")
+        corpo += [
+            f'<p align="justify" style="font-size:10pt; line-height:150%;">'
+            f'<font color="{INK}">{_html2.escape(x)}</font></p>'
+            for x in RESSALVAS_AVANCADO]
 
     blocos = "".join(corpo)
 

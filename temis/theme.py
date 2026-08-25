@@ -66,6 +66,15 @@ QFrame#tile:hover {{
     background: {P['surface2']};
     border: 1px solid {P['gold']};
 }}
+QFrame#tile_centro {{
+    background: {P['gold']};
+    border: 2px solid {P['gold_h']};
+    border-radius: 14px;
+}}
+QFrame#tile_centro:hover {{
+    background: {P['gold_h']};
+    border: 2px solid {P['text']};
+}}
 QFrame#tile_soon {{
     background: {P['surface']};
     border: 1px dashed {P['border']};

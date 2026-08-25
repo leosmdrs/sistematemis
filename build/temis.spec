@@ -52,6 +52,29 @@ WINRT_BINARIOS = collect_dynamic_libs("winrt")
 # ligadas estaticamente ao módulo compilado.
 DADOS_DE_PACOTE = collect_data_files("faster_whisper")
 
+# O scrcpy e o adb vão junto, na pasta "scrcpy": o Espelhamento de
+# Celular depende deles e a premissa do sistema é que a estação não tenha
+# como instalar pré-requisito.
+#
+# São redistribuíveis, e isso foi apurado antes de embutir: o adb é do
+# AOSP sob Apache-2.0; a licença do SDK do Android proíbe redistribuir o
+# conjunto (§3.4) mas ressalva expressamente os componentes de código
+# aberto, regidos pela própria licença (§3.5); o Debian empacota
+# `android-platform-tools` na área `main`, que exige licença livre e
+# redistribuível; e o próprio scrcpy distribui o adb.exe em suas versões
+# oficiais. O FFmpeg que acompanha o scrcpy foi conferido no binário e é
+# LGPL — sem --enable-gpl —, distinto do nosso.
+_PASTA_SCRCPY = os.path.join(ROOT, "vendor", "scrcpy")
+SCRCPY = [
+    (os.path.join(_PASTA_SCRCPY, nome), "scrcpy")
+    for nome in (sorted(os.listdir(_PASTA_SCRCPY))
+                 if os.path.isdir(_PASTA_SCRCPY) else [])
+    if os.path.isfile(os.path.join(_PASTA_SCRCPY, nome))
+]
+if not SCRCPY:
+    print("AVISO: vendor/scrcpy não encontrado — o Espelhamento de Celular "
+          "ficará indisponível no pacote gerado.")
+
 # FFmpeg vai junto, na pasta "ffmpeg": a Edição de Vídeo depende dele e as
 # estações onde o Têmis roda não têm como instalar pré-requisitos.
 # video_core.localizar() procura exatamente aqui antes de tentar o PATH.
@@ -71,7 +94,7 @@ a = Analysis(
     [os.path.join(ROOT, "run_temis.py")],
     pathex=[ROOT],
     binaries=WINRT_BINARIOS,
-    datas=FFMPEG + DADOS_DE_PACOTE,
+    datas=FFMPEG + SCRCPY + DADOS_DE_PACOTE,
     hiddenimports=WINRT,
     hookspath=[],
     hooksconfig={},

@@ -1,32 +1,67 @@
-QUADRO DE EVIDÊNCIAS — dois defeitos corrigidos
+ESPELHAMENTO DE CELULAR — ferramenta nova
 
-Colar imagem fechava o programa. A conversão da imagem para PNG entregava
-ao buffer um vetor de bytes temporário, do qual ele guardava apenas o
-endereço; o coletor de lixo recolhia o vetor e a gravação escrevia em
-memória já liberada. Como dependia do instante em que o coletor passava,
-o defeito era intermitente — daí acontecer "muitas vezes" e não sempre.
+Há diligências que precisam registrar o que se vê num aparelho, e não o
+que está num arquivo: a sequência de telas de um aplicativo, uma conversa
+percorrida na frente de quem a apresenta, a navegação de quem entrega o
+celular voluntariamente. Fotografar a tela com outro celular resolve mal
+e documenta pior.
 
-Navegar segurando a barra de espaço não funcionava. A mãozinha aparecia,
-mas o quadro não se movia: o item sob o ponteiro consumia o clique antes
-de a rolagem começar. Funcionava apenas quando se clicava em área vazia,
-o que num quadro com conteúdo é quase nunca. O mesmo valia para o botão
-Mover. Durante a navegação a cena deixa de receber o clique, o que
-também impede arrastar sem querer a anotação que estava embaixo.
+A ferramenta liga o aparelho Android pelo cabo USB, mostra a tela dele
+dentro do sistema e grava tudo o que acontece, com a identificação da
+diligência marcada na própria imagem. Ao fim, gera o termo com a relação
+das gravações, os hashes e a declaração do que foi alterado no aparelho
+para que o espelhamento fosse possível — a depuração habilitada, a
+estação autorizada, o componente transferido. Declarar isso é o que
+sustenta a cadeia de custódia depois.
+
+O espelho não controla o aparelho: o sistema apenas vê e grava. Quem
+navega é a pessoa que está com o celular na mão.
+
+Havia ainda um problema de sequência: terminada uma diligência e gerado o
+termo, ao voltar à ferramenta as gravações anteriores continuavam ali e o
+termo seguinte repetia o que já se tinha juntado. A opção Limpar encerra
+a diligência e deixa a ferramenta pronta para a próxima.
 
 
-CONSTATAÇÃO WEB — por que o vídeo não toca
+METADADOS E HASH — exame avançado
 
-O navegador embutido não reproduz os formatos H.264 e AAC, usados pelo
-Instagram, pelo TikTok e pela maior parte do vídeo na web. É uma
-característica de como o componente é distribuído, ligada ao
-licenciamento de patentes desses formatos, e não algo que se corrija do
-lado do programa.
+O que um arquivo declara sobre si mesmo é apenas parte do que ele
+carrega. O modo Avançado procura o resto: fluxos de dados alternativos do
+sistema de arquivos — inclusive a marca que o Windows grava com o
+endereço de onde o arquivo foi baixado —, revisões anteriores preservadas
+dentro do próprio documento, propriedades que o programa de edição não
+exibe, comentários e alterações controladas, macros, e dados anexados
+depois do fim do formato.
 
-Antes, a página carregava e o vídeo mostrava o erro do próprio site, sem
-explicação. Agora, quando a página tem vídeo que o navegador não sabe
-reproduzir, aparece uma faixa dizendo isso e apontando o caminho: a
-captura registra a página, o texto, a legenda e a imagem; para registrar
-o vídeo em movimento, reproduza-o no navegador do sistema e grave com a
-Gravação de Tela. As duas peças se complementam nos autos.
+Os achados saem em quadro próprio no termo, separados dos metadados e
+graduados por relevância, com as ressalvas impressas junto: o exame
+constata a existência do que encontra, mas não recupera o conteúdo — diz
+que há revisão anterior dentro do documento, não a extrai; e a ausência
+de achados não prova que o arquivo não foi alterado, prova apenas que as
+marcas procuradas não estavam lá. Extração é perícia.
 
-O guia da ferramenta passou a trazer a mesma ressalva.
+
+PORTAL — a disposição das ferramentas
+
+As doze ferramentas existem em função da peça que instruem, e três
+fileiras iguais diziam o contrário: que eram treze coisas equivalentes.
+Agora o Encarregado de IPS ocupa o centro, em cor própria e maior, e as
+demais se distribuem em volta, cada uma ligada a ele.
+
+
+DOIS DEFEITOS QUE A MEDIÇÃO DA TELA NOVA REVELOU
+
+A frase de cada ladrilho tinha altura fixa de duas linhas, para que os
+ícones ficassem alinhados ao longo da fileira. Onze das treze frases
+precisavam de mais que isso e perdiam a última linha — inclusive nas
+versões anteriores. Agora cada frase toma as linhas de que precisa.
+
+A linha que diz o que sai e o que não sai da máquina não quebrava em mais
+de uma linha. A cada ferramenta acrescentada ela ficava mais comprida, e
+ao chegar a treze exigia do portal quase o dobro da largura de um
+notebook, o que punha barra de rolagem horizontal na tela inicial.
+
+Para que isso não volte a acontecer sem aviso, a verificação de
+integridade da instalação passou a conferir a geometria do portal: monta
+a tela na menor área prevista e reprova se houver ladrilho sobreposto,
+ladrilho fora da área ou texto cortado.

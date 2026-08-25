@@ -79,13 +79,14 @@ class ExtrairThread(QThread):
     progresso = pyqtSignal(int, int)
     pronto = pyqtSignal(list)
 
-    def __init__(self, caminhos: list[str]):
+    def __init__(self, caminhos: list[str], avancado: bool = False):
         super().__init__()
         self._caminhos = caminhos
+        self._avancado = avancado
 
     def run(self):
         self.pronto.emit(core.extrair_varios(
-            self._caminhos,
+            self._caminhos, avancado=self._avancado,
             progresso=lambda i, t: self.progresso.emit(i, t)))
 
 
@@ -302,7 +303,7 @@ class TermoDialog(QDialog):
 class MetadadosTool(ToolPage):
     meta = META
 
-    MODOS = (core.SO_HASH, core.RELEVANTES, core.COMPLETO)
+    MODOS = (core.SO_HASH, core.RELEVANTES, core.COMPLETO, core.AVANCADO)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -358,6 +359,11 @@ class MetadadosTool(ToolPage):
                                  "apuração: pessoas, equipamento, datas e "
                                  "local",
                 core.COMPLETO: "Juntada mais todos os metadados lidos",
+                core.AVANCADO: "Procura o que a leitura comum não mostra: "
+                               "fluxos alternativos do sistema de arquivos, "
+                               "revisões preservadas dentro do documento, "
+                               "propriedades ocultas e dados anexados após "
+                               "o fim do formato",
             }[chave])
             b.clicked.connect(lambda _c, n=chave: self._definir_modo(n))
             self._grupo.addButton(b)
@@ -553,7 +559,43 @@ class MetadadosTool(ToolPage):
         self._modo = nome
         for chave, b in self._botoes_modo.items():
             b.setChecked(chave == nome)
+        if nome == core.AVANCADO:
+            self._examinar_pendentes()
         self._mostrar(self._lista.currentRow())
+
+    def _examinar_pendentes(self):
+        """Roda o exame avançado nos arquivos que ainda não passaram.
+
+        Não se faz na leitura inicial de propósito: o exame percorre o
+        arquivo atrás de fluxos alternativos, revisões e cauda anexada, e
+        cobrar esse tempo de quem só quer o termo de juntada seria trocar
+        a espera de todos pela conveniência de alguns.
+        """
+        pendentes = [a for a in self._arquivos if a.analise is None]
+        if not pendentes:
+            return
+        from . import metadados_avancado
+        QGuiApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            for a in pendentes:
+                try:
+                    a.analise = metadados_avancado.analisar(a.caminho)
+                except Exception as e:                  # noqa: BLE001
+                    a.analise = metadados_avancado.Analise(
+                        caminho=a.caminho,
+                        erros=[f"{type(e).__name__}: {e}"])
+        finally:
+            QGuiApplication.restoreOverrideCursor()
+        achados = sum(len(a.analise.achados) for a in self._arquivos
+                      if a.analise is not None)
+        relevantes = sum(
+            a.analise.quantos(metadados_avancado.ALERTA)
+            for a in self._arquivos if a.analise is not None)
+        self.status_msg.emit(
+            f"Exame avançado concluído: {achados} achado(s), "
+            f"{relevantes} de maior relevância."
+            if achados else
+            "Exame avançado concluído: nada além dos metadados já lidos.")
 
     def _mostrar(self, _linha: int = -1):
         a = self._atual()
@@ -565,10 +607,64 @@ class MetadadosTool(ToolPage):
         self._view.setHtml(self._html(a))
         self._atualizar_alerta(a)
 
+    def _html_avancado(self, a: core.Arquivo) -> str:
+        """O painel do exame avançado: achados, e não campos."""
+        import html as _html
+
+        from . import metadados_avancado as av
+
+        e = _html.escape
+        cores = {av.ALERTA: core.DESTAQUE, av.ATENCAO: PALETTE["warning"],
+                 av.INFORMATIVO: CINZA}
+        partes = [
+            f'<p style="font-size:14pt; margin-bottom:2px;">'
+            f'<b><font color="{TINTA}">{e(a.nome)}</font></b></p>'
+            f'<p style="margin-top:0;"><font color="{CINZA}" size="2">'
+            f"{e(a.tipo)} · exame avançado</font></p>"]
+
+        analise = a.analise
+        if analise is None:
+            partes.append(f'<p><font color="{CINZA}">Ainda não examinado.'
+                          f"</font></p>")
+            return "".join(partes)
+        if analise.vazio:
+            partes.append(
+                f'<p style="margin-top:18px;"><font color="{CINZA}">'
+                f"Nada foi encontrado além dos metadados que o arquivo "
+                f"declara.<br/><br/>Isso não significa que ele não tenha "
+                f"sido alterado — significa que não foram encontradas as "
+                f"marcas procuradas: fluxos alternativos, revisões "
+                f"preservadas, propriedades ocultas e dados anexados após "
+                f"o fim do formato.</font></p>")
+            return "".join(partes)
+
+        for ach in analise.ordenados:
+            cor = cores.get(ach.relevancia, CINZA)
+            partes.append(
+                f'<p style="margin-top:18px; margin-bottom:2px;">'
+                f'<font color="{cor}" size="1">'
+                f"{e(av.ROTULO_RELEVANCIA.get(ach.relevancia, '').upper())}"
+                + (f" · {e(ach.origem)}" if ach.origem else "")
+                + f'</font><br/><b><font color="{TINTA}">{e(ach.titulo)}'
+                f"</font></b></p>")
+            if ach.detalhe:
+                partes.append(
+                    f'<p style="margin-top:0;"><font color="{CINZA}">'
+                    + e(ach.detalhe).replace(chr(10), "<br/>")
+                    + "</font></p>")
+        if analise.erros:
+            partes.append(
+                f'<p style="margin-top:20px;"><font color="{CINZA}" size="2">'
+                f"Falhas durante o exame: {e('; '.join(analise.erros[:4]))}"
+                f"</font></p>")
+        return "".join(partes)
+
     def _html(self, a: core.Arquivo) -> str:
         import html as _html
 
         e = _html.escape
+        if self._modo == core.AVANCADO:
+            return self._html_avancado(a)
         campos = a.relevantes if self._modo != core.COMPLETO else a.campos
         partes = [
             f'<p style="font-size:14pt; margin-bottom:2px;">'
