@@ -113,8 +113,36 @@ fora concorreria com essa numeração. O texto do item entra como parágrafo
 comum. Hiperlink também sai, e o texto dele fica.
 
 Tabela continua tabela: ali a estrutura carrega significado, e
-desmontá-la em parágrafos perderia a relação entre coluna e valor. O que se ajusta
-dentro dela é a tipografia, como no resto.
+desmontá-la em parágrafos perderia a relação entre coluna e valor. O que se
+ajusta dentro dela é a tipografia, como no resto.
+
+Texto vindo de origem que usa formato pré-formatado chegava marcado como
+"não quebrar linha" e continuava assim: o parágrafo corria numa linha só,
+saindo pela direita da caixa, e no documento o marcador ficava sozinho na
+linha de cima. A marca é desfeita agora, e os parágrafos que já estavam
+gravados assim são endireitados ao abrir, sem redigitar nada.
+
+
+ENCARREGADO DE IPS — a leitura da peça gerada
+
+Duas correções de defeitos antigos, encontradas a partir de uma
+Informação real.
+
+As células de tabela eram montadas com alinhamento justificado, igual ao
+corpo do texto. Numa coluna estreita, onde cabe uma palavra por linha, não
+há espaço a distribuir — e o motor de texto passa a afastar letra por
+letra para preencher a linha. Uma tabela real saía com o nome do servidor
+soletrado. As células passam a ser alinhadas à esquerda; o cabeçalho
+continua centrado.
+
+Nos parágrafos a justificação continua, que é a praxe da peça. Com uma
+exceção: parágrafo que carregue resumo criptográfico ou nome de arquivo
+comprido sai alinhado à esquerda. Essa sequência não quebra, desce inteira
+para a linha seguinte e deixa a anterior com três ou quatro palavras que a
+justificação espalha de margem a margem — era o que acontecia justamente
+no termo de juntada, onde os hashes aparecem. A correção não altera o
+texto nem insere caractere invisível no hash, que alguém vai copiar para
+conferir.
 
 
 PORTAL
