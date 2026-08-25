@@ -295,7 +295,46 @@ def autoteste() -> int:
     return 1 if falhas else 0
 
 
+def registrar_quedas():
+    """Faz o Python anotar em disco antes de o processo morrer.
+
+    Programa gráfico não tem console: quando ele fecha sozinho, quem
+    estava usando vê a janela sumir e mais nada — e o que se perde junto
+    é justamente a informação que diria por quê.
+
+    Isto não impede queda alguma; apenas deixa rastro. Cobre também a
+    morte por dentro do Qt, que é o caso mais difícil de diagnosticar:
+    exceção de Python levantada dentro de um método chamado pelo C++ não
+    vira erro, encerra o processo.
+    """
+    import faulthandler
+    import os
+    from pathlib import Path
+
+    try:
+        base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+        destino = Path(base) / "SistemaTemis" / "quedas.txt"
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        # Mantido aberto de propósito, pelo tempo do processo: o
+        # `faulthandler` escreve nele no instante da queda, quando já não
+        # há mais Python para abrir arquivo nenhum.
+        registro = open(destino, "a", encoding="utf-8", buffering=1)
+        registro.write(f"\n=== sessão iniciada — {__version_para_queda()} ===\n")
+        faulthandler.enable(file=registro)
+    except Exception:                                       # noqa: BLE001
+        pass
+
+
+def __version_para_queda() -> str:
+    import datetime
+
+    from temis import __version__
+    return (f"{__version__} — "
+            f"{datetime.datetime.now().astimezone().isoformat(timespec='seconds')}")
+
+
 if __name__ == "__main__":
     if "--autoteste" in sys.argv:
         sys.exit(autoteste())
+    registrar_quedas()
     sys.exit(main())

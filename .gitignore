@@ -42,3 +42,12 @@ venv/
 oficio-*.html
 anexo-*.html
 *.pdf
+
+# Capturas de tela ficam de fora por padrão: elas costumam trazer nome de
+# investigado, número de processo e conteúdo de caso real — e este
+# repositório é público. Uma captura entrou por engano no commit da
+# 1.7.0; a regra existe para que não dependa de alguém reparar.
+*.png
+*.jpg
+*.jpeg
+!temis/**/*.png

@@ -110,52 +110,82 @@ def normalizar_colagem(doc: QTextDocument) -> None:
     padrao = fonte_paragrafo()
     doc.setDefaultFont(padrao)
 
-    # Recolhe antes de alterar: mexer na lista de um bloco enquanto se
-    # percorre o documento é pedir para perder o passo.
-    blocos = []
+    # ── primeiro se lê tudo; só depois se altera ──
+    #
+    # Não é organização: é a correção de uma queda. A versão anterior
+    # trocava o formato de cada trecho enquanto percorria os trechos, e
+    # trocar formato é justamente o que faz o Qt **fundir** trechos
+    # vizinhos que passaram a ser iguais — que é o efeito inevitável de
+    # normalizar. O iterador seguia apontando para o que deixara de
+    # existir, e o programa morria por violação de acesso, sem mensagem,
+    # levando junto o texto ainda não gravado.
+    #
+    # Guardar posição e comprimento em vez do trecho é o que torna isso
+    # seguro: mudar formato não muda o tamanho do texto, de modo que as
+    # posições recolhidas continuam valendo depois de qualquer fusão.
+    recolhidos = []      # (posição, comprimento, negrito, itálico, sublinhado)
+    inicios_de_bloco = []
+
     bloco = doc.begin()
     while bloco.isValid():
-        blocos.append(bloco)
+        inicios_de_bloco.append(bloco.position())
+        pedaco = bloco.begin()
+        while not pedaco.atEnd():
+            trecho = pedaco.fragment()
+            if trecho.isValid() and trecho.length():
+                formato = trecho.charFormat()
+                recolhidos.append((
+                    trecho.position(),
+                    trecho.length(),
+                    formato.fontWeight() >= QFont.Weight.Bold,
+                    formato.fontItalic(),
+                    formato.fontUnderline(),
+                ))
+            pedaco += 1
         bloco = bloco.next()
 
-    for bloco in blocos:
-        lista = bloco.textList()
+    # ── agora sim, as alterações ──
+    for posicao in inicios_de_bloco:
+        cursor = QTextCursor(doc)
+        cursor.setPosition(posicao)
+        alvo = cursor.block()
+        if not alvo.isValid():
+            continue
+        lista = alvo.textList()
         if lista is not None:
-            lista.remove(bloco)
-
-        formato = bloco.blockFormat()
+            lista.remove(alvo)
+        formato = alvo.blockFormat()
         formato.setIndent(0)
         formato.setLeftMargin(0)
         formato.setRightMargin(0)
         formato.setTextIndent(0)
-        cursor = QTextCursor(bloco)
+        # Sem esta linha, texto vindo de origem com `<pre>` ou
+        # `white-space:pre` chegava marcado como "não quebrar linha" e
+        # continuava assim: o parágrafo corria numa linha só, saindo pela
+        # direita da caixa, e no documento o marcador ficava sozinho na
+        # linha de cima. Custou dois parágrafos de uma Informação real
+        # para aparecer, porque a marca não se vê — só o efeito dela.
+        formato.setNonBreakableLines(False)
         cursor.setBlockFormat(formato)
 
-        pedaco = bloco.begin()
-        while not pedaco.atEnd():
-            trecho = pedaco.fragment()
-            if trecho.isValid():
-                antigo = trecho.charFormat()
-                # Formato novo em folha, e não o antigo remendado: assim
-                # o que não for explicitamente recolocado — cor, realce,
-                # tachado, endereço do link — desaparece por construção,
-                # em vez de depender de uma lista de coisas a limpar que
-                # alguém teria de manter em dia.
-                novo = QTextCharFormat()
-                novo.setFont(padrao)
-                novo.setFontWeight(
-                    QFont.Weight.Bold
-                    if antigo.fontWeight() >= QFont.Weight.Bold
-                    else QFont.Weight.Normal)
-                novo.setFontItalic(antigo.fontItalic())
-                novo.setFontUnderline(antigo.fontUnderline())
+    for posicao, tamanho, negrito, italico, sublinhado in recolhidos:
+        # Formato novo em folha, e não o antigo remendado: assim o que
+        # não for explicitamente recolocado — cor, realce, tachado,
+        # endereço do link — desaparece por construção, em vez de
+        # depender de uma lista de coisas a limpar que alguém teria de
+        # manter em dia.
+        novo = QTextCharFormat()
+        novo.setFont(padrao)
+        novo.setFontWeight(QFont.Weight.Bold if negrito
+                           else QFont.Weight.Normal)
+        novo.setFontItalic(italico)
+        novo.setFontUnderline(sublinhado)
 
-                seleção = QTextCursor(doc)
-                seleção.setPosition(trecho.position())
-                seleção.setPosition(trecho.position() + trecho.length(),
-                                    QTextCursor.MoveMode.KeepAnchor)
-                seleção.setCharFormat(novo)
-            pedaco += 1
+        seleção = QTextCursor(doc)
+        seleção.setPosition(posicao)
+        seleção.setPosition(posicao + tamanho,
+                            QTextCursor.MoveMode.KeepAnchor)
+        seleção.setCharFormat(novo)
 
 
 class _EditorParagrafo(QTextEdit):
@@ -201,22 +231,92 @@ class _EditorParagrafo(QTextEdit):
 
         Imagem segue pelo caminho de sempre — ela não tem tipografia a
         corrigir, e o editor já sabe guardá-la na pasta do caso.
+
+        O `try` que envolve a normalização não é zelo excessivo, é o que
+        separa um contratempo de um desastre. Este método é chamado pelo
+        Qt, em C++; uma exceção de Python aqui não vira mensagem de erro
+        — **encerra o processo**, e com ele o texto que o encarregado
+        ainda não gravou. Se algo der errado ao normalizar, o texto entra
+        sem formatação nenhuma, que é feio e recuperável.
         """
         if fonte.hasImage() or fonte.hasUrls():
             super().insertFromMimeData(fonte)
             return
+
         if fonte.hasHtml():
-            doc = QTextDocument()
-            doc.setHtml(fonte.html())
-            normalizar_colagem(doc)
-            # Fragmento, e não texto: é o que preserva a tabela e os
-            # grifos que sobreviveram à normalização.
-            self.textCursor().insertFragment(QTextDocumentFragment(doc))
-            return
+            try:
+                doc = QTextDocument()
+                doc.setHtml(fonte.html())
+                normalizar_colagem(doc)
+                # Fragmento, e não texto: é o que preserva a tabela e os
+                # grifos que sobreviveram à normalização.
+                self.textCursor().insertFragment(QTextDocumentFragment(doc))
+                return
+            except Exception as e:                          # noqa: BLE001
+                self._anotar_falha_de_colagem(e)
+
         if fonte.hasText():
             self.textCursor().insertText(fonte.text())
             return
-        super().insertFromMimeData(fonte)
+
+        try:
+            super().insertFromMimeData(fonte)
+        except Exception as e:                              # noqa: BLE001
+            self._anotar_falha_de_colagem(e)
+
+    def desfazer_linha_unica(self):
+        """Tira a marca de "não quebrar linha" de todos os parágrafos.
+
+        A marca não se vê — vê-se o efeito: o texto corre numa linha só,
+        some pela direita da caixa e, no documento gerado, empurra o
+        marcador para a linha de cima. Ela entra por colagem de origem
+        que usa `<pre>` ou `white-space:pre`, e ficava gravada no caso.
+
+        Silencioso quando não há nada a fazer, que é o caso comum: sem
+        isso, abrir uma Informação marcaria todos os parágrafos como
+        alterados e dispararia gravação à toa.
+        """
+        doc = self.document()
+        alvos = []
+        bloco = doc.begin()
+        while bloco.isValid():
+            if bloco.blockFormat().nonBreakableLines():
+                alvos.append(bloco.position())
+            bloco = bloco.next()
+        if not alvos:
+            return
+        for posicao in alvos:
+            cursor = QTextCursor(doc)
+            cursor.setPosition(posicao)
+            formato = cursor.block().blockFormat()
+            formato.setNonBreakableLines(False)
+            cursor.setBlockFormat(formato)
+
+    @staticmethod
+    def _anotar_falha_de_colagem(erro: Exception):
+        """Guarda a falha em disco, já que a tela não pode mostrá-la.
+
+        Ninguém vai reproduzir de propósito, e o defeito só aparece com o
+        conteúdo que a pessoa tinha copiado naquele instante. O arquivo
+        registra o tipo do erro e onde ele ocorreu — nunca o texto
+        colado, que é material de apuração.
+        """
+        import datetime
+        import os
+        import traceback
+        from pathlib import Path
+
+        try:
+            base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+            destino = Path(base) / "SistemaTemis" / "falhas-colagem.txt"
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            quando = datetime.datetime.now().astimezone().isoformat(
+                timespec="seconds")
+            with open(destino, "a", encoding="utf-8") as f:
+                f.write(f"\n--- {quando} — {type(erro).__name__}: {erro}\n")
+                f.write("".join(traceback.format_tb(erro.__traceback__)))
+        except Exception:                                   # noqa: BLE001
+            pass
 
     def loadResource(self, tipo: int, nome: QUrl):
         """Resolve `imagens/<arquivo>` na pasta do caso.
@@ -380,6 +480,12 @@ class BlocoWidget(QFrame):
             self.editor = _EditorParagrafo()
             self.editor.pintar(bloco.exemplo)
             self.editor.setHtml(bloco.html)
+            # Conserta o que já está gravado, e não só o que se cola de
+            # agora em diante: parágrafos colados antes da correção
+            # ficaram marcados como "não quebrar linha" e continuariam
+            # correndo para fora da caixa a cada abertura. Isto os
+            # endireita ao abrir, sem que ninguém precise redigitar.
+            self.editor.desfazer_linha_unica()
             self.editor.textChanged.connect(self._ao_editar)
             self.editor.novo_bloco.connect(lambda: self.pediu_novo.emit(self))
             self.editor.aprofundar.connect(

@@ -348,7 +348,45 @@ def render_blocos(blocos: list[Bloco], numero_elemento: int) -> str:
     return espaco(ESPACO).join(saida)
 
 
+#: A partir de quantos caracteres uma sequência sem espaço estraga a
+#: justificação.
+#:
+#: Trinta: é mais que qualquer palavra do português e menos que um
+#: SHA-256, que tem sessenta e quatro. Nome de arquivo com data e hora
+#: também passa disso.
+LIMITE_SEM_ESPACO = 30
+
+
+def _tem_palavra_longa(conteudo: str) -> bool:
+    """Diz se o parágrafo carrega uma sequência que não cabe numa linha.
+
+    Mede o texto visível, e não o HTML: um endereço de imagem dentro de
+    um atributo tem dezenas de caracteres seguidos e não aparece na
+    página — contá-lo desalinharia parágrafos por um motivo invisível.
+    """
+    visivel = texto_visivel(conteudo)
+    return any(len(palavra) > LIMITE_SEM_ESPACO for palavra in visivel.split())
+
+
 def _render_paragrafo(b: Bloco, marcador: str) -> str:
+    """Parágrafo do elemento, com o marcador na frente.
+
+    O alinhamento é o que o autor escolheu — justificado, na quase
+    totalidade das vezes, como manda a praxe da peça. Com uma exceção
+    medida: parágrafo que carrega um resumo criptográfico, ou um nome de
+    arquivo comprido, sai alinhado à esquerda.
+
+    A razão é que essa sequência não quebra: ela desce inteira para a
+    linha seguinte, deixando a anterior com três ou quatro palavras que a
+    justificação então espalha de margem a margem. O termo de juntada,
+    que é justamente onde os hashes aparecem, ficava com linhas assim:
+
+        003.   WhatsApp   Video   2026-08-24   at   10.09.01.mp4
+
+    Alinhar à esquerda só esses parágrafos mantém a peça justificada
+    onde a justificação funciona, e não mexe no texto — nem no hash, que
+    alguém vai copiar para conferir.
+    """
     linhas = paragrafos(b.html)
     if not linhas:
         return ""
@@ -364,6 +402,8 @@ def _render_paragrafo(b: Bloco, marcador: str) -> str:
                     f'<p align="left" style="margin:0;">{rotulo}</p>')
             saida.append(conteudo)
             continue
+        if alinhamento == "justify" and _tem_palavra_longa(conteudo):
+            alinhamento = "left"
         saida.append(
             f'<p align="{alinhamento}" '
             f'style="text-align:{alinhamento}; margin:0;">'
@@ -372,6 +412,17 @@ def _render_paragrafo(b: Bloco, marcador: str) -> str:
 
 
 def _render_tabela(b: Bloco) -> str:
+    """Grade do bloco de tabela.
+
+    A célula é alinhada à esquerda, e não justificada como o corpo do
+    texto. Justificar num parágrafo largo distribui a sobra entre os
+    espaços e fica bom; numa coluna estreita, onde cabe uma palavra por
+    linha, não há espaço a distribuir — e o motor de texto do Qt passa a
+    afastar **letra por letra** para preencher a linha. O efeito medido
+    numa tabela real: `P o s t a g e n s . p d f`, e uma coluna com o
+    nome do servidor soletrado. À esquerda, a sobra fica toda no fim da
+    linha, que é onde ninguém repara.
+    """
     if not b.celulas:
         return ""
     largura = f"{100 // max(1, b.colunas())}%"
@@ -388,7 +439,8 @@ def _render_tabela(b: Bloco) -> str:
             else:
                 celulas.append(
                     f'<td width="{largura}">'
-                    f'<p align="justify" style="margin:0;">{conteudo}</p>'
+                    f'<p align="left" style="text-align:left; margin:0;">'
+                    f"{conteudo}</p>"
                     "</td>")
         linhas.append("<tr>" + "".join(celulas) + "</tr>")
     return ('<table width="100%" cellspacing="0" cellpadding="4" border="1" '
