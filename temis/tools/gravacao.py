@@ -452,12 +452,37 @@ class GravacaoTool(ToolPage):
         painel.body.addWidget(field_label("Qualidade"))
         painel.body.addWidget(self._cb_qualidade)
 
+        # Duas fontes de som, escolhidas em separado, porque são coisas
+        # diferentes: o que a máquina reproduz e o que se fala na sala.
+        # Marcadas as duas, entram como faixas distintas no arquivo — e
+        # não misturadas, para que a peça possa afirmar a origem de cada
+        # uma.
+        painel.body.addWidget(field_label("Áudio da gravação"))
+
         self._cb_microfone = NoScrollComboBox()
-        self._cb_microfone.addItem("Sem áudio", "")
+        self._cb_microfone.addItem("Sem microfone", "")
         for nome in core.microfones():
             self._cb_microfone.addItem(nome, nome)
-        painel.body.addWidget(field_label("Narração pelo microfone"))
+        self._cb_microfone.setToolTip(
+            "Som do ambiente: o que for falado na sala durante a diligência")
         painel.body.addWidget(self._cb_microfone)
+
+        from .audio_sistema import disponivel as _retorno_disponivel
+        pode_sistema, detalhe_sistema = _retorno_disponivel()
+        self._chk_som_sistema = QCheckBox("Som do computador")
+        self._chk_som_sistema.setEnabled(pode_sistema)
+        self._chk_som_sistema.setToolTip(
+            f"Grava o que o computador reproduz — vídeos, mensagens de "
+            f"voz, chamadas. Saída: {detalhe_sistema}" if pode_sistema else
+            f"Indisponível nesta estação: {detalhe_sistema}")
+        painel.body.addWidget(self._chk_som_sistema)
+
+        painel.body.addWidget(subtext(
+            "Marcadas as duas, o vídeo sai com duas faixas de áudio "
+            "separadas — o que o computador tocou e o que foi dito na "
+            "sala." if pode_sistema else
+            f"O som do computador não pode ser gravado nesta estação: "
+            f"{detalhe_sistema}", wrap=True))
 
         self._op_resistente = QCheckBox("Resistir a interrupção")
         self._op_resistente.setChecked(True)
@@ -613,6 +638,7 @@ class GravacaoTool(ToolPage):
             monitor=self._cb_area.currentData() or "desktop",
             qualidade=self._cb_qualidade.currentData() or "normal",
             microfone=self._cb_microfone.currentData() or "",
+            audio_sistema=self._chk_som_sistema.isChecked(),
             identificacao=self._identificacao(),
             resistente=self._op_resistente.isChecked())
 
@@ -788,6 +814,7 @@ class GravacaoTool(ToolPage):
             self._arvore.currentItem() is not None and not gravando)
         for w in (self._e_processo, self._e_operador, self._e_objeto,
                   self._cb_area, self._cb_qualidade, self._cb_microfone,
+                  self._chk_som_sistema,
                   self._op_resistente):
             w.setEnabled(not gravando)
 

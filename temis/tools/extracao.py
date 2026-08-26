@@ -408,6 +408,35 @@ class ExtracaoTool(ToolPage):
             "registro dos atos. O termo cruza os dois pelo tempo decorrido.")
         painel.body.addWidget(self._op_gravar)
 
+        # As duas fontes de som ficam recuadas sob a gravação, porque só
+        # fazem sentido com ela ligada — e se apagam junto quando ela é
+        # desmarcada, em vez de ficarem oferecendo o que não vai
+        # acontecer.
+        from .audio_sistema import disponivel as _retorno_disponivel
+        pode_sistema, detalhe_sistema = _retorno_disponivel()
+
+        self._op_som_sistema = QCheckBox("      com o som do computador")
+        self._op_som_sistema.setEnabled(pode_sistema)
+        self._op_som_sistema.setToolTip(
+            "Grava o que o computador reproduz durante a extração"
+            if pode_sistema else f"Indisponível: {detalhe_sistema}")
+        painel.body.addWidget(self._op_som_sistema)
+
+        self._op_som_ambiente = QCheckBox("      com o som do ambiente")
+        vozes = grav.microfones()
+        self._op_som_ambiente.setEnabled(bool(vozes))
+        self._op_som_ambiente.setToolTip(
+            f"Grava pelo microfone: {vozes[0]}" if vozes
+            else "Nenhum microfone disponível nesta estação")
+        painel.body.addWidget(self._op_som_ambiente)
+
+        def _seguir_gravacao(ligado: bool):
+            self._op_som_sistema.setEnabled(ligado and pode_sistema)
+            self._op_som_ambiente.setEnabled(ligado and bool(vozes))
+
+        self._op_gravar.toggled.connect(_seguir_gravacao)
+        _seguir_gravacao(self._op_gravar.isChecked())
+
         self._rot_estado = QLabel("Sessão não iniciada.")
         self._rot_estado.setObjectName("muted")
         self._rot_estado.setWordWrap(True)
@@ -583,6 +612,10 @@ class ExtracaoTool(ToolPage):
             self._gravador = grav.Gravador(
                 base / "gravacao-da-diligencia.mp4",
                 grav.Opcoes(identificacao=identificacao,
+                            microfone=((grav.microfones() or [""])[0]
+                                       if self._op_som_ambiente.isChecked()
+                                       else ""),
+                            audio_sistema=self._op_som_sistema.isChecked(),
                             rodape="SISTEMA TÊMIS — EXTRAÇÃO REGISTRADA"))
             try:
                 self._gravador.iniciar()

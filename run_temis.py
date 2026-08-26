@@ -132,6 +132,18 @@ def autoteste() -> int:
         from temis.tools import REGISTRY
         return f"{len(REGISTRY)} ferramentas registradas"
 
+    def som_do_sistema():
+        # Capacidade que depende da placa de som da estação, e não do
+        # pacote: numa máquina sem captura de retorno o botão existe e
+        # não funciona. O autoteste diz qual é o caso antes de alguém
+        # descobrir no meio de uma diligência.
+        from temis.tools.audio_sistema import disponivel
+        pode, detalhe = disponivel()
+        if not pode:
+            raise RuntimeError(
+                f"esta estação não grava o som do computador: {detalhe}")
+        return f"captura de retorno em “{detalhe}”"
+
     def identificacao():
         # O perfil chega às ferramentas por convenção de nome: os campos
         # se chamam `_in_nome`/`_e_nome` e afins, e cada diálogo de termo
@@ -274,6 +286,7 @@ def autoteste() -> int:
         ("reconhecimento óptico", ocr),
         ("espelhamento de celular", espelhamento),
         ("registro de ferramentas", ferramentas),
+        ("som do computador", som_do_sistema),
         ("identificação do operador", identificacao),
         ("cabeçalho das peças", timbre),
         ("geometria do portal", portal),

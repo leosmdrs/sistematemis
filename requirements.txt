@@ -14,3 +14,11 @@ winrt-Windows.Storage.Streams>=3.2
 winrt-Windows.Globalization>=3.2
 winrt-Windows.Foundation>=3.2
 winrt-Windows.Foundation.Collections>=3.2
+
+# Captura do som que o Windows reproduz, para a Gravação de Tela e a
+# Extração Registrada. O FFmpeg no Windows só enxerga dispositivos
+# DirectShow, e som de saída não é dispositivo de entrada: numa estação
+# comum não há retorno a gravar. Esta biblioteca conversa com a interface
+# de áudio do Windows por ctypes — sem compilar nada e sem pedir
+# instalação na estação.
+soundcard>=0.4.4

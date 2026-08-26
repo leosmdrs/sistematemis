@@ -59,6 +59,19 @@ correspondente. Ele está nos endereços acima; na impossibilidade de
 obtê-lo ali, abra uma questão no repositório do Sistema Têmis e ele será
 fornecido.
 
+## soundcard
+
+A captura do som que o computador reproduz, na Gravação de Tela e na
+Extração Registrada, usa a biblioteca **soundcard**. Ela conversa com a
+interface de áudio do Windows por `ctypes` — não traz binário próprio nem
+exige instalação na estação.
+
+| Componente | Licença | Origem |
+|---|---|---|
+| **soundcard** | BSD-3-Clause | [github.com/bastibe/SoundCard](https://github.com/bastibe/SoundCard) |
+
+A BSD-3-Clause é permissiva e compatível com a AGPL-3.0 deste projeto.
+
 ## scrcpy e Android Debug Bridge
 
 O instalador acompanha o **scrcpy** e o **adb**, usados pelo Espelhamento

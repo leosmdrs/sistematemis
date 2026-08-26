@@ -31,7 +31,13 @@ WINRT = [
     "winrt.windows.graphics.imaging",
     "winrt.windows.media.ocr",
     "winrt.windows.storage.streams",
-] + collect_submodules("winrt")
+]
+#: A captura do som do sistema carrega os próprios dados de suporte, e o
+#: PyInstaller recolhe código, não dados: sem esta linha a biblioteca vai
+#: para o pacote e falha ao abrir a placa, na estação de quem instalou.
+SOM = collect_submodules("soundcard") + collect_submodules("cffi")
+
+WINRT += collect_submodules("winrt")
 
 #: O pacote traz o runtime do Visual C++ de que suas extensões dependem.
 WINRT_BINARIOS = collect_dynamic_libs("winrt")
@@ -50,7 +56,8 @@ WINRT_BINARIOS = collect_dynamic_libs("winrt")
 # licença, que não pesam na execução. As DLLs do sherpa-onnx pareciam
 # faltar, mas escondê-las do interpretador não impediu o import — estão
 # ligadas estaticamente ao módulo compilado.
-DADOS_DE_PACOTE = collect_data_files("faster_whisper")
+DADOS_DE_PACOTE = (collect_data_files("faster_whisper")
+                   + collect_data_files("soundcard"))
 
 # O scrcpy e o adb vão junto, na pasta "scrcpy": o Espelhamento de
 # Celular depende deles e a premissa do sistema é que a estação não tenha
@@ -95,7 +102,7 @@ a = Analysis(
     pathex=[ROOT],
     binaries=WINRT_BINARIOS,
     datas=FFMPEG + SCRCPY + DADOS_DE_PACOTE,
-    hiddenimports=WINRT,
+    hiddenimports=WINRT + SOM,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

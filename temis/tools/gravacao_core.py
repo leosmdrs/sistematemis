@@ -423,7 +423,13 @@ class Opcoes:
 
     monitor: str = "desktop"
     qualidade: str = "normal"
+    #: Nome do dispositivo de entrada — o som da sala. Vazio, não grava.
     microfone: str = ""
+    #: Grava também o que o computador reproduz. Entra como faixa
+    #: separada, e não misturada com o microfone: a distinção entre o que
+    #: a máquina tocou e o que foi dito na sala tem valor na peça, e
+    #: misturar apaga essa distinção para sempre.
+    audio_sistema: bool = False
     #: Identificação impressa na faixa — processo, operador, estação.
     identificacao: str = ""
     rodape: str = "SISTEMA TÊMIS — REGISTRO"
@@ -460,6 +466,8 @@ class Resultado:
     altura: int = 0
     quadros: int = 0
     com_audio: bool = False
+    #: O que aconteceu com a captura do som do sistema, quando pedida.
+    captura_sistema: object = None
     contexto: Contexto | None = None
     opcoes: Opcoes | None = None
     erro: str = ""
@@ -502,6 +510,54 @@ class Gravador:
         if self._andaime is not None:
             shutil.rmtree(self._andaime, ignore_errors=True)
             self._andaime = None
+
+    def _juntar_som_do_sistema(self, captura) -> str:
+        """Acrescenta o som do sistema ao vídeo, como segunda faixa.
+
+        Feito depois, e não durante: o FFmpeg lê o comando de parada pela
+        entrada padrão, que não pode ser ocupada pelo áudio. Juntar ao
+        fim custa poucos segundos — só o áudio é convertido, o vídeo é
+        copiado como está — e mantém intacta a resistência a interrupção
+        do arquivo principal, que se perderia num arranjo com fluxo
+        contínuo.
+
+        O deslocamento é medido, não estimado: é a diferença entre o
+        instante em que a placa começou a entregar amostras e o instante
+        em que o vídeo começou. O trecho de som anterior ao vídeo é
+        descartado, para que os dois comecem juntos.
+        """
+        import shutil
+
+        ffmpeg = ffmpeg_path()
+        if ffmpeg is None or not Path(captura.arquivo).exists():
+            return "arquivo de som não encontrado"
+
+        atraso = max(0.0, getattr(self, "_video_comecou", 0.0)
+                     - captura.inicio_relogio)
+        juntado = self.destino.with_suffix(".juntado.mp4")
+        cmd = [str(ffmpeg), "-hide_banner", "-loglevel", "error", "-y",
+               "-i", str(self.destino),
+               "-ss", f"{atraso:.3f}", "-i", str(captura.arquivo),
+               "-map", "0", "-map", "1:a",
+               "-c:v", "copy", "-c:a", "copy",
+               f"-c:a:{1 if self.opcoes.microfone else 0}", "aac",
+               "-b:a", "128k", "-shortest",
+               str(juntado)]
+        try:
+            r = subprocess.run(cmd, capture_output=True, timeout=600,
+                               creationflags=_SEM_JANELA)
+        except Exception as e:                              # noqa: BLE001
+            return f"{type(e).__name__}: {e}"
+        if r.returncode != 0 or not juntado.exists():
+            erro = (r.stderr or b"").decode("utf-8", "replace")
+            return erro.strip().splitlines()[-1] if erro.strip() else "falhou"
+
+        try:
+            shutil.move(str(juntado), str(self.destino))
+            Path(captura.arquivo).unlink(missing_ok=True)
+        except OSError as e:
+            return f"{type(e).__name__}: {e}"
+        return ""
 
     # ── comando ───────────────────────────
     def comando(self) -> list[str]:
@@ -559,9 +615,26 @@ class Gravador:
         self._inicio_iso = datetime.datetime.now().astimezone().isoformat(
             timespec="seconds")
         self._inicio = time.time()
+
+        # A captura do som do sistema abre **antes** do vídeo, e o vídeo
+        # só começa quando a placa já está entregando amostras. A ordem
+        # importa: a placa leva um tempo variável para abrir — medido,
+        # cerca de três décimos de segundo — e começar o vídeo primeiro
+        # jogaria o áudio adiantado desse tanto, sem que se soubesse de
+        # quanto.
+        self._captura = None
+        if self.opcoes.audio_sistema:
+            from .audio_sistema import CapturaSistema
+            self._captura = CapturaSistema(
+                self.destino.with_suffix(".sistema.wav"))
+            if not self._captura.iniciar():
+                self._erros.append(
+                    "som do sistema: " + self._captura.resultado.erro)
+
         self._processo = subprocess.Popen(
             self.comando(), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, creationflags=_SEM_JANELA)
+        self._video_comecou = time.time()
         self._conferir_partida()
 
     #: Quanto se espera para saber se o codificador ficou de pé.
@@ -592,6 +665,7 @@ class Gravador:
             except (OSError, ValueError, AttributeError):
                 erro = ""
             self._processo = None
+
             self._inicio = 0.0
             raise RuntimeError(_explicar_falha(erro))
 
@@ -620,6 +694,20 @@ class Gravador:
                     "O codificador não encerrou no prazo e foi interrompido; "
                     "o arquivo pode ter a duração incompleta.")
             self._processo = None
+
+        # A captura para depois do vídeo, nunca antes: parar antes
+        # deixaria o fim da diligência sem som, e é justamente o fim que
+        # costuma interessar.
+        if getattr(self, "_captura", None) is not None:
+            captura = self._captura.encerrar()
+            resultado.captura_sistema = captura
+            self._captura = None
+            if captura.houve_falha:
+                self._erros.append(f"som do sistema: {captura.erro}")
+            else:
+                erro = self._juntar_som_do_sistema(captura)
+                if erro:
+                    self._erros.append(f"som do sistema: {erro}")
 
         resultado.segundos = self.decorrido
         resultado.fim = datetime.datetime.now().astimezone().isoformat(
@@ -825,10 +913,31 @@ def _quadro(linhas, largura_rotulo: str = "34%") -> str:
         f"{corpo}</table>")
 
 
+def descrever_audio(r) -> str:
+    """Como o áudio daquele registro é dito na peça.
+
+    Precisa ser exato. Antes, qualquer gravação com som era descrita como
+    "com áudio do microfone", o que é verdade quando só há microfone e
+    falso quando há som do computador — e quem lesse entenderia que o
+    áudio reproduzido na tela ficou registrado, quando não ficava.
+    """
+    captura = getattr(r, "captura_sistema", None)
+    tem_sistema = captura is not None and not captura.houve_falha
+    if r.com_audio and tem_sistema:
+        return ("duas faixas de áudio: 1 — som do ambiente, captado pelo "
+                "microfone; 2 — som reproduzido pelo computador")
+    if tem_sistema:
+        return "áudio do som reproduzido pelo computador"
+    if r.com_audio:
+        return ("áudio do ambiente, captado pelo microfone; o som "
+                "reproduzido pelo computador não foi registrado")
+    return "sem áudio"
+
+
 def _quadro_registros(t: TermoGravacao) -> str:
     linhas = []
     for i, r in enumerate(t.bons, 1):
-        audio = "com áudio do microfone" if r.com_audio else "sem áudio"
+        audio = descrever_audio(r)
         linhas.append(
             "<tr>"
             + _cel(i, "center")
@@ -917,10 +1026,41 @@ def build_html(t: TermoGravacao) -> str:
         "Encerrada a captura, calculou-se o resumo criptográfico SHA-256 "
         "do arquivo produzido, adiante consignado.",
     ]
-    if t.bons and t.bons[0].opcoes and t.bons[0].opcoes.microfone:
-        metodo.append(
-            f"O áudio foi captado do dispositivo "
-            f"“{t.bons[0].opcoes.microfone}” em conjunto com a imagem.")
+    # O que foi captado, e — o que importa tanto quanto — o que não foi.
+    # Silenciar sobre a fonte do som é o tipo de omissão que a defesa
+    # encontra depois: quem lê "com áudio" supõe que tudo o que se ouviu
+    # na diligência ficou registrado.
+    primeiro = t.bons[0] if t.bons else None
+    if primeiro is not None and primeiro.opcoes:
+        captura = getattr(primeiro, "captura_sistema", None)
+        tem_sistema = captura is not None and not captura.houve_falha
+        if primeiro.opcoes.microfone:
+            metodo.append(
+                f"O som do ambiente foi captado do dispositivo "
+                f"“{primeiro.opcoes.microfone}” em conjunto com a imagem.")
+        if tem_sistema:
+            metodo.append(
+                "O som reproduzido pelo computador foi captado diretamente "
+                "da placa de áudio, e não pelo microfone, ficando em faixa "
+                "própria do arquivo — de modo que o que a máquina "
+                "reproduziu e o que foi dito no ambiente permanecem "
+                "distinguíveis."
+                + (f" Saída de áudio: “{captura.dispositivo}”."
+                   if captura.dispositivo else ""))
+        elif not primeiro.opcoes.audio_sistema:
+            metodo.append(
+                "O som reproduzido pelo computador não foi registrado: a "
+                "gravação captou apenas a imagem"
+                + (" e o som do ambiente."
+                   if primeiro.opcoes.microfone else "."))
+        if captura is not None and captura.houve_falha:
+            metodo.append(
+                "A captação do som reproduzido pelo computador foi "
+                "solicitada, mas não se completou"
+                + (f", tendo sido interrompida após "
+                   f"{captura.interrompida_em:.0f} segundos"
+                   if captura.interrompida_em else "")
+                + f". Motivo registrado: {captura.erro}.")
     partes += [f'<p align="justify" style="font-size:10.5pt; '
                f'line-height:150%;">{e(linha)}</p>' for linha in metodo]
 
