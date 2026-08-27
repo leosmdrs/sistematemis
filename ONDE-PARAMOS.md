@@ -236,13 +236,20 @@ por um instante e derrubou a verificação.
 * **Qual ferramenta construir depois.** A sugestão foi a calculadora de
   prazos prescricionais.
 
-### 5.2-A Defasagem do README
+### 5.2-A README — acertado em 27/08/2026
 
-A tabela de ferramentas do `README.md` relaciona **seis das quinze**.
-Ficaram de fora, entre outras, a Análise de Planilha, a Gravação de
-Tela, a Extração Registrada, a Varredura, o PDF Pesquisável e o
-Relatório de Atividades. Convém acertar antes de publicar a 1.7.4:
-quem chega ao repositório lê aquela tabela como sendo o sistema.
+A tabela de ferramentas relacionava **seis das quinze**, e a passagem da
+Calculadora ePAD afirmava que nenhuma ferramenta acessa a rede — falso
+desde a 1.1.0, quando entrou a Constatação Web. As duas coisas foram
+corrigidas, e `provas/prova_readme.py` passa a reprovar a defasagem:
+confere a tabela contra o `REGISTRY`, na mesma ordem, a marca de rede em
+quem tem `online=True`, e as contagens escritas por extenso.
+
+Fica **um resto**, que não é do README: o diálogo **Sobre**
+(`shell.py`, por volta da linha 960) ainda diz "a ferramenta X, Y, que
+abre uma página oficial externa" — no singular para duas, e com uma
+redação que o próprio código, na frase do portal, declara imprecisa. É
+texto de privacidade visto pelo usuário; convém acertar com cuidado.
 
 ### 5.3 Testes que só podem ser feitos com material real
 

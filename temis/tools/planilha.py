@@ -903,11 +903,13 @@ class PlanilhaTool(ToolPage):
         tagline="Examina planilha registrando cada passo",
         description=(
             "Abre planilhas de auditoria e permite filtrar, ordenar, escolher "
-            "colunas e remover duplicidades — registrando cada passo. Ao fim, "
-            "produz o arquivo com o resultado e um termo que identifica "
-            "original e resultado pelos resumos criptográficos e traz o "
-            "roteiro completo da análise, que pode ser re-executado por "
-            "terceiro para conferir que o resultado é aquele mesmo."),
+            "colunas, remover duplicidades, acrescentar coluna calculada, "
+            "agrupar e resumir, marcar linhas com justificativa e cruzar com "
+            "outra planilha — registrando cada passo. Ao fim, produz o "
+            "arquivo com o resultado e um termo que identifica original e "
+            "resultado pelos resumos criptográficos e traz o roteiro "
+            "completo da análise, que pode ser re-executado por terceiro "
+            "para conferir que o resultado é aquele mesmo."),
     )
 
     def __init__(self, parent=None):

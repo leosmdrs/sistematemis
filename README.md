@@ -71,14 +71,33 @@ instalar.
 
 ## Ferramentas
 
-| Ferramenta | Situação | O que faz |
-|---|---|---|
-| **Tarja Preta** | ✅ Disponível | Tarjamento irreversível de PDFs. Tarja manual, marcação por `[colchetes]` e busca automática de CPF, CNPJ, RG, telefone e e-mail. |
-| **Anti-Injection** | ✅ Disponível | Detecção de texto oculto em PDFs, com modos Normal / Revelar / Raio-X e relatório de constatação. |
-| **Quadro de Evidências** | ✅ Disponível | Mural de vínculos da investigação: anotações, imagens e conexões por caso. |
-| **Edição de Vídeo** | ✅ Disponível | Compactar, fatiar e mesclar gravações para a juntada aos autos. |
-| **Encarregado de IPS** | ✅ Disponível | Montagem da Informação de juízo de admissibilidade: roteiro das seis partes do art. 92 da IN PRF nº 127/2024, texto padrão embutido, exportação em HTML para o SEI e em PDF. |
-| **Metadados e Hash** | ✅ Disponível | SHA-256 dos arquivos e o que eles informam sobre si — autor, equipamento, datas e coordenadas. Emite termo único de juntada e metadados, com coluna de nº SEI. |
+**Quinze ferramentas**, todas disponíveis. A ordem abaixo é a do portal, que não é
+alfabética: no alto a peça que instrui o procedimento, depois o que
+identifica e captura a prova onde ela está, depois o que extrai conteúdo
+do material apreendido, e na base o preparo e o apoio.
+
+| Ferramenta | O que faz |
+|---|---|
+| **Encarregado de IPS** | Monta a Informação da Investigação Preliminar Sumária parte por parte, com o roteiro do que entra em cada uma e o respaldo normativo à mão — art. 92 da IN PRF nº 127/2024. Exporta HTML já diagramado para importar no SEI, e PDF. |
+| **Metadados e Hash** | SHA-256 dos arquivos e o que eles informam sobre si: autor, programa que gerou, datas, equipamento de origem e, quando o aparelho as gravou, as coordenadas da captura. Emite termo único de juntada e metadados, com coluna de nº SEI. |
+| **Constatação Web** | **Acessa a rede.** Abre o endereço num navegador dedicado, sem extensões e sem sessão anterior, e registra o que foi exibido: a página inteira em PDF, o código-fonte, a tela, o IP do servidor e o certificado que ele apresentou — cada peça com o seu SHA-256. |
+| **Varredura** | Indexa um pendrive, um cartão ou uma pasta inteira: SHA-256 de cada arquivo e o texto que houver, inclusive o de páginas digitalizadas, por reconhecimento óptico. A busca passa a ser instantânea e não toca mais no dispositivo, que pode ser lacrado. Aponta os duplicados. |
+| **PDF Pesquisável** | Acrescenta camada de texto invisível a PDFs escaneados e a fotos de documentos, encaixada palavra por palavra sobre a imagem. O documento fica igual ao original, mas passa a permitir busca, seleção e cópia — e a ser encontrado pela Varredura. |
+| **Degravação** | Transcreve áudio e vídeo com reconhecimento de fala executado na própria máquina; nenhum trecho é enviado a serviço externo. Separa automaticamente quem fala, na cronologia da gravação, e basta nomear cada voz uma vez. |
+| **Extração Registrada** | **Acessa a rede.** Abre o sistema num navegador instrumentado e registra cada passo da extração: endereços, cliques, consultas com seus parâmetros e arquivos recebidos — cada um resumido no instante em que chega, antes de tocar qualquer pasta de trabalho. Grava a tela ao mesmo tempo. |
+| **Gravação de Tela** | Registra a diligência feita no computador, com a identificação do processo, do operador e da estação impressa no próprio vídeo, junto ao relógio e ao tempo decorrido. Grava também, em faixa própria e à escolha de quem opera, o som que o computador reproduz. |
+| **Espelhamento de Celular** | Liga um Android por cabo USB, espelha a tela e grava a sessão em resolução nativa, com fabricante, modelo, versão do Android e número de série lidos do próprio aparelho. Por padrão não repassa toque nem digitação: observa. |
+| **Tarja Preta** | Tarjamento irreversível de PDFs — a página é rasterizada ao salvar, então o texto sob a tarja sai do arquivo, e não fica apenas coberto. Tarja manual, tarja por seleção de texto, marcação por sinal à escolha (`[ ]`, `{ }` ou `( )`) e busca automática de CPF, CNPJ, RG, telefone e e-mail. |
+| **Anti-Injection** | Detecção de texto oculto em PDFs — opacidade zero, corpo minúsculo, branco sobre branco, conteúdo fora da área da página e camadas ocultas —, usado para induzir a erro quem lê o documento, humano ou assistente de IA. Modos Normal / Revelar / Raio-X e relatório de constatação. |
+| **Análise de Planilha** | Filtrar, ordenar, escolher colunas, remover duplicidades, acrescentar coluna calculada, agrupar e resumir, marcar linhas com justificativa e cruzar com outra planilha — registrando cada passo. Produz o resultado e um termo com o roteiro completo, que terceiro re-executa sobre o original para conferir. |
+| **Quadro de Evidências** | Mural de vínculos da investigação: anotações, imagens e marcações conectadas, organizadas por caso. Serve para enxergar as relações entre pessoas, fatos e provas antes de redigir a peça. |
+| **Edição de Vídeo** | Compactar, fatiar e mesclar gravações para a juntada aos autos. Trabalha com videomonitoramento, câmeras corporais e vídeos anexados pelas partes. |
+| **Relatório de Atividades** | Documenta cada execução do sistema, do abrir ao fechar, sem que ninguém precise ligá-la: ferramentas usadas e por quanto tempo, o que cada uma relatou ao concluir, e a identificação da estação e da rede. Grava enquanto a sessão corre. Fica só nesta máquina. |
+
+Duas acessam a rede, e estão marcadas acima. As outras treze leem e
+processam tudo na própria estação. Fora delas, o sistema só sai à rede
+para conferir se há versão nova, sem enviar identificação — e isso se
+desliga em **Sobre**.
 
 ### Heurísticas do Anti-Injection
 
@@ -129,9 +148,14 @@ O código está preservado em `desativado/calculadora.py`, com as instruções
 para trazê-lo de volta. A calculadora continua acessível pelo navegador,
 em `epad.cgu.gov.br`.
 
-Efeito colateral: sem ela, **nenhuma ferramenta acessa a rede**. A frase de
-privacidade do portal é montada a partir do registro de ferramentas, então
-se ajustou sozinha.
+Efeito colateral à época: sem ela, nenhuma ferramenta acessava a rede.
+
+**Isso não vale mais, e este parágrafo afirmou o contrário por tempo
+demais.** O QtWebEngine voltou na 1.1.0, com a Constatação Web, e desde
+a 1.4.0 são duas as ferramentas que acessam a rede — ela e a Extração
+Registrada. A frase de privacidade do portal é montada a partir do
+registro de ferramentas e se ajustou sozinha às duas; quem não se
+ajustava era o texto aqui.
 
 ### Edição de Vídeo — FFmpeg empacotado
 
