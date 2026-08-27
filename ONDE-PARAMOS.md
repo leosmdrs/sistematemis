@@ -162,10 +162,10 @@ célula que permite ao termo afirmar que a relação de passos é completa.
 
 ## 5. O que falta
 
-### 5.1 Análise de Planilha — etapa 2
+### 5.1 Análise de Planilha — etapa 2 concluída
 
-Das quatro operações combinadas, **três estão entregues** em 27/08/2026,
-com provas em `provas/`. Sete famílias no diálogo agora.
+As quatro operações combinadas estão **entregues** em 27/08/2026, com
+provas em `provas/`. Oito famílias no diálogo agora.
 
 * ~~**Coluna derivada**~~ — `Derivada`: juntar textos, extrair parte,
   contar dias entre datas. Não sobrescreve coluna existente: nome já em
@@ -177,18 +177,28 @@ com provas em `provas/`. Sete famílias no diálogo agora.
   condições do filtro, com a justificativa dentro da operação. A marca
   se acumula, nunca substitui.
 
-**Falta uma:**
+* ~~**Cruzar com outra planilha**~~ — `Cruzamento`: o PROCV. É a única
+  operação que lê arquivo dentro do `aplicar`, e por isso a que mexeu
+  fora de si:
 
-* **Cruzar com outra planilha** (o PROCV). Em auditoria costuma ser o
-  passo que produz o achado. O termo passa a citar **duas origens com
-  hash** — `derivado_core.Derivacao` já aceita lista de origens, e
-  `derivado.medir()` também; é só passar as duas.
+  - o termo passa a relacionar **duas origens, cada uma com o seu
+    resumo** (`montar_termo` chama `derivado.medir` com a lista), e ganha
+    a `RESSALVA_CRUZAMENTO`, acrescentada só quando há cruzamento;
+  - chave repetida do outro lado usa a primeira ocorrência, como o PROCV
+    — mas a peça diz quantas chaves repetiam, porque casamento ambíguo
+    muda o peso do achado;
+  - a linha sem par tem destino declarado: mantida, descartada, ou é o
+    que fica — que é como se produz a relação das divergências, o
+    cruzamento que mais interessa numa apuração;
+  - planilha que sumiu ou que mudou depois de escolhida vira aviso no
+    passo, e não queda. **A re-execução acusa**: alterado o segundo
+    arquivo, o resumo do conteúdo não bate e a conferência de
+    reprodutibilidade reprova, conforme está provado.
 
-  É a mais invasiva das quatro, e por isso ficou por último: as outras
-  três só transformam a `Tabela` em memória, enquanto esta precisa abrir
-  um segundo arquivo dentro do `aplicar`, guardar o resumo dele, e
-  responder por ele na re-execução — arquivo que sumiu ou que mudou de
-  conteúdo tem de virar aviso no passo, e não queda.
+  As auxiliares ficam em cache (`TETO_CACHE_AUXILIAR`, quatro), com a
+  hora de modificação e o tamanho na chave. Sem isso a ferramenta
+  travaria: o roteiro é refeito do zero a cada mudança na tela, e reler
+  cem mil linhas a cada tecla leva quinze segundos.
 
 **Onde mexer**, para cada operação nova:
 
@@ -203,6 +213,8 @@ com provas em `provas/`. Sete famílias no diálogo agora.
 4. As provas em `provas/prova_planilha.py` e `prova_planilha_tela.py`.
    A segunda confere que a família e o núcleo falam do mesmo conjunto,
    nos dois sentidos, e reprova operação que volte diferente do diálogo.
+   Operação que leia arquivo precisa também de `arquivos_auxiliares`,
+   senão a peça deixa de relacionar aquilo de que o resultado depende.
 
 **Armadilha medida:** atributo de widget cujo nome termine em `_nome`,
 `_cargo`, `_matricula`, `_lotacao` ou `_orgao` é reprovado pelo
@@ -224,6 +236,14 @@ por um instante e derrubou a verificação.
 * **Qual ferramenta construir depois.** A sugestão foi a calculadora de
   prazos prescricionais.
 
+### 5.2-A Defasagem do README
+
+A tabela de ferramentas do `README.md` relaciona **seis das quinze**.
+Ficaram de fora, entre outras, a Análise de Planilha, a Gravação de
+Tela, a Extração Registrada, a Varredura, o PDF Pesquisável e o
+Relatório de Atividades. Convém acertar antes de publicar a 1.7.4:
+quem chega ao repositório lê aquela tabela como sendo o sistema.
+
 ### 5.3 Testes que só podem ser feitos com material real
 
 * **Espelhamento de Celular** com aparelho Android de verdade.
@@ -240,7 +260,7 @@ A pasta `provas/` existe desde 27/08/2026, e roda assim:
 python -m unittest discover -s provas -p "prova_*.py"
 ```
 
-Cobre hoje **só a Análise de Planilha** — 38 provas, o comportamento de
+Cobre hoje **só a Análise de Planilha** — 53 provas, o comportamento de
 cada operação e a ida e volta pelo diálogo, sem abrir janela (o Qt roda
 pelo motor *offscreen*). Já valeu o preço na primeira execução: o
 agrupamento contava zero em todo grupo, porque a contagem procurava uma

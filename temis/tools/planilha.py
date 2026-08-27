@@ -21,7 +21,8 @@ from pathlib import Path
 from PyQt6.QtCore import QAbstractTableModel, Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QCheckBox, QDialog, QDialogButtonBox, QFileDialog,
+    QAbstractItemView, QApplication, QCheckBox, QDialog, QDialogButtonBox,
+    QFileDialog,
     QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
     QMessageBox, QPlainTextEdit, QProgressDialog, QPushButton,
     QStackedWidget, QTableView, QVBoxLayout, QWidget,
@@ -122,6 +123,7 @@ class DialogoOperacao(QDialog):
         ("Acrescentar coluna calculada", "derivada"),
         ("Agrupar e resumir", "agrupamento"),
         ("Marcar linhas", "marcacao"),
+        ("Cruzar com outra planilha", "cruzamento"),
     )
 
     def __init__(self, colunas: list, operacao=None, parent=None):
@@ -148,6 +150,7 @@ class DialogoOperacao(QDialog):
         self._paginas.addWidget(self._pagina_derivada())
         self._paginas.addWidget(self._pagina_agrupamento())
         self._paginas.addWidget(self._pagina_marcacao())
+        self._paginas.addWidget(self._pagina_cruzamento())
         self._familia.currentIndexChanged.connect(self._paginas.setCurrentIndex)
         fora.addWidget(self._paginas, 1)
 
@@ -542,6 +545,151 @@ class DialogoOperacao(QDialog):
     def _ajustar_marcacao(self):
         self._ajustar_condicao(self._m)
 
+    # ── cruzamento ───────────────────────
+    #: Filtros do seletor de arquivo, iguais aos da abertura principal.
+    FILTROS = ("Planilhas (*.xlsx *.xlsm *.xlsb *.xls *.ods *.csv *.txt)"
+               ";;Todos os arquivos (*)")
+
+    def _pagina_cruzamento(self) -> QWidget:
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(0, 6, 0, 0)
+        lay.setSpacing(8)
+        lay.addWidget(subtext(
+            "É o PROCV. A planilha escolhida aqui entra no termo como "
+            "segunda origem, com resumo criptográfico próprio — o achado "
+            "depende dos dois arquivos, e a peça precisa dizer contra o "
+            "que o cruzamento foi feito.", wrap=True))
+
+        # Estado da planilha do outro lado. Só a tela guarda; a operação
+        # leva o caminho e o resumo, e relê por conta própria.
+        self._x_caminho = ""
+        self._x_resumo = ""
+        self._x_recarregando = False
+
+        escolha = QHBoxLayout()
+        botao = QPushButton("Escolher planilha…")
+        botao.clicked.connect(self._escolher_cruzada)
+        self._x_rotulo = QLabel("nenhuma escolhida")
+        self._x_rotulo.setWordWrap(True)
+        escolha.addWidget(botao)
+        escolha.addWidget(self._x_rotulo, 1)
+        lay.addLayout(escolha)
+
+        leitura = QHBoxLayout()
+        esquerda = QVBoxLayout()
+        esquerda.addWidget(field_label("Aba"))
+        self._x_aba = NoScrollComboBox()
+        esquerda.addWidget(self._x_aba)
+        direita = QVBoxLayout()
+        direita.addWidget(field_label("Linha do cabeçalho"))
+        self._x_cabecalho = NoScrollSpinBox()
+        self._x_cabecalho.setRange(1, 200)
+        direita.addWidget(self._x_cabecalho)
+        leitura.addLayout(esquerda, 2)
+        leitura.addLayout(direita, 1)
+        lay.addLayout(leitura)
+
+        chaves = QHBoxLayout()
+        aqui = QVBoxLayout()
+        aqui.addWidget(field_label("Casar esta coluna"))
+        self._x_chave_aqui = self._combo_colunas()
+        aqui.addWidget(self._x_chave_aqui)
+        la = QVBoxLayout()
+        la.addWidget(field_label("Com esta, da outra"))
+        self._x_chave_la = NoScrollComboBox()
+        la.addWidget(self._x_chave_la)
+        chaves.addLayout(aqui)
+        chaves.addLayout(la)
+        lay.addLayout(chaves)
+
+        lay.addWidget(field_label("Trazer as colunas"))
+        self._x_trazer = QListWidget()
+        self._x_trazer.setSelectionMode(
+            QAbstractItemView.SelectionMode.NoSelection)
+        lay.addWidget(self._x_trazer, 1)
+
+        self._x_sensivel = QCheckBox(
+            "Distinguir maiúsculas e acentos ao casar as chaves")
+        lay.addWidget(self._x_sensivel)
+
+        lay.addWidget(field_label("Linhas que não encontrarem par"))
+        self._x_sem_par = NoScrollComboBox()
+        self._x_sem_par.addItem("Manter, com as colunas trazidas vazias",
+                                "manter")
+        self._x_sem_par.addItem("Descartar", "descartar")
+        self._x_sem_par.addItem("Ficar só com elas — a relação das "
+                                "divergências", "somente")
+        self._x_sem_par.setToolTip(
+            "A terceira é o cruzamento que costuma produzir o achado: quem "
+            "está de um lado e não está do outro.")
+        lay.addWidget(self._x_sem_par)
+
+        self._x_aba.currentIndexChanged.connect(self._reler_cruzada)
+        self._x_cabecalho.valueChanged.connect(self._reler_cruzada)
+        return w
+
+    def _escolher_cruzada(self):
+        caminho, _ = QFileDialog.getOpenFileName(
+            self, "Escolher a planilha a cruzar", str(Path.home()),
+            self.FILTROS)
+        if not caminho:
+            return
+        try:
+            nomes = pc.abas(caminho)
+        except Exception as e:                              # noqa: BLE001
+            QMessageBox.warning(self, "Não foi possível abrir",
+                                f"{type(e).__name__}: {e}")
+            return
+        self._x_caminho = caminho
+        self._x_recarregando = True
+        self._x_aba.clear()
+        self._x_aba.addItems(nomes)
+        self._x_aba.setEnabled(len(nomes) > 1)
+        self._x_cabecalho.setValue(1)
+        self._x_recarregando = False
+        self._reler_cruzada()
+
+    def _reler_cruzada(self):
+        """Relê a planilha do outro lado e reoferece as colunas dela.
+
+        Vai pela mesma `ler_auxiliar` que a operação usa, e portanto pelo
+        mesmo cache: oferecer aqui colunas lidas de outro jeito criaria a
+        chance de a operação, depois, não encontrar a que foi escolhida.
+        """
+        if self._x_recarregando or not self._x_caminho:
+            return
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            tabela, resumo, erro = pc.ler_auxiliar(
+                self._x_caminho, self._aba_cruzada(),
+                self._x_cabecalho.value())
+        finally:
+            QApplication.restoreOverrideCursor()
+        if tabela is None:
+            self._x_rotulo.setText("não foi possível ler: " + erro)
+            return
+        self._x_resumo = resumo
+        self._x_rotulo.setText(
+            Path(self._x_caminho).name + " — " + str(tabela.n_linhas)
+            + " linha(s), " + str(tabela.n_colunas) + " coluna(s)")
+        marcadas = set(self._marcadas(self._x_trazer))
+        escolhida = self._x_chave_la.currentText()
+        self._x_chave_la.clear()
+        self._x_chave_la.addItems(tabela.colunas)
+        if escolhida in tabela.colunas:
+            self._x_chave_la.setCurrentText(escolhida)
+        self._x_trazer.clear()
+        for nome in tabela.colunas:
+            item = QListWidgetItem(nome)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Checked if nome in marcadas
+                               else Qt.CheckState.Unchecked)
+            self._x_trazer.addItem(item)
+
+    def _aba_cruzada(self) -> str:
+        return self._x_aba.currentText() if self._x_aba.count() > 1 else ""
+
     # ── entrada e saída ──────────────────
     def _carregar(self, op):
         indices = {chave: i for i, (_, chave) in enumerate(self.FAMILIAS)}
@@ -607,6 +755,33 @@ class DialogoOperacao(QDialog):
             self._m_marca.setText(op.marca)
             self._m_justificativa.setPlainText(op.justificativa)
             self._ajustar_marcacao()
+        elif isinstance(op, pc.Cruzamento):
+            self._x_caminho = op.arquivo
+            self._x_resumo = op.resumo_arquivo
+            self._x_recarregando = True
+            self._x_aba.clear()
+            try:
+                nomes = pc.abas(op.arquivo) if op.arquivo else []
+            except Exception:                               # noqa: BLE001
+                nomes = []
+            self._x_aba.addItems(nomes)
+            self._x_aba.setEnabled(len(nomes) > 1)
+            if op.aba and op.aba in nomes:
+                self._x_aba.setCurrentText(op.aba)
+            self._x_cabecalho.setValue(max(1, int(op.linha_cabecalho)))
+            self._x_recarregando = False
+            self._reler_cruzada()
+            self._x_chave_aqui.setCurrentText(op.chave_aqui)
+            self._x_chave_la.setCurrentText(op.chave_la)
+            for i in range(self._x_trazer.count()):
+                item = self._x_trazer.item(i)
+                item.setCheckState(Qt.CheckState.Checked
+                                   if item.text() in op.trazer
+                                   else Qt.CheckState.Unchecked)
+            self._x_sensivel.setChecked(op.sensivel)
+            j = self._x_sem_par.findData(op.sem_par)
+            if j >= 0:
+                self._x_sem_par.setCurrentIndex(j)
 
     def _reordenar(self, lista: QListWidget, escolhidas: list):
         """Repõe a lista com as escolhidas em cima, na ordem da operação.
@@ -648,6 +823,18 @@ class DialogoOperacao(QDialog):
             return pc.Duplicidades(
                 chaves=self._marcadas(self._d_lista),
                 manter=self._d_qual.currentData() or "primeira")
+        if chave == "cruzamento":
+            if not self._x_caminho or self._x_chave_la.currentIndex() < 0:
+                return None
+            return pc.Cruzamento(
+                arquivo=self._x_caminho, resumo_arquivo=self._x_resumo,
+                aba=self._aba_cruzada(),
+                linha_cabecalho=self._x_cabecalho.value(),
+                chave_aqui=self._x_chave_aqui.currentText(),
+                chave_la=self._x_chave_la.currentText(),
+                trazer=self._marcadas(self._x_trazer),
+                sensivel=self._x_sensivel.isChecked(),
+                sem_par=self._x_sem_par.currentData() or "manter")
         if chave == "derivada":
             return self._operacao_derivada()
         if chave == "agrupamento":

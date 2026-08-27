@@ -278,5 +278,136 @@ class RoteiroQueVoltaInteiro(unittest.TestCase):
         self.assertEqual(lida.dados(), a.dados())
 
 
+class CruzarComOutraPlanilha(unittest.TestCase):
+    """O PROCV, e o que ele precisa declarar para virar peça."""
+
+    def setUp(self):
+        import tempfile
+        self.pasta = tempfile.TemporaryDirectory()
+        self.addCleanup(self.pasta.cleanup)
+        self.esquerda = tabela(
+            ["Matricula", "Nome"],
+            [("001", "Ana"), ("002", "Bruno"), ("003", "Caio")])
+        # A chave 003 aparece duas vezes do outro lado, de propósito.
+        self.direita = self.gravar(
+            "cadastro.xlsx", ["Mat", "Lotacao"],
+            [("001", "Sede"), ("003", "Norte"), ("003", "Sul")])
+
+    def gravar(self, nome, colunas, linhas):
+        from openpyxl import Workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.append(list(colunas))
+        for linha in linhas:
+            ws.append(list(linha))
+        caminho = Path(self.pasta.name) / nome
+        wb.save(caminho)
+        return caminho
+
+    def cruzamento(self, **ajustes):
+        campos = dict(arquivo=str(self.direita), chave_aqui="Matricula",
+                      chave_la="Mat", trazer=["Lotacao"])
+        campos.update(ajustes)
+        return pc.Cruzamento(**campos)
+
+    def test_traz_a_coluna_da_outra_planilha(self):
+        r, p = self.cruzamento().aplicar(self.esquerda)
+        self.assertEqual(r.colunas, ["Matricula", "Nome", "Lotacao"])
+        self.assertEqual(r.coluna("Lotacao"), ["Sede", "", "Norte"])
+        self.assertIn("Encontraram par 2 linha(s); 1, não.", p.descricao)
+
+    def test_chave_repetida_usa_a_primeira_e_declara_que_repetia(self):
+        _, p = self.cruzamento().aplicar(self.esquerda)
+        self.assertIn("1 chave(s)", p.aviso)
+        self.assertIn("primeira ocorrência", p.aviso)
+
+    def test_sem_par_descartada(self):
+        r, _ = self.cruzamento(sem_par="descartar").aplicar(self.esquerda)
+        self.assertEqual(r.coluna("Matricula"), ["001", "003"])
+
+    def test_sem_par_e_o_que_fica_e_a_relacao_das_divergencias(self):
+        r, _ = self.cruzamento(sem_par="somente").aplicar(self.esquerda)
+        self.assertEqual(r.coluna("Matricula"), ["002"])
+
+    def test_casa_sem_distinguir_caixa_e_acento_por_padrao(self):
+        esquerda = tabela(["Chave"], [("JOSÉ",)])
+        direita = self.gravar("outra.xlsx", ["Chave", "Dado"],
+                              [("jose", "achou")])
+        op = pc.Cruzamento(arquivo=str(direita), chave_aqui="Chave",
+                           chave_la="Chave", trazer=["Dado"])
+        r, _ = op.aplicar(esquerda)
+        self.assertEqual(r.coluna("Dado"), ["achou"])
+        r2, _ = pc.Cruzamento(arquivo=str(direita), chave_aqui="Chave",
+                              chave_la="Chave", trazer=["Dado"],
+                              sensivel=True).aplicar(esquerda)
+        self.assertEqual(r2.coluna("Dado"), [""])
+
+    def test_coluna_trazida_de_nome_repetido_nao_encobre_a_daqui(self):
+        direita = self.gravar("nomes.xlsx", ["Mat", "Nome"],
+                              [("001", "Ana Maria")])
+        r, _ = pc.Cruzamento(arquivo=str(direita), chave_aqui="Matricula",
+                             chave_la="Mat",
+                             trazer=["Nome"]).aplicar(self.esquerda)
+        self.assertEqual(r.colunas, ["Matricula", "Nome", "Nome (2)"])
+        self.assertEqual(r.coluna("Nome"), ["Ana", "Bruno", "Caio"])
+        self.assertEqual(r.coluna("Nome (2)"), ["Ana Maria", "", ""])
+
+    def test_planilha_que_sumiu_vira_aviso_e_nao_queda(self):
+        op = self.cruzamento(arquivo=str(Path(self.pasta.name) / "nada.xlsx"))
+        r, p = op.aplicar(self.esquerda)
+        self.assertEqual(r.linhas, self.esquerda.linhas)
+        self.assertIn("não encontrada", p.aviso)
+
+    def test_coluna_chave_ausente_do_outro_lado_vira_aviso(self):
+        r, p = self.cruzamento(chave_la="Inexistente").aplicar(self.esquerda)
+        self.assertEqual(r.colunas, self.esquerda.colunas)
+        self.assertIn("não existe na planilha cruzada", p.aviso)
+
+    def test_planilha_trocada_depois_de_escolhida_e_denunciada(self):
+        op = self.cruzamento(resumo_arquivo="0" * 64)
+        _, p = op.aplicar(self.esquerda)
+        self.assertIn("mudou depois de escolhida", p.aviso)
+        # E ainda assim executa: o passo relata, não interrompe a análise.
+        self.assertIn("Encontraram par", p.descricao)
+
+    def test_arquivo_alterado_no_disco_e_relido(self):
+        r1, _ = self.cruzamento().aplicar(self.esquerda)
+        self.assertEqual(r1.coluna("Lotacao"), ["Sede", "", "Norte"])
+        self.gravar("cadastro.xlsx", ["Mat", "Lotacao"],
+                    [("001", "Leste"), ("002", "Oeste")])
+        r2, _ = self.cruzamento().aplicar(self.esquerda)
+        self.assertEqual(r2.coluna("Lotacao"), ["Leste", "Oeste", ""])
+
+    def test_a_peca_relaciona_as_duas_origens_e_ganha_a_ressalva(self):
+        analise = pc.Analise(origem=str(self.direita),
+                             operacoes=[self.cruzamento()])
+        resultado, passos = analise.executar(self.esquerda)
+        saida = Path(self.pasta.name) / "resultado.xlsx"
+        pc.gravar(resultado, saida)
+        termo = pc.montar_termo(analise, resultado, passos, str(saida))
+        self.assertEqual(len(termo.itens[0].origens), 2)
+        self.assertIn(pc.RESSALVA_CRUZAMENTO, termo.ressalvas)
+
+    def test_sem_cruzamento_a_ressalva_nao_aparece(self):
+        analise = pc.Analise(origem=str(self.direita), operacoes=[])
+        saida = Path(self.pasta.name) / "so.xlsx"
+        pc.gravar(self.esquerda, saida)
+        termo = pc.montar_termo(analise, self.esquerda, [], str(saida))
+        self.assertEqual(len(termo.itens[0].origens), 1)
+        self.assertNotIn(pc.RESSALVA_CRUZAMENTO, termo.ressalvas)
+
+    def test_o_roteiro_com_cruzamento_faz_a_volta(self):
+        op = self.cruzamento(sem_par="somente", sensivel=True,
+                             resumo_arquivo="a" * 64, linha_cabecalho=1)
+        volta = pc.TIPOS["cruzamento"].de_dados(op.dados())
+        self.assertEqual(volta.dados(), op.dados())
+
+    def test_a_auxiliar_e_relacionada_como_arquivo_do_roteiro(self):
+        analise = pc.Analise(operacoes=[self.cruzamento(), self.cruzamento()])
+        # A mesma planilha duas vezes conta uma só: a peça relaciona
+        # arquivos, não passos.
+        self.assertEqual(pc.arquivos_auxiliares(analise), [str(self.direita)])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

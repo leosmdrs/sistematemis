@@ -25,6 +25,35 @@ from temis.tools.planilha import DialogoOperacao      # noqa: E402
 
 COLUNAS = ["Nome", "Sobrenome", "UF", "Valor", "Início", "Fim"]
 
+
+def _planilha_para_cruzar() -> tuple:
+    """Uma planilha de verdade, em pasta temporária, e o resumo dela.
+
+    O cruzamento é a única operação que lê arquivo dentro do `aplicar`, e
+    a página dele só sabe oferecer colunas depois de abrir o arquivo — de
+    modo que provar a ida e volta pelo diálogo exige um arquivo mesmo.
+    """
+    import atexit
+    import shutil
+    import tempfile
+
+    from openpyxl import Workbook
+
+    from temis.tools.hash_core import sha256_file
+
+    pasta = tempfile.mkdtemp()
+    atexit.register(shutil.rmtree, pasta, True)
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["Nome", "Lotacao"])
+    ws.append(["Ana", "Sede"])
+    caminho = Path(pasta) / "cadastro.xlsx"
+    wb.save(caminho)
+    return str(caminho), sha256_file(caminho)
+
+
+CRUZADA, RESUMO_CRUZADA = _planilha_para_cruzar()
+
 #: Uma de cada família, com os campos fora do padrão de fábrica — valor
 #: igual ao padrão passaria mesmo que a tela não lesse coisa alguma.
 EXEMPLOS = [
@@ -43,6 +72,9 @@ EXEMPLOS = [
     pc.Marcacao(coluna_marca="Achado", marca="ALTO",
                 justificativa="acima do teto", coluna="Valor",
                 condicao="maior", valor="1000"),
+    pc.Cruzamento(arquivo=CRUZADA, resumo_arquivo=RESUMO_CRUZADA,
+                  chave_aqui="Nome", chave_la="Nome", trazer=["Lotacao"],
+                  sem_par="somente", sensivel=True),
 ]
 
 
@@ -122,6 +154,9 @@ class RecusaOQueEstaIncompleto(unittest.TestCase):
         d = self.montar("marcacao")
         d._m_marca.setText("")
         self.assertIsNone(d.operacao())
+
+    def test_cruzamento_sem_planilha_escolhida(self):
+        self.assertIsNone(self.montar("cruzamento").operacao())
 
 
 if __name__ == "__main__":

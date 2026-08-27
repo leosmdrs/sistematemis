@@ -1136,6 +1136,219 @@ class Marcacao(Operacao):
                    sensivel=bool(d.get("sensivel", False)))
 
 
+# ── cruzamento ───────────────────────────
+
+#: Planilhas auxiliares já lidas. O roteiro é refeito do zero a cada
+#: mudança na tela (ver o cabeçalho de `planilha.py`), e reabrir cem mil
+#: linhas a cada tecla inviabilizaria a ferramenta. A chave carrega a
+#: hora de modificação e o tamanho do arquivo: trocado no disco, ele
+#: invalida a própria entrada, sem ninguém precisar lembrar de limpar.
+_CACHE_AUXILIAR: dict = {}
+
+#: Quantas planilhas auxiliares ficam em memória. Um roteiro costuma
+#: cruzar uma ou duas; o teto existe para que abrir muitas em sequência
+#: não vá guardando todas.
+TETO_CACHE_AUXILIAR = 4
+
+
+def ler_auxiliar(caminho: str, aba: str, linha_cabecalho: int) -> tuple:
+    """(tabela, resumo do arquivo, erro) da planilha cruzada."""
+    from .hash_core import sha256_file
+
+    if not caminho:
+        return None, "", "não indicada"
+    try:
+        estado = Path(caminho).stat()
+    except OSError:
+        return None, "", "não encontrada em " + str(caminho)
+    chave = (str(caminho), aba, int(linha_cabecalho),
+             estado.st_mtime_ns, estado.st_size)
+    guardado = _CACHE_AUXILIAR.get(chave)
+    if guardado is not None:
+        return guardado[0], guardado[1], ""
+    try:
+        tabela = carregar(caminho, aba, linha_cabecalho)
+        resumo = sha256_file(caminho)
+    except Exception as e:                              # noqa: BLE001
+        return None, "", "não pôde ser lida: " + str(e)
+    if len(_CACHE_AUXILIAR) >= TETO_CACHE_AUXILIAR:
+        _CACHE_AUXILIAR.pop(next(iter(_CACHE_AUXILIAR)))
+    _CACHE_AUXILIAR[chave] = (tabela, resumo)
+    return tabela, resumo, ""
+
+
+#: Destino da linha que não encontrou par -> como se lê na peça.
+SEM_PAR: dict[str, str] = {
+    "manter": "mantidas, com as colunas trazidas vazias",
+    "descartar": "descartadas",
+    "somente": "é o que fica; as que encontraram par saem",
+}
+
+
+@dataclass
+class Cruzamento(Operacao):
+    """Traz colunas de outra planilha, casando por uma coluna-chave.
+
+    É o PROCV, e em auditoria costuma ser o passo que produz o achado: a
+    folha contra o cadastro, o empenho contra a nota, o beneficiário
+    contra o quadro de servidores.
+
+    Três coisas o separam do PROCV da planilha comum, e as três existem
+    porque a peça precisa poder ser conferida:
+
+    **A segunda planilha entra na peça com resumo próprio.** O resultado
+    passa a depender de dois arquivos; dizer que veio só do primeiro
+    seria afirmação incompleta, e não haveria como demonstrar contra o
+    que o cruzamento foi feito.
+
+    **Chave repetida do outro lado é contada e declarada.** O PROCV pega
+    a primeira ocorrência e se cala. Aqui também se usa a primeira — mas
+    a peça registra quantas chaves tinham mais de uma, porque saber que o
+    casamento foi ambíguo muda o peso do achado.
+
+    **A linha sem par não some por descuido.** O destino dela é escolha
+    declarada: mantida com as colunas vazias, descartada, ou é justamente
+    o que se quer guardar — que é como se produz a relação das
+    divergências, o cruzamento que mais interessa numa apuração.
+    """
+
+    arquivo: str = ""
+    #: Resumo do arquivo no momento em que foi escolhido. Serve para o
+    #: passo acusar, na re-execução, que a planilha cruzada não é mais a
+    #: mesma — sem isso o roteiro renderia outro resultado sem explicar.
+    resumo_arquivo: str = ""
+    aba: str = ""
+    linha_cabecalho: int = 1
+    chave_aqui: str = ""
+    chave_la: str = ""
+    trazer: list = field(default_factory=list)
+    sensivel: bool = False
+    sem_par: str = "manter"
+
+    tipo = "cruzamento"
+
+    def _parado(self, t: Tabela, motivo: str) -> Passo:
+        return Passo(descricao=self.descrever(), antes=t.n_linhas,
+                     depois=t.n_linhas, aviso="não executado: " + motivo)
+
+    def aplicar(self, t: Tabela) -> tuple[Tabela, Passo]:
+        p = self._falta(t, self.chave_aqui)
+        if p is not None:
+            return t, p
+        outra, resumo, erro = ler_auxiliar(self.arquivo, self.aba,
+                                            self.linha_cabecalho)
+        if outra is None:
+            return t, self._parado(t, "a planilha cruzada " + erro)
+        if outra.indice(self.chave_la) < 0:
+            return t, self._parado(
+                t, 'a coluna "' + self.chave_la
+                + '" não existe na planilha cruzada')
+
+        avisos = []
+        if self.resumo_arquivo and resumo and resumo != self.resumo_arquivo:
+            avisos.append(
+                "a planilha cruzada mudou depois de escolhida: o resumo do "
+                "arquivo não é mais o declarado no roteiro")
+
+        trazer = [c for c in self.trazer if outra.indice(c) >= 0]
+        sumidas = [c for c in self.trazer if outra.indice(c) < 0]
+        if sumidas:
+            avisos.append("colunas ausentes na planilha cruzada: "
+                          + ", ".join('"' + c + '"' for c in sumidas))
+
+        arruma = (str.strip) if self.sensivel else sem_acento
+        jota = outra.indice(self.chave_la)
+        de_la = [outra.indice(c) for c in trazer]
+        indice: dict = {}
+        ambiguas: set = set()
+        for linha in outra.linhas:
+            k = arruma(texto(linha[jota]))
+            if k in indice:
+                ambiguas.add(k)
+                continue
+            indice[k] = tuple(linha[i] for i in de_la)
+        if ambiguas:
+            avisos.append(
+                str(len(ambiguas)) + " chave(s) da planilha cruzada "
+                "apareciam mais de uma vez; de cada uma foi usada a "
+                "primeira ocorrência")
+
+        novos: list = []
+        for c in trazer:
+            novos.append(_nome_livre(list(t.colunas) + novos, c))
+        vazios = tuple(VAZIO for _ in trazer)
+
+        aqui = t.indice(self.chave_aqui)
+        linhas, com_par, sem = [], 0, 0
+        for linha in t.linhas:
+            par = indice.get(arruma(texto(linha[aqui])))
+            if par is None:
+                sem += 1
+                if self.sem_par == "descartar":
+                    continue
+            else:
+                com_par += 1
+                if self.sem_par == "somente":
+                    continue
+            linhas.append(tuple(linha) + (vazios if par is None else par))
+
+        return (Tabela(colunas=list(t.colunas) + novos, linhas=linhas),
+                Passo(descricao=self.descrever() + " Encontraram par "
+                      + str(com_par) + " linha(s); " + str(sem) + ", não.",
+                      antes=t.n_linhas, depois=len(linhas),
+                      aviso="; ".join(avisos)))
+
+    def descrever(self) -> str:
+        nome = Path(self.arquivo).name if self.arquivo else "(não indicada)"
+        frase = 'Cruzada com a planilha "' + nome + '"'
+        if self.aba:
+            frase += ', aba "' + self.aba + '"'
+        frase += (', casando "' + self.chave_aqui + '" com "'
+                  + self.chave_la + '"')
+        if self.trazer:
+            frase += (", trazendo "
+                      + ", ".join('"' + c + '"' for c in self.trazer))
+        frase += (", distinguindo maiúsculas e acentos" if self.sensivel
+                  else ", sem distinguir maiúsculas nem acentos")
+        return (frase + ". Linhas sem par: "
+                + SEM_PAR.get(self.sem_par, self.sem_par) + ".")
+
+    def dados(self) -> dict:
+        return {"tipo": self.tipo, "arquivo": self.arquivo,
+                "resumo_arquivo": self.resumo_arquivo, "aba": self.aba,
+                "linha_cabecalho": int(self.linha_cabecalho),
+                "chave_aqui": self.chave_aqui, "chave_la": self.chave_la,
+                "trazer": list(self.trazer), "sensivel": self.sensivel,
+                "sem_par": self.sem_par}
+
+    @classmethod
+    def de_dados(cls, d: dict) -> "Cruzamento":
+        return cls(arquivo=d.get("arquivo", ""),
+                   resumo_arquivo=d.get("resumo_arquivo", ""),
+                   aba=d.get("aba", ""),
+                   linha_cabecalho=int(d.get("linha_cabecalho", 1)),
+                   chave_aqui=d.get("chave_aqui", ""),
+                   chave_la=d.get("chave_la", ""),
+                   trazer=list(d.get("trazer", [])),
+                   sensivel=bool(d.get("sensivel", False)),
+                   sem_par=d.get("sem_par", "manter"))
+
+
+def arquivos_auxiliares(analise) -> list:
+    """As planilhas que o roteiro consulta além da de partida.
+
+    O termo precisa relacionar cada uma com o seu resumo: o resultado
+    depende delas tanto quanto do arquivo aberto, e uma peça que citasse
+    só a origem estaria escondendo metade do que produziu o achado.
+    """
+    vistos: list = []
+    for op in analise.operacoes:
+        caminho = getattr(op, "arquivo", "")
+        if caminho and caminho not in vistos:
+            vistos.append(caminho)
+    return vistos
+
+
 #: Como o roteiro salvo volta a ser operação. Toda operação nova precisa
 #: entrar aqui, senão o roteiro grava e não relê.
 TIPOS: dict = {
@@ -1146,6 +1359,7 @@ TIPOS: dict = {
     Derivada.tipo: Derivada,
     Agrupamento.tipo: Agrupamento,
     Marcacao.tipo: Marcacao,
+    Cruzamento.tipo: Cruzamento,
 }
 
 
@@ -1384,6 +1598,17 @@ RESSALVAS = (
     "antes disso.",
 )
 
+#: Acrescentada às demais quando o roteiro cruza com outra planilha. Só
+#: então, porque ressalva que não se aplica ao caso é ruído que ensina o
+#: leitor a passar os olhos pelas que se aplicam.
+RESSALVA_CRUZAMENTO = (
+    "O resultado depende também da planilha cruzada, relacionada acima "
+    "entre as origens e identificada por resumo criptográfico próprio. "
+    "Re-executar este roteiro exige os dois arquivos; alterada a segunda "
+    "planilha, o resultado muda, e a conferência de reprodutibilidade "
+    "acusa a divergência em vez de deixá-la passar."
+)
+
 
 def _quadro_roteiro(t: TermoPlanilha) -> str:
     """A tabela dos passos — o miolo da peça."""
@@ -1530,8 +1755,9 @@ def build_texto(t: TermoPlanilha) -> str:
 def montar_termo(analise: Analise, resultado: Tabela, passos: list,
                  saida: str, reproducao: str = "") -> TermoPlanilha:
     """Junta o que a análise produziu na peça pronta para assinar."""
+    auxiliares = arquivos_auxiliares(analise)
     item = derivado.medir(
-        analise.origem, saida,
+        [analise.origem] + auxiliares, saida,
         detalhes=[
             ("Aba analisada", analise.aba or "primeira"),
             ("Linhas do original", str(analise.linhas_originais)),
@@ -1543,7 +1769,8 @@ def montar_termo(analise: Analise, resultado: Tabela, passos: list,
     return TermoPlanilha(
         titulo="Termo de Análise de Planilha",
         operacao="exame analítico",
-        ressalvas=RESSALVAS,
+        ressalvas=RESSALVAS + ((RESSALVA_CRUZAMENTO,) if auxiliares
+                               else ()),
         itens=[item],
         passos=list(passos),
         aba=analise.aba,
