@@ -7,7 +7,7 @@
 ; ─────────────────────────────────────────────────────────────
 
 #define AppName        "Sistema Têmis"
-#define AppVersion     "1.8.0"
+#define AppVersion     "1.8.1"
 #define AppPublisher   "Leonardo Medeiros"
 #define AppExe         "SistemaTemis.exe"
 
