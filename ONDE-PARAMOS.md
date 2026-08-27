@@ -158,6 +158,35 @@ respeitado em qualquer acréscimo: **não pode existir maneira de alterar
 dado que não seja uma operação declarada.** É a ausência de edição de
 célula que permite ao termo afirmar que a relação de passos é completa.
 
+### Nitidez da interface — o fator 0,85 saiu (27/08/2026)
+
+Relatado como três defeitos: texto embaralhando ao digitar na barra de
+endereço, a janela não se ajustando ao monitor, e "dependendo do tamanho
+da fonte a resolução não fica boa". Era um só, e estava em
+`temis/__main__.py`: `QT_SCALE_FACTOR = "0.85"`.
+
+O Qt calcula as métricas em pixels lógicos inteiros e só então multiplica
+pelo fator — a interface inteira era desenhada em meio pixel. E o Qt
+passava a informar que o monitor ultrawide de 2560×1080 tinha 3012×1271
+pixels lógicos, que é a origem do desencontro entre a área do
+QtWebEngine e o que aparecia na tela.
+
+**A medição, a explicação e a razão de não haver fator fracionário
+nítido estão escritas no lugar onde a crença errada estava**, no cabeçalho
+do `__main__.py`, e `provas/prova_escala.py` reprova quem reimpuser o
+fator. Se um dia a interface parecer grande demais, o caminho é baixar as
+medidas do tema, que são em pixel e chegam inteiras à tela — e não
+reintroduzir o atalho.
+
+**Fica um resto medido e não mexido:** o `main()` chama
+`SetProcessDpiAwareness(1)`, que é o modo antigo, por DPI do sistema.
+Nesta máquina os dois monitores estão a 100% e isso não muda nada, mas
+numa estação com escala diferente entre monitores o Windows passa a
+esticar a janela como imagem — o mesmo borrão, por outra porta. O Qt 6
+sozinho usaria o modo por monitor. Não foi removido porque a Gravação de
+Tela e a Extração Registrada passam coordenadas ao FFmpeg, e é preciso
+conferir se elas são de dispositivo antes de mudar o modo.
+
 ---
 
 ## 5. O que falta
