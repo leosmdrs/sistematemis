@@ -1,180 +1,30 @@
-ANÁLISE DE PLANILHA — ferramenta nova
+O PROGRAMA RESPONDE POR SI, E O REGISTRO SE ENCADEIA
 
-Planilha de auditoria trabalhada no Excel resolve o problema prático e
-destrói o jurídico: ao fim existe um resultado e não existe como
-demonstrar de onde ele veio. Filtro aplicado é filtro perdido, e quem lê
-o relatório precisa acreditar em quem o escreveu.
+Toda peça passa a declarar, no pé, o resumo criptográfico do próprio
+executável que a produziu — não só a versão. Declarar a versão diz qual
+programa fez a peça; declarar o resumo diz que foi aquele mesmo, e não
+uma cópia alterada com o mesmo nome. O Superior Tribunal de Justiça, ao
+tratar da mesmidade pelo hash, exigiu que ela venha acompanhada de
+software confiável e auditável (AgRg no HC 828.054/RN); software cujo
+binário não se pode conferir não se audita.
 
-O que se poderia fazer é registrar cliques. Não foi o caminho: registro
-de ações é afirmação — diz que alguém fez algo e continua dependendo de
-confiança. Aqui a análise inteira é um roteiro de operações declaradas e
-determinísticas, que terceiro re-executa sobre o arquivo original para
-chegar ao mesmo resultado. A peça deixa de afirmar e passa a ser
-conferível, que é garantia de outra natureza.
-
-São oito famílias de operação: filtrar (catorze condições), ordenar,
-escolher e reordenar colunas, remover duplicidades, acrescentar coluna
-calculada, agrupar e resumir, marcar linhas com justificativa registrada,
-e cruzar com outra planilha.
-
-Três decisões merecem registro, porque mudam resultado e por isso vão
-declaradas na peça. O resumo criptográfico é do conteúdo, e não do
-arquivo: gravar duas vezes a mesma planilha produz arquivos diferentes,
-porque o formato guarda a hora da gravação dentro de si. A comparação é
-livre de idioma, para que o mesmo roteiro rodado em outra estação não
-devolva outra ordem. E o que não pôde ser comparado é contado, e não
-some — filtrar por faixa numérica uma coluna com três células de texto
-faz essas três desaparecerem em silêncio no Excel; aqui elas entram no
-termo como incomparáveis.
-
-A regra que sustenta tudo está escrita no código e vale para qualquer
-acréscimo futuro: não pode existir maneira de alterar dado que não seja
-uma operação declarada. Não há edição de célula. É a ausência dela que
-permite ao termo afirmar que a relação de passos é completa.
-
-O CRUZAMENTO ENTRE PLANILHAS — o PROCV com endereço
-
-Em auditoria costuma ser o passo que produz o achado: a folha contra o
-cadastro, o empenho contra a nota, o beneficiário contra o quadro de
-servidores. Três coisas o separam do PROCV comum.
-
-A segunda planilha entra na peça com resumo criptográfico próprio: o
-resultado depende de dois arquivos, e dizer que veio só do primeiro seria
-afirmação incompleta. Chave repetida do outro lado usa a primeira
-ocorrência, como o PROCV — mas a peça registra quantas chaves repetiam,
-porque casamento ambíguo muda o peso do achado. E a linha que não
-encontrou par tem destino declarado: mantida, descartada, ou é o que
-fica, que é como se produz a relação das divergências.
+O Relatório de Atividades passa a encadear cada anotação pelo resumo da
+anterior, à maneira de uma corrente: alterar, remover ou inserir uma
+linha rompe a corrente a partir dali, e a conferência aponta onde. O que
+a corrente não prova vai dito na peça — ela detecta a alteração à mão
+sobre o arquivo, não detém quem recalcule tudo; a força está em o resumo
+de fecho ser citado numa peça que circula.
 
 
-TARJA PRETA — abre imagem, e diz quando não há texto a procurar
+CONFERÊNCIA DE INTEGRIDADE — o sistema passa a conferir resumo
 
-Passa a abrir PNG, JPG, TIFF, BMP e demais formatos de imagem, além de
-PDF — fotografia de documento, digitalização, captura de tela.
-
-Junto veio a correção de um silêncio caro. Sem camada de texto não há
-busca automática de dado protegido, e isso já valia para o PDF de
-digitalização, que é a maior parte do que chega a uma corregedoria. A
-ferramenta não dizia: respondia "nada encontrado" sobre páginas cheias de
-CPF, e quem lê essa resposta conclui que não há CPF ali — o contrário da
-verdade. Agora a ausência é reconhecida ao abrir, as ações que dependem
-de texto ficam desligadas com a explicação, e a mensagem aponta o PDF
-Pesquisável, que devolve a camada por reconhecimento óptico.
-
-Corrigido também um defeito antigo: a página produzida saía com o dobro
-do tamanho físico do original. Rasterizava-se a dois, e a imagem era
-gravada como se fosse 72 pontos por polegada, de modo que um A4 saía
-perto de um A2. Peça dos autos em papel de tamanho errado é problema de
-quem for juntá-la.
-
-
-A CENSURA E A EDIÇÃO VIRAM ROTEIRO CONFERÍVEL
-
-O termo de censura dizia "N áreas cobertas em M páginas", e o de edição
-declarava os parâmetros em prosa. Prosa se lê e não se executa: um
-terceiro que quisesse conferir teria de adivinhar o comando.
-
-Agora as duas ferramentas produzem roteiro — relação declarada de
-retângulos, no caso da Tarja Preta; operação e parâmetros em forma de
-máquina, no caso da Edição de Vídeo. Salvo em arquivo próprio, ele
-acompanha a peça, e quem tiver o original re-executa e chega ao mesmo
-resultado. A própria peça informa se a re-execução reproduziu.
-
-Cada uma confere o que pode conferir. A censura compara o resumo dos
-pixels, porque gravar duas vezes o mesmo PDF produz bytes diferentes. A
-edição compara os próprios bytes: foi medido que as cinco formas que ela
-produz saem byte a byte idênticas com o mesmo FFmpeg, e podendo conferir
-os bytes, conferem-se os bytes.
-
-Nas três ferramentas com roteiro, "não reproduz" e "não foi possível" são
-situações distintas. Original que sumiu, original que mudou, ou motor de
-outra versão não é operação que deixou de reproduzir — e a peça não chama
-uma pela outra.
-
-
-CADEIA DE CUSTÓDIA — o que toda peça passou a declarar
-
-A jurisprudência recente do Superior Tribunal de Justiça deixou de
-presumir a idoneidade da prova digital pela fé pública de quem a colheu.
-Confiabilidade e integridade passaram a ser matéria de demonstração, e o
-ônus é de quem produziu a prova. Quatro mudanças decorrem disso.
-
-Toda peça declara com o que foi produzida: a versão do sistema, a do
-sistema operacional e a de cada componente que executou a operação.
-Método cuja ferramenta e cuja versão não constam não se reexecuta nem se
-contesta.
-
-O sistema passa a conferir resumo, e não apenas gerá-lo. O Metadados e
-Hash recebe o resumo declarado na entrega — do ofício, da mídia lacrada,
-do termo de quem entregou —, recalcula e confronta, e emite Termo de
-Juntada e Conferência de Integridade. São três estados, e não dois:
-confere, não confere, e não perguntado. E o alcance vai impresso: a
-conferência diz que o arquivo não mudou desde a declaração; não diz que a
+O Metadados e Hash sabia gerar resumo e não sabia conferir um. Agora
+recebe o resumo declarado na entrega — do ofício, da mídia lacrada, do
+termo de quem entregou —, recalcula sobre os bytes e confronta, emitindo
+Termo de Juntada e Conferência de Integridade. São três estados, e não
+dois: confere, não confere, e não perguntado. O alcance vai impresso: a
+conferência diz que o arquivo não mudou desde a declaração, não que a
 declaração estava certa.
-
-A hora vai qualificada. O carimbo ganhou segundo e fuso, e a peça declara
-o estado do relógio da estação, apurado junto ao próprio Windows —
-inclusive quando ele informa relógio não sincronizado. Uma peça que
-carimbasse a hora sem dizer isso apresentaria como certo o que não é.
-Vai também a advertência de que não se trata de carimbo de tempo
-certificado por terceira parte.
-
-E o termo de juntada registra de quem, por que meio e quando o material
-foi recebido — a falta de indicação do meio de entrega está entre as
-falhas que os julgados arrolam. Tudo opcional: campo vazio não sai
-impresso, porque rótulo genérico preenchido para cumprir formulário
-afirma percurso que ninguém apurou.
-
-
-GRAVAÇÃO DE TELA — o som do computador
-
-O vídeo pode levar duas faixas de áudio separadas: o que o computador
-tocou e o que foi dito na sala. Marcadas as duas, cada uma fica em faixa
-própria, e não misturadas — quem for periciar consegue isolar uma da
-outra. A captura do retorno é feita pela interface de áudio do próprio
-Windows, e a escolha é de quem opera.
-
-
-A INTERFACE — nitidez e portal
-
-Três defeitos relatados tinham uma origem só: a interface era desenhada
-com fator de escala de 0,85. O Qt calcula as métricas em pixels lógicos
-inteiros e só então multiplica pelo fator, de modo que a interface era
-desenhada em meio pixel — as hastes das letras caíam na fronteira entre
-pixels, e o defeito parecia depender do tamanho da fonte porque só as
-medidas cujo produto dava inteiro saíam nítidas. O fator saiu.
-
-O portal deixou a constelação e passou a três fileiras de cinco. A
-disposição anterior dizia algo verdadeiro — os instrumentos existem em
-função da peça que instruem — e cobrava caro por dizê-lo: quinze
-ladrilhos numa elipse exigiam 1224 pixels de largura para a volta se
-fechar. A grade cabe em 804, e a hierarquia passou a ser dita pela ordem
-das fileiras.
-
-
-CONFERÊNCIAS AUTOMÁTICAS
-
-Nasce a pasta "provas", com cento e vinte provas versionadas no
-repositório. Elas conferem o comportamento das ferramentas — coisa
-diferente do autoteste, que confere a integridade da instalação — e
-rodam sem abrir janela, em qualquer máquina. Já se pagaram: o agrupamento
-contava zero em todo grupo, a página censurada saía com o dobro do
-tamanho, e colar uma linha de sha256sum grudava no resumo as letras do
-nome do arquivo. Nada disso apareceria em uso.
-
-O autoteste ganhou duas verificações: a procedência das peças, que
-reprova ferramenta cuja peça não declare com o que foi produzida; e a
-geometria do portal, refeita para a grade.
-
-
-CONFERÊNCIA DE INTEGRIDADE — o sistema passa a conferir resumo, não só gerar
-
-O Metadados e Hash recebe o resumo declarado na entrega — do ofício, da
-mídia lacrada, do termo de quem entregou —, recalcula sobre os bytes e
-confronta, emitindo Termo de Juntada e Conferência de Integridade. São
-três estados, e não dois: confere, não confere, e não perguntado. O
-alcance vai impresso: a conferência diz que o arquivo não mudou desde a
-declaração, não que a declaração estava certa.
 
 
 CONSTATAÇÃO WEB — quem registrou o domínio
@@ -187,24 +37,22 @@ próprio, e a peça declara que são dados de terceiro, não apuração do
 sistema.
 
 
-O PROGRAMA RESPONDE POR SI
+NORMAS TÉCNICAS DECLARADAS
 
-Toda peça passou a declarar, no pé, com o que foi produzida: a versão do
-sistema, o sistema operacional, os motores empregados e o resumo
-criptográfico do próprio executável. Método cuja ferramenta e cuja
-versão não constam não se reexecuta nem se contesta. As peças também
-citam as normas ABNT NBR ISO/IEC 27037 e RFC 3227, com o alcance da
-observância e o que fica fora dela relacionados em NORMAS.md.
+As peças passam a citar as normas ABNT NBR ISO/IEC 27037 e RFC 3227, com
+o alcance da observância — e o que fica fora dela — relacionados no
+arquivo NORMAS.md. Conformidade afirmada em bloco repetiria, num outro
+nível, a presunção que os tribunais recusaram; o que se oferece é o
+mapeamento, conferível contra o código público.
 
 
-RELATÓRIO DE ATIVIDADES — registro encadeado, e avisos de sessão
+REGISTRO DA SESSÃO — avisos de abertura e de encerramento
 
-Cada anotação da sessão passou a carregar o resumo da anterior: alterar,
-remover ou inserir uma linha rompe a corrente, e a conferência aponta
-onde. Ao abrir o sistema, um aviso informa que a sessão será registrada
-localmente; ao fechar, recomenda-se juntar o registro aos autos com os
-termos e arquivos gerados. O que a corrente não prova — deter quem
-recalcule tudo — vai dito na peça.
+Ao abrir o sistema, um aviso informa que a sessão será registrada nesta
+máquina, o que se anota e o que não se anota. Ao fechar, recomenda-se
+juntar o registro aos autos com os termos e arquivos gerados, e aponta-se
+onde ele ficou. O registro sozinho é prestação de contas; junto das
+peças, é cadeia de custódia.
 
 
 GRAVAÇÃO DE TELA — arquivos recebidos e janelas em primeiro plano
