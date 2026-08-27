@@ -89,7 +89,25 @@ def escrever_versao(versao: str):
     print(f"versão {versao} escrita nos três arquivos")
 
 
+def gerar_icone():
+    """Desenha o `.ico` que o executável carrega, se ele não existir.
+
+    Fica aqui porque o PUBLICACAO.md promete um comando só, e o ícone é
+    derivado — não vai para o Git. Quem clonasse o repositório e rodasse
+    a publicação direto perdia quarenta minutos para descobrir, no fim da
+    compilação, que faltava um arquivo de 27 KB que o próprio projeto
+    sabe desenhar.
+    """
+    alvo = RAIZ / "build" / "temis.ico"
+    if alvo.is_file():
+        return
+    print("desenhando o ícone…")
+    subprocess.run([sys.executable, str(RAIZ / "build" / "make_icon.py")],
+                   cwd=RAIZ, check=True)
+
+
 def compilar_exe():
+    gerar_icone()
     print("compilando o executável…")
     subprocess.run(
         [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean",
