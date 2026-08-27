@@ -554,7 +554,7 @@ def build_html(d: Degravacao, decl: Declarante | None = None,
                proc: Procedimento | None = None,
                com_marcas: bool = True) -> str:
     """Termo de degravação em HTML, para exibir e exportar."""
-    from ..impressao import cabecalho_html
+    from ..impressao import cabecalho_html, rodape_html
     import html as _html
 
     e = _html.escape
@@ -655,5 +655,6 @@ não fonte de fé.
 Sem mais a relatar, encerro o presente termo.
 </p>
 {assinatura}
+{rodape_html("fala", "locutores", "video")}
 </body></html>
 """

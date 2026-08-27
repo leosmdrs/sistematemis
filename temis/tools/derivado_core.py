@@ -132,6 +132,11 @@ class TermoDerivado:
     operacao: str = "processamento"
     #: Parágrafos que descrevem o alcance e os limites da operação.
     ressalvas: tuple[str, ...] = ()
+    #: Chaves de `procedencia.MOTORES` — os programas de que a operação
+    #: dependeu. A peça imprime nome e versão de cada um: sem isso, ela
+    #: diz o que foi feito e não diz com o quê, e quem for contestar o
+    #: método não tem o que reunir para reexecutá-lo.
+    motores: tuple[str, ...] = ()
 
     nome: str = ""
     cargo: str = field(default_factory=cargo_padrao)
@@ -255,6 +260,9 @@ def build_html(t: TermoDerivado) -> str:
         f'<p align="justify" style="font-size:11pt; line-height:160%; '
         f'margin-top:16px;">{e(ENCERRAMENTO)}</p>')
 
+    from ..impressao import rodape_html
+    partes.append(rodape_html(*t.motores))
+
     partes.append(
         '<p align="center" style="margin-top:38px; font-size:11pt;">'
         "______________________________________<br/>"
@@ -292,7 +300,8 @@ def build_texto(t: TermoDerivado) -> str:
         L.append("ALCANCE E LIMITES DA OPERAÇÃO")
         L += [f"- {x}" for x in t.ressalvas]
         L.append("")
-    L += [ENCERRAMENTO, "", "_" * 40, t.nome]
+    from ..impressao import rodape_texto
+    L += [ENCERRAMENTO, "", rodape_texto(*t.motores), "", "_" * 40, t.nome]
     if t.cargo.strip():
         L.append(t.cargo)
     if t.matricula.strip():

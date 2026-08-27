@@ -257,6 +257,38 @@ def autoteste() -> int:
                 f"peça(s) sem o cabeçalho do sistema: {sem_timbre}")
         return "todas as peças abrem com o mesmo cabeçalho"
 
+    def procedencia():
+        # E toda peça fecha declarando com o que foi produzida: versão do
+        # sistema, sistema operacional e os motores de que a operação
+        # dependeu. Não é enfeite de rodapé — o STJ deixou de presumir a
+        # idoneidade da prova digital pela fé pública, e método cuja
+        # ferramenta e cuja versão não constam não se reexecuta nem se
+        # contesta. Ferramenta nova que monte a peça à mão sairia sem a
+        # linha, e ninguém repararia até alguém precisar dela.
+        import ast
+        import pathlib
+
+        raiz = pathlib.Path(__file__).resolve().parent / "temis" / "tools"
+        sem_procedencia = []
+        for arquivo in sorted(raiz.glob("*_core.py")):
+            arvore = ast.parse(arquivo.read_text(encoding="utf-8"))
+            for no in arvore.body:
+                if not isinstance(no, ast.FunctionDef):
+                    continue
+                if no.name not in ("build_html", "relatorio_html"):
+                    continue
+                chama = any(
+                    isinstance(x, ast.Name) and x.id == "rodape_html"
+                    for x in ast.walk(no))
+                if not chama:
+                    sem_procedencia.append(f"{arquivo.name}:{no.name}")
+        if sem_procedencia:
+            raise RuntimeError(
+                f"peça(s) sem a linha de procedência: {sem_procedencia}")
+        from temis import procedencia as proc
+        return ("todas as peças declaram com o que foram produzidas — "
+                + proc.sistema())
+
     def portal():
         # A grade do portal reparte os ladrilhos em fileiras de cinco, e
         # o que cabe ali depende do tamanho do ladrilho, do tamanho da
@@ -316,6 +348,7 @@ def autoteste() -> int:
         ("leitura de planilhas", planilhas),
         ("identificação do operador", identificacao),
         ("cabeçalho das peças", timbre),
+        ("procedência das peças", procedencia),
         ("geometria do portal", portal),
     ):
         conferir(rotulo, funcao)

@@ -730,6 +730,7 @@ class VideoTool(ToolPage):
             titulo="Termo de Edição de Material Audiovisual",
             operacao=f"{operacao} audiovisual",
             ressalvas=self.RESSALVAS,
+            motores=("video",),
             itens=itens)
         TermoDerivadoDialog(termo, self).exec()
 

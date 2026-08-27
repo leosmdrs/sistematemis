@@ -964,7 +964,7 @@ def _quadro_registros(t: TermoGravacao) -> str:
 
 def build_html(t: TermoGravacao) -> str:
     """Termo em HTML, para exibir e exportar."""
-    from ..impressao import cabecalho_html
+    from ..impressao import cabecalho_html, rodape_html
     import html as _html
     e = _html.escape
 
@@ -1078,7 +1078,7 @@ def build_html(t: TermoGravacao) -> str:
         f'<span style="font-size:10pt;">{e(t.cargo)}</span>'
         + (f'<br/><span style="font-size:10pt;">Matrícula {e(t.matricula)}'
            f"</span>" if t.matricula else "")
-        + "</div></body></html>")
+        + "</div>" + rodape_html("video") + "</body></html>")
     return "\n".join(partes)
 
 

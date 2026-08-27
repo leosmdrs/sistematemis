@@ -132,6 +132,8 @@ class TermoData:
     mes: int = 1
     ano: int = 2026
     arquivos: list[FileEntry] = field(default_factory=list)
+    #: Chaves de `procedencia.MOTORES`. Ver `TermoDerivado.motores`.
+    motores: tuple[str, ...] = ()
 
 
 def build_intro(d: TermoData) -> str:
@@ -159,7 +161,7 @@ ENCERRAMENTO = "Sem mais a relatar, encerro o presente termo."
 
 def build_html(d: TermoData) -> str:
     """Termo em HTML, para exibir e exportar em PDF."""
-    from ..impressao import cabecalho_html
+    from ..impressao import cabecalho_html, rodape_html
     e = html.escape
     # A cor vai explícita em cada célula: o motor de texto do Qt não
     # propaga o `color` do <body> para dentro da tabela, e ainda trata
@@ -197,6 +199,7 @@ def build_html(d: TermoData) -> str:
   {''.join(rows)}
 </table>
 <p align="justify" style="font-size:11pt; margin-top:18px;">{ENCERRAMENTO}</p>
+{rodape_html(*d.motores)}
 <br/><br/>
 <div align="center" style="margin-top:36px;">
   ______________________________________<br/>
@@ -222,6 +225,9 @@ def build_text(d: TermoData) -> str:
             L.append(f"   Nº SEI: {f.sei}")
         L.append("")
     L.append(ENCERRAMENTO)
+    L.append("")
+    from ..impressao import rodape_texto
+    L.append(rodape_texto(*d.motores))
     L.append("")
     L.append("_" * 40)
     L.append(d.nome)

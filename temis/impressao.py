@@ -171,6 +171,35 @@ def cabecalho_html() -> str:
     )
 
 
+def rodape_html(*motores: str) -> str:
+    """A linha que diz com o que a peça foi produzida.
+
+    Fica ao pé de toda peça pelo mesmo motivo do timbre no alto: quem
+    compara dois documentos do mesmo processo precisa reconhecer a
+    procedência dos dois. E porque o Superior Tribunal de Justiça deixou
+    de presumir a idoneidade da prova digital — cabe a quem a produziu
+    demonstrar a confiabilidade do método, e método sem ferramenta e sem
+    versão declaradas não se reexecuta nem se contesta.
+
+    Recebe as chaves de `procedencia.MOTORES` da operação. Sem chave
+    alguma, ainda sai: a versão do sistema e a do sistema operacional
+    valem para qualquer peça.
+    """
+    from html import escape
+
+    from . import procedencia
+    texto = procedencia.frase(procedencia.motores(*motores))
+    return ('<p align="justify" style="font-size:9pt; line-height:145%; '
+            'margin-top:14px;"><font color="#5A6B85">'
+            + escape(texto) + "</font></p>")
+
+
+def rodape_texto(*motores: str) -> str:
+    """A mesma linha, sem marcação, para colar onde não se aceita HTML."""
+    from . import procedencia
+    return procedencia.frase(procedencia.motores(*motores))
+
+
 def preparar_escritor(caminho: str, titulo: str = "",
                       resolucao: int = 300) -> QPdfWriter:
     """QPdfWriter em A4 com as margens do sistema."""

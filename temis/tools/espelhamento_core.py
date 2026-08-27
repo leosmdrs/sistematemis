@@ -599,7 +599,7 @@ def _quadro(linhas, largura: str = "36%") -> str:
 
 def build_html(t: TermoEspelhamento) -> str:
     """Termo em HTML, para exibir e exportar."""
-    from ..impressao import cabecalho_html
+    from ..impressao import cabecalho_html, rodape_html
     import html as _html
     e = _html.escape
     primeiro = t.bons[0] if t.bons else None
@@ -702,7 +702,7 @@ def build_html(t: TermoEspelhamento) -> str:
         f'<span style="font-size:10pt;">{e(t.cargo)}</span>'
         + (f'<br/><span style="font-size:10pt;">Matrícula {e(t.matricula)}'
            f"</span>" if t.matricula else "")
-        + "</div></body></html>")
+        + "</div>" + rodape_html("espelhamento", "video") + "</body></html>")
     return "\n".join(partes)
 
 

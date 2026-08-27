@@ -514,5 +514,10 @@ def relatorio_html(s: Sessao) -> str:
         "servidor externo. Registra o uso do sistema; não registra o "
         "conteúdo do material examinado.</p>")
 
-    from ..impressao import documento_html
+    from ..impressao import documento_html, rodape_html
+    # Sem motor declarado: este relatório não processa material, apenas
+    # anota o que a sessão fez. O que ele precisa dizer é a versão do
+    # sistema que o compôs — e é justamente ela que amarra os termos
+    # emitidos na mesma sessão a este registro.
+    partes.append(rodape_html())
     return documento_html("".join(partes), "Relatório de Atividades")

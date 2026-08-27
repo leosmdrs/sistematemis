@@ -158,6 +158,40 @@ respeitado em qualquer acréscimo: **não pode existir maneira de alterar
 dado que não seja uma operação declarada.** É a ausência de edição de
 célula que permite ao termo afirmar que a relação de passos é completa.
 
+### Cadeia de custódia — duas exigências do STJ atendidas (27/08/2026)
+
+A partir de artigo sobre a jurisprudência recente do STJ em cadeia de
+custódia digital. A virada é de ônus: integridade não se presume por fé
+pública, e quem produziu a prova é que demonstra a confiabilidade do
+método — a dúvida razoável sobre inalterabilidade não milita contra o
+réu.
+
+**Procedência em toda peça.** `temis/procedencia.py` lê, na hora, a
+versão do sistema, o sistema operacional e a dos motores de que a
+operação dependeu; `impressao.rodape_html()` imprime a linha ao pé. As
+catorze peças foram ligadas, e o autoteste passou a exigir a chamada,
+como já exigia a do cabeçalho. Método cuja ferramenta e cuja versão não
+constam não se reexecuta nem se contesta.
+
+**Conferência de integridade.** O sistema gerava resumo e nunca conferia
+um. O Metadados e Hash ganhou o campo "Resumo declarado na entrega": o
+que veio no ofício, na mídia lacrada ou no termo de quem entregou. O
+termo passa a ser de "Juntada e Conferência de Integridade", com coluna
+de veredito e parágrafo declarando o alcance — que a conferência diz que
+o arquivo não mudou desde a declaração, e **não** que a declaração
+estava certa.
+
+Armadilha medida na normalização do resumo colado: varrer tudo que não
+é hexadecimal gruda no fim do resumo as letras do nome do arquivo, numa
+linha de `sha256sum` — "arquivo.pdf" contribui a, d e f. Agora se procura
+antes uma palavra que já seja o resumo inteiro. Achado por prova, não em
+uso.
+
+**Três das cinco ideias do artigo continuam abertas:** registrar o meio
+de entrega e o momento do recebimento; hora com fuso nas peças, e a
+fonte do relógio declarada; e roteiro re-executável na Tarja Preta e na
+Edição de Vídeo, no molde da Análise de Planilha.
+
 ### Nitidez da interface — o fator 0,85 saiu (27/08/2026)
 
 Relatado como três defeitos: texto embaralhando ao digitar na barra de

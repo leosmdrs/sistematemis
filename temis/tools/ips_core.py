@@ -601,7 +601,7 @@ def titulo_secao(numero: int, titulo: str) -> str:
 def build_html(caso: CasoIPS, quando: str = "",
                pasta_imagens: Path | None = None) -> str:
     """Documento final, pronto para a importação de HTML do SEI."""
-    from ..impressao import cabecalho_html
+    from ..impressao import cabecalho_html, rodape_html
     e = html.escape
     # Sem cabeçalho: no SEI o timbre, o nome do documento e o número do
     # processo são gerados pelo próprio sistema. O documento importado
@@ -648,5 +648,5 @@ def build_html(caso: CasoIPS, quando: str = "",
         f'<body style="{_ESTILO_CORPO}">\n'
         + cabecalho_html()
         + "\n".join(partes)
-        + "\n</body></html>\n"
+        + rodape_html() + "\n</body></html>\n"
     )

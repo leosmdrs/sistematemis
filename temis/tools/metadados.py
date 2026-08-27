@@ -448,6 +448,27 @@ class MetadadosTool(ToolPage):
         self._in_sei.textEdited.connect(self._anotar_sei)
         painel.body.addWidget(self._in_sei)
 
+        # O resumo que veio declarado com o arquivo — do ofício que o
+        # encaminhou, da mídia lacrada, do termo de quem o entregou. É o
+        # que transforma gerar resumo em conferir resumo: sem um par a
+        # confrontar, o hash prova apenas que o arquivo não mudou de
+        # agora em diante, e nada sobre o que se recebeu.
+        painel.body.addWidget(field_label("Resumo declarado na entrega"))
+        self._in_declarado = QLineEdit()
+        self._in_declarado.setPlaceholderText(
+            "Cole o SHA-256 que veio com o arquivo — opcional")
+        self._in_declarado.setToolTip(
+            "Maiúsculas, espaços e dois-pontos são ignorados; pode-se "
+            "colar a linha inteira de um sha256sum. Havendo resumo "
+            "declarado, o termo passa a atestar a conferência.")
+        self._in_declarado.setEnabled(False)
+        self._in_declarado.textEdited.connect(self._anotar_declarado)
+        painel.body.addWidget(self._in_declarado)
+
+        self._lbl_confere = QLabel("")
+        self._lbl_confere.setWordWrap(True)
+        painel.body.addWidget(self._lbl_confere)
+
         acoes = QHBoxLayout()
         self._btn_remover = QPushButton("  Remover")
         self._btn_remover.setIcon(draw_icon("trash", 14, PALETTE["danger"]))
@@ -566,6 +587,47 @@ class MetadadosTool(ToolPage):
         if a is not None:
             a.sei = texto.strip()
 
+    def _anotar_declarado(self, texto: str):
+        a = self._atual()
+        if a is not None:
+            a.declarado = texto.strip()
+        self._mostrar_conferencia(a)
+
+    def _mostrar_conferencia(self, a):
+        """O veredito ao lado do campo, enquanto se digita.
+
+        Aparece aqui, e não só no termo, porque errar ao colar é comum e
+        descobrir isso na peça pronta custa refazer tudo. Enquanto o que
+        foi colado não tiver a forma de um SHA-256, a tela diz isso em
+        vez de acusar divergência — resumo pela metade não diverge de
+        coisa alguma, está apenas incompleto.
+        """
+        if a is None or not a.declarado.strip():
+            self._lbl_confere.clear()
+            return
+        if not core.resumo_valido(a.declarado):
+            faltam = core.TAMANHO_SHA256 - len(
+                core.normalizar_resumo(a.declarado))
+            self._lbl_confere.setText(
+                f"<font color='{PALETTE['text3']}'>Resumo incompleto — "
+                f"{'faltam ' + str(faltam) if faltam > 0 else 'excedem ' + str(-faltam)}"
+                " caractere(s) para um SHA-256.</font>")
+            return
+        confere = a.confere
+        if confere is None:
+            self._lbl_confere.setText(
+                f"<font color='{PALETTE['text3']}'>O resumo do arquivo "
+                "ainda não foi calculado.</font>")
+        elif confere:
+            self._lbl_confere.setText(
+                f"<b><font color='{PALETTE['success']}'>CONFERE</font></b> — "
+                "o arquivo é o mesmo a que se refere o resumo declarado.")
+        else:
+            self._lbl_confere.setText(
+                f"<b><font color='{PALETTE['danger']}'>NÃO CONFERE</font></b>"
+                " — o arquivo recebido não é o mesmo a que se refere o "
+                "resumo declarado.")
+
     def _definir_modo(self, nome: str):
         self._modo = nome
         for chave, b in self._botoes_modo.items():
@@ -612,6 +674,9 @@ class MetadadosTool(ToolPage):
         a = self._atual()
         self._in_sei.setEnabled(a is not None)
         self._in_sei.setText(a.sei if a is not None else "")
+        self._in_declarado.setEnabled(a is not None)
+        self._in_declarado.setText(a.declarado if a is not None else "")
+        self._mostrar_conferencia(a)
         if a is None:
             self._boas_vindas()
             return

@@ -1658,7 +1658,7 @@ def _frase_reproducao(t: TermoPlanilha) -> str:
 
 def build_html(t: TermoPlanilha) -> str:
     """A peça em HTML, para exibir e exportar."""
-    from ..impressao import cabecalho_html
+    from ..impressao import cabecalho_html, rodape_html
 
     e = _escape
     partes = [
@@ -1712,7 +1712,7 @@ def build_html(t: TermoPlanilha) -> str:
            if t.cargo.strip() else "")
         + (f'<span style="font-size:10pt;">Matrícula {e(t.matricula)}</span>'
            if t.matricula.strip() else "")
-        + "</p></body></html>")
+        + "</p>" + rodape_html(*t.motores) + "</body></html>")
     return "".join(partes)
 
 
@@ -1771,6 +1771,7 @@ def montar_termo(analise: Analise, resultado: Tabela, passos: list,
         operacao="exame analítico",
         ressalvas=RESSALVAS + ((RESSALVA_CRUZAMENTO,) if auxiliares
                                else ()),
+        motores=("planilha",),
         itens=[item],
         passos=list(passos),
         aba=analise.aba,

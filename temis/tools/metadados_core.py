@@ -81,6 +81,44 @@ EXT_MIDIA = {".mp4", ".mov", ".avi", ".mkv", ".wmv", ".m4v", ".mp3", ".wav",
              ".m4a", ".aac", ".ogg", ".flac", ".webm"}
 
 
+def normalizar_resumo(texto: str) -> str:
+    """O resumo reduzido à forma comparável.
+
+    Resumo criptográfico não chega limpo. Vem em maiúsculas de um
+    programa, em minúsculas de outro; vem com espaços a cada quatro
+    caracteres, com dois-pontos entre os pares, colado de uma linha de
+    `sha256sum` com o nome do arquivo ao lado, ou quebrado em duas linhas
+    pelo editor de texto de quem redigiu o ofício.
+
+    Comparar sem normalizar acusaria divergência onde há apenas outra
+    grafia do mesmo número — e divergência acusada por engano, numa peça
+    de cadeia de custódia, é acusação de adulteração.
+    """
+    import re
+
+    bruto = texto or ""
+    # Primeiro: alguma palavra isolada que já seja o resumo inteiro? É o
+    # caso da linha de `sha256sum`, que traz o resumo e, ao lado, o nome
+    # do arquivo — e "arquivo.pdf" tem três letras hexadecimais dentro
+    # (a, d, f) que, varridas junto, se grudariam no fim do resumo.
+    for pedaco in bruto.split():
+        so_hex = re.sub(r"[^0-9a-fA-F]", "", pedaco)
+        if len(so_hex) == TAMANHO_SHA256:
+            return so_hex.lower()
+    # Senão, o resumo veio partido: em grupos separados por espaço, ou
+    # quebrado em duas linhas pelo editor de quem redigiu o ofício.
+    return re.sub(r"[^0-9a-fA-F]", "", re.sub(r"[\s:.\-]", "", bruto)).lower()
+
+
+#: Quantos caracteres tem um SHA-256 escrito em hexadecimal.
+TAMANHO_SHA256 = 64
+
+
+def resumo_valido(texto: str) -> bool:
+    """Se o que foi digitado tem a forma de um SHA-256."""
+    return len(normalizar_resumo(texto)) == TAMANHO_SHA256
+
+
 @dataclass
 class Arquivo:
     """Resultado da leitura de um arquivo."""
@@ -93,6 +131,12 @@ class Arquivo:
     #: Número do documento no SEI, digitado pelo encarregado. Vai para a
     #: coluna do termo de juntada, que é o que amarra o arquivo aos autos.
     sei: str = ""
+    #: Resumo criptográfico que veio declarado com o arquivo — do ofício
+    #: que o encaminhou, da mídia lacrada, do termo de quem o entregou.
+    #: É o que permite conferir, e não apenas gerar: o Superior Tribunal
+    #: de Justiça tratou a ausência de confrontação de resumo como falha
+    #: da cadeia de custódia, e resumo gerado sem par não confronta nada.
+    declarado: str = ""
     #: Resultado do exame avançado, quando pedido. Fica separado dos
     #: campos porque é de outra natureza: aquilo são dados declarados
     #: pelo arquivo, isto são achados sobre ele.
@@ -101,6 +145,19 @@ class Arquivo:
     @property
     def nome(self) -> str:
         return Path(self.caminho).name
+
+    @property
+    def confere(self):
+        """True, False, ou None quando não há resumo declarado a conferir.
+
+        None não é "não confere": é "não foi perguntado". Confundir os
+        dois faria a peça declarar divergência onde houve apenas ausência
+        de referência — que é afirmação grave e falsa.
+        """
+        if not self.declarado.strip() or not self.sha256:
+            return None
+        return normalizar_resumo(self.declarado) == normalizar_resumo(
+            self.sha256)
 
     @property
     def extensao(self) -> str:
@@ -741,6 +798,84 @@ def _bloco_arquivo(a: Arquivo, numero: int, so_relevantes: bool) -> str:
 """
 
 
+#: O que a conferência responde, e o que ela não responde. Vai impresso
+#: sempre que houver resumo declarado — uma peça que afirma "confere" sem
+#: dizer o alcance daquilo convida a que se lhe atribua mais do que ela
+#: tem, que é justamente a presunção que o Superior Tribunal de Justiça
+#: deixou de aceitar.
+ALCANCE_CONFERENCIA = (
+    "A conferência de integridade responde a uma única pergunta: se o "
+    "arquivo aqui identificado é, byte a byte, aquele a que se refere o "
+    "resumo criptográfico declarado. O resumo foi recalculado sobre os "
+    "bytes do arquivo recebido, nesta estação, e confrontado com o "
+    "declarado.",
+    "Nada se afirma, por esta conferência, sobre a procedência do arquivo "
+    "antes da entrega, sobre quem o produziu, nem sobre a autenticidade do "
+    "resumo declarado — que é dado recebido de terceiro e vale pelo que "
+    "valer a fonte que o declarou. Conferir diz que o arquivo não mudou "
+    "desde aquela declaração; não diz que a declaração estava certa.",
+)
+
+
+def _paragrafo_conferencia(arquivos: list[Arquivo]) -> str:
+    """O resultado da conferência, e o alcance dela.
+
+    Sai por extenso, e não só como coluna: quem lê a peça no processo
+    precisa encontrar a conclusão em texto corrido, sem ter de somar
+    linhas de tabela.
+    """
+    import html as _h
+
+    if not houve_conferencia(arquivos):
+        return ""
+    e = _h.escape
+    conferidos = [a for a in arquivos if a.confere is not None]
+    batem = [a for a in conferidos if a.confere]
+    divergem = [a for a in conferidos if not a.confere]
+    # Declarado sem que o resumo tenha sido calculado — arquivo que não
+    # pôde ser lido. Some da conta se não for dito, e some justamente o
+    # caso em que a conferência falhou por impedimento.
+    pendentes = [a for a in arquivos
+                 if a.declarado.strip() and a.confere is None]
+
+    partes = []
+    if len(conferidos) == 1 and not divergem and not pendentes:
+        resultado = ("O arquivo submetido a conferência <b>confere</b> com o "
+                     "resumo criptográfico declarado.")
+    else:
+        resultado = (f"Dos {len(conferidos)} arquivo(s) submetidos a "
+                     f"conferência, <b>{len(batem)} conferiram</b>")
+        resultado += (f" e <b>{len(divergem)} divergiram</b>."
+                      if divergem else ".")
+    if divergem:
+        quais = ", ".join(e(a.nome) for a in divergem)
+        resultado += (" O resumo recalculado não corresponde ao declarado "
+                      f"em: {quais}. A divergência significa que o arquivo "
+                      "recebido não é o mesmo a que se refere a declaração — "
+                      "não sendo possível, por esta peça, dizer em que "
+                      "momento nem por que ele passou a ser outro.")
+    if pendentes:
+        quais = ", ".join(e(a.nome) for a in pendentes)
+        resultado += (" Não foi possível calcular o resumo, e portanto "
+                      f"conferir, em: {quais}.")
+    partes.append(
+        f'<p align="justify" style="font-size:11pt; line-height:160%; '
+        f'margin-top:18px;">{resultado}</p>')
+    partes.append(
+        f'<p style="font-size:11pt; margin-top:14px;">'
+        f'<b><font color="{INK}">Alcance da conferência</font></b></p>')
+    partes += [
+        f'<p align="justify" style="font-size:10pt; line-height:150%;">'
+        f'<font color="{INK}">{e(x)}</font></p>'
+        for x in ALCANCE_CONFERENCIA]
+    return "".join(partes)
+
+
+def houve_conferencia(arquivos: list[Arquivo]) -> bool:
+    """Se algum arquivo trouxe resumo declarado a confrontar."""
+    return any(a.declarado.strip() for a in arquivos)
+
+
 def _quadro_juntada(arquivos: list[Arquivo]) -> str:
     """A tabela do termo de juntada: o que se está juntando aos autos."""
     import html as _html
@@ -748,6 +883,7 @@ def _quadro_juntada(arquivos: list[Arquivo]) -> str:
     e = _html.escape
     from .hash_core import format_size
 
+    confere = houve_conferencia(arquivos)
     linhas = []
     for i, a in enumerate(arquivos, 1):
         linhas.append(
@@ -758,7 +894,8 @@ def _quadro_juntada(arquivos: list[Arquivo]) -> str:
             f"{e(format_size(a.tamanho))}</font></td>"
             f'<td><font color="{INK}" face="Courier New" size="1">'
             f"{e(a.sha256)}</font></td>"
-            f'<td><font color="{INK}">{e(a.sei)}</font></td>'
+            + (_celula_conferencia(a) if confere else "")
+            + f'<td><font color="{INK}">{e(a.sei)}</font></td>'
             "</tr>")
 
     return f"""
@@ -766,14 +903,35 @@ def _quadro_juntada(arquivos: list[Arquivo]) -> str:
        style="border-collapse:collapse; font-size:9pt;">
   <tr style="background-color:#0A2442; color:#FFD633;">
     <th width="4%">Nº</th>
-    <th width="30%">Nome do Arquivo</th>
-    <th width="10%">Tamanho</th>
-    <th width="40%">Hash SHA-256</th>
-    <th width="16%">Nº SEI!</th>
+    <th width="{'22%' if confere else '30%'}">Nome do Arquivo</th>
+    <th width="9%">Tamanho</th>
+    <th width="{'33%' if confere else '40%'}">Hash SHA-256</th>
+    {'<th width="20%">Conferência</th>' if confere else ''}
+    <th width="12%">Nº SEI!</th>
   </tr>
   {''.join(linhas)}
 </table>
 """
+
+
+def _celula_conferencia(a: Arquivo) -> str:
+    """A coluna que diz se o arquivo é o mesmo do resumo declarado.
+
+    O resumo declarado vai impresso junto do veredito. Sem ele a peça
+    afirmaria "confere" sem dizer contra o quê, que é exatamente o tipo
+    de afirmação sem lastro que a conferência existe para substituir.
+    """
+    import html as _h
+
+    e = _h.escape
+    resultado = a.confere
+    if resultado is None:
+        return f'<td><font color="{CINZA}" size="1">não declarado</font></td>'
+    cor = "#1B6E3C" if resultado else DESTAQUE
+    palavra = "CONFERE" if resultado else "NÃO CONFERE"
+    return (f'<td><font color="{cor}"><b>{palavra}</b></font>'
+            f'<br/><font color="{CINZA}" face="Courier New" size="1">'
+            f"{e(normalizar_resumo(a.declarado))}</font></td>")
 
 
 #: Cores de cada peso, no quadro de achados.
@@ -866,7 +1024,7 @@ def build_html(arquivos: list[Arquivo], quando: str,
     quadros; há juntada em que a lista de metadados só atrapalha a
     leitura.
     """
-    from ..impressao import cabecalho_html
+    from ..impressao import cabecalho_html, rodape_html
     import html as _html
 
     e = _html.escape
@@ -949,8 +1107,10 @@ def build_html(arquivos: list[Arquivo], quando: str,
 {cabecalho_html()}
 <div align="center" style="margin-bottom:16px;">
   <b style="font-size:14pt; letter-spacing:0.5px;">{
-    "Termo de Juntada de Arquivo(s) Digital(is)" if not com_metadados
-    else "Termo de Juntada e Extração de Metadados"}</b>
+    ("Termo de Juntada de Arquivo(s) Digital(is)" if not com_metadados
+     else "Termo de Juntada e Extração de Metadados")
+    + (" e Conferência de Integridade"
+       if houve_conferencia(arquivos) else "")}</b>
 </div>
 <hr/>
 {blocos}
@@ -966,9 +1126,11 @@ def build_html(arquivos: list[Arquivo], quando: str,
  f'<br/>Diligência realizada em {e(quando)}, com processamento local, sem '
  "envio dos arquivos a terceiros."}
 </p>
+{_paragrafo_conferencia(arquivos)}
 <p align="justify" style="font-size:11pt; margin-top:14px;">
 Sem mais a relatar, encerro o presente termo.
 </p>
 {assinatura}
+{rodape_html("pdf", "imagem")}
 </body></html>
 """

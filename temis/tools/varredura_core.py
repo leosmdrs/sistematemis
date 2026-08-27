@@ -1373,7 +1373,7 @@ def _secoes(t: TermoVarredura) -> dict:
 
 def build_html(t: TermoVarredura) -> str:
     """Termo em HTML, para exibir e exportar."""
-    from ..impressao import cabecalho_html
+    from ..impressao import cabecalho_html, rodape_html
     import html as _html
     e = _html.escape
     p = t.panorama or {}
@@ -1498,7 +1498,7 @@ def build_html(t: TermoVarredura) -> str:
         "______________________________________<br/>"
         f"<b>{e(t.nome)}</b><br/>"
         f'<span style="font-size:10pt;">{e(t.cargo)}</span>'
-        "</div></body></html>")
+        "</div>" + rodape_html("pdf", "ocr") + "</body></html>")
     return "\n".join(partes)
 
 

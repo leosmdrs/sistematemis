@@ -1113,6 +1113,7 @@ class TarjaPretaTool(ToolPage):
             titulo="Termo de Censura em Dados e Informações Protegidas",
             operacao="tarjamento de dados e informações protegidas",
             ressalvas=self.RESSALVAS,
+            motores=("pdf", "imagem"),
             itens=[item])
         TermoDerivadoDialog(termo, self).exec()
 

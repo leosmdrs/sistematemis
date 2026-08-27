@@ -426,7 +426,7 @@ def _bloco_captura(c: Captura, numero: int, total: int) -> str:
 def build_html(sessao: Sessao, decl: Declarante | None = None,
                proc: Procedimento | None = None) -> str:
     """Termo de constatação em HTML, para exibir e exportar."""
-    from ..impressao import cabecalho_html
+    from ..impressao import cabecalho_html, rodape_html
     import html as _html
 
     e = _html.escape
@@ -516,5 +516,6 @@ registradas, nas condições aqui descritas.
 Sem mais a relatar, encerro o presente termo.
 </p>
 {assinatura}
+{rodape_html("navegador")}
 </body></html>
 """

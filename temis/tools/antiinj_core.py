@@ -397,7 +397,7 @@ class Declarante:
 def build_html(file_name: str, n_pages: int, findings: list[Finding],
                when: str, decl: Declarante | None = None) -> str:
     """Relatório de constatação em HTML, para exibir e exportar em PDF."""
-    from ..impressao import cabecalho_html
+    from ..impressao import cabecalho_html, rodape_html
     import html as _html
 
     e = _html.escape
@@ -498,6 +498,7 @@ posição e camada —, sem qualquer alteração do documento original.
 Sem mais a relatar, encerro o presente relatório.
 </p>
 {assinatura}
+{rodape_html("pdf")}
 </body></html>
 """
 
