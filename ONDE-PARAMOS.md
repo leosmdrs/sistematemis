@@ -22,37 +22,44 @@ A versão declarada em `temis/__init__.py` continua **1.7.3**. As duas
 
 ---
 
-## 2. Pendente de publicação
+## 2. A 1.7.3 está publicada. Pendente é a 1.7.4
 
-O instalador **1.7.3** está compilado em `dist/`, conferido, e **não foi
-publicado**:
+A release **v1.7.3 foi publicada em 25/08/2026** e é a mais recente. A
+versão anterior desta nota dizia que ela continuava pendente; estava
+errada, e foi corrigida em 27/08/2026 conferindo a própria release.
 
-    SistemaTemis-1.7.3-setup.exe
+    https://github.com/leosmdrs/sistematemis/releases/tag/v1.7.3
+
+A etiqueta aponta para **`840841b`** — o alvo certo, o mesmo commit que
+gerou aquele instalador, e não o topo do `main`. Os dois anexos estão lá:
+
+    SistemaTemis-1.7.3-setup.exe   271,8 MB
     SHA-256  cb548de3caf60b93a1db9445dc0231bef8b85652fd8deae6675d1c90369c1bad
+    versao.json                    declara esse mesmo resumo
 
-`dist/` não vai para o Git. **Esse arquivo só existe na máquina em que
-foi compilado.** Se o trabalho continuar em outra, ou se leva o `.exe`
-junto, ou se compila de novo — e aí não é mais o mesmo arquivo, porque
-o instalador carrega a hora da geração; o resumo criptográfico muda.
+O resumo publicado bate com o que estava anotado aqui. Não há o que
+republicar nem o que corrigir na release.
 
-Ao publicar a release v1.7.3, o alvo (*Target*) tem de ser **`840841b`**,
-e não `main`. O topo do `main` já tem duas entregas que não estão dentro
-daquele instalador; apontar a etiqueta para lá faria a release afirmar
-que aquele código gerou aquele arquivo, o que não é verdade.
+**O que segue pendente é a 1.7.4**, com as duas entregas que estão no topo
+do `main` e fora daquele instalador: som do computador na gravação de tela
+e Análise de Planilha. Ali etiqueta, código e instalador coincidem no topo
+do `main`, e por isso não há alvo a escolher. São uns quarenta minutos de
+compilação. O passo a passo está em `PUBLICACAO.md`.
 
-    https://github.com/leosmdrs/sistematemis/releases/new?tag=v1.7.3&target=840841b
-
-Anexar `SistemaTemis-1.7.3-setup.exe` e `versao.json`, os dois de `dist/`.
-
-**A alternativa mais simples** é pular a 1.7.3 e compilar uma **1.7.4**
-com tudo dentro — som do computador e Análise de Planilha. Aí etiqueta,
-código e instalador coincidem no topo do `main` e não há alvo a escolher.
-São uns quarenta minutos de compilação. O passo a passo está em
-`PUBLICACAO.md`.
+Continua valendo a advertência que motivou a nota anterior, agora para a
+1.7.4: **`dist/` não vai para o Git**, então o instalador só existe na
+máquina que o compilou. Compilar de novo não devolve o mesmo arquivo — o
+instalador carrega a hora da geração, e o resumo criptográfico muda. Ou o
+`.exe` viaja junto, ou quem compilar publica o resumo que a sua própria
+compilação produziu.
 
 ---
 
 ## 3. Montar o ambiente na outra máquina
+
+**Já feito em 27/08/2026, em `E:\SistemaTemis`**, com autoteste em 15 de
+15 — "Instalação íntegra". O que segue vale para a próxima máquina, ou
+para refazer esta.
 
 ```bash
 git clone https://github.com/leosmdrs/sistematemis.git
@@ -60,11 +67,48 @@ cd sistematemis
 pip install -r requirements.txt
 ```
 
+**Python.** O `python` solto costuma cair no atalho da Microsoft Store,
+que não executa nada — era o que havia nesta máquina, e é a mesma
+armadilha que o `Abrir Sistema Temis.bat` já contornava. Instalado o
+3.12.10:
+
+```bash
+winget install --id Python.Python.3.12 --scope user
+```
+
+O instalador põe o `py` e a pasta do interpretador no PATH do usuário, e
+com isso o `.bat` volta a funcionar com dois cliques, pelo caminho de
+reserva que ele mesmo previa.
+
 **`vendor/` não vai no Git** (são dezenas de MB de binário de terceiro).
 É preciso baixar à parte, conforme o `README.md`:
 
 * `vendor/ffmpeg/bin/` — `ffmpeg.exe` e `ffprobe.exe`
 * `vendor/scrcpy/` — scrcpy e adb
+
+O winget resolve os dois, e confere o resumo do que baixa:
+
+```bash
+winget install --id Gyan.FFmpeg
+winget install --id Genymobile.scrcpy
+```
+
+Ele extrai em `%LOCALAPPDATA%\Microsoft\WinGet\Packages\...`. De lá se
+copiam `ffmpeg.exe` e `ffprobe.exe` para `vendor/ffmpeg/bin/`, e **todos**
+os arquivos do scrcpy para `vendor/scrcpy/` — inclusive o `scrcpy-server`,
+que não tem extensão e sem o qual o espelhamento não sobe.
+
+**Copiar para `vendor/` é obrigatório, não é capricho.** O FFmpeg tem o
+PATH como último recurso em `video_core.localizar()`, mas o scrcpy não
+tem nenhum: `espelhamento_core.adb_path()` só olha `vendor/scrcpy/`.
+Instalado, no PATH e fora dali, o Espelhamento continua se declarando
+indisponível. É também de `vendor/` que o `build/temis.spec` lê na hora
+de empacotar, então o mesmo gesto serve à execução e à compilação.
+
+Uma medida a rever antes de compilar: o `README.md` diz que `ffmpeg.exe`
+e `ffprobe.exe` somam ~196 MB. Na build **9.0.1 full** somam **424 MB**, e
+isso vai inteiro para dentro do instalador. Se pesar, a build *essentials*
+do mesmo autor atende ao Compactar e ao Fatiar.
 
 Depois, a conferência que vale por todas:
 
