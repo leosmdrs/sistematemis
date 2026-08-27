@@ -37,10 +37,14 @@ from . import derivado_core as core
 class TermoDerivadoDialog(QDialog):
     """A peça pronta para os autos, editável antes de salvar."""
 
-    def __init__(self, termo: core.TermoDerivado, parent=None):
+    def __init__(self, termo: core.TermoDerivado, parent=None, modulo=None):
         super().__init__(parent)
         self.setWindowTitle(termo.titulo)
         self._termo = termo
+        # Quem monta o texto da peca. A Analise de Planilha traz o seu
+        # proprio, porque precisa do roteiro no meio; o formulario, a
+        # previa e as saidas continuam sendo estes.
+        self._core = modulo or core
         fit_to_screen(self, 940, 800)
 
         layout = QVBoxLayout(self)
@@ -180,7 +184,7 @@ class TermoDerivadoDialog(QDialog):
         return t
 
     def _remontar(self):
-        self._vista.setHtml(core.build_html(self._atualizado()))
+        self._vista.setHtml(self._core.build_html(self._atualizado()))
 
     def _sugerir(self, extensao: str) -> str:
         base = "termo"
@@ -223,7 +227,7 @@ class TermoDerivadoDialog(QDialog):
 
     def _copiar(self):
         QGuiApplication.clipboard().setText(
-            core.build_texto(self._atualizado()))
+            self._core.build_texto(self._atualizado()))
         self._anunciar("Texto copiado")
 
     def _anunciar(self, texto: str):

@@ -37,7 +37,7 @@ META = ToolMeta(
     key="atividades",
     name="Relatório de Atividades",
     icon="tool_atividades",
-    tagline="Registra sozinho o que se fez em cada sessão",
+    tagline="Registra sozinho o que se fez na sessão",
     description=(
         "Documenta cada execução do sistema, do abrir ao fechar: as "
         "ferramentas usadas e por quanto tempo, o que cada uma relatou ao "

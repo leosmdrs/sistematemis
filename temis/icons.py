@@ -322,6 +322,21 @@ def draw_icon(kind: str, size: int = 16, color: str = None, width: float = 1.8) 
                    QPointF(s - m * 0.9, s - m * 0.9 - s * 0.1))
         p.drawLine(QPointF(s - m * 0.9, s - m * 0.9),
                    QPointF(s - m * 0.9 + s * 0.08, s - m * 0.9))
+    elif kind == "tool_planilha":
+        # grade com a faixa de cabecalho cheia: e planilha, e a divisao
+        # interna sugere as colunas que a analise separa
+        r = QRectF(m, m + s * 0.04, s - 2 * m, s - 2 * m - s * 0.08)
+        p.drawRoundedRect(r, s * 0.07, s * 0.07)
+        topo = r.top() + r.height() * 0.30
+        p.drawLine(QPointF(r.left(), topo), QPointF(r.right(), topo))
+        p.drawLine(QPointF(r.left(), r.top() + r.height() * 0.65),
+                   QPointF(r.right(), r.top() + r.height() * 0.65))
+        p.drawLine(QPointF(r.left() + r.width() * 0.40, topo),
+                   QPointF(r.left() + r.width() * 0.40, r.bottom()))
+        p.setBrush(QBrush(QColor(color)))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.drawRect(QRectF(r.left() + s * 0.03, r.top() + s * 0.03,
+                          r.width() - s * 0.06, topo - r.top() - s * 0.05))
     elif kind == "tool_quadro":
         # alfinetes ligados por barbante — o mural de investigação
         a = (s * 0.24, s * 0.26)

@@ -22,3 +22,11 @@ winrt-Windows.Foundation.Collections>=3.2
 # de áudio do Windows por ctypes — sem compilar nada e sem pedir
 # instalação na estação.
 soundcard>=0.4.4
+
+# Análise de Planilha. O leitor em Rust abre cem mil linhas em 15 s,
+# contra 133 s do leitor comum em Python — e ocupa 1,6 MB. O openpyxl
+# entra só para gravar o resultado. Nada de pandas: somaria uns 35 MB e
+# converteria tipo por conta própria, que é justamente o estrago que
+# esta ferramenta existe para evitar.
+python-calamine>=0.8
+openpyxl>=3.1

@@ -61,7 +61,7 @@ CHAVE_CENTRAL = "ips"
 #:
 #: O do centro é maior porque é o procedimento, e os demais o instruem —
 #: a diferença de tamanho diz isso sem precisar de legenda.
-LADRILHO = (156, 147)
+LADRILHO = (148, 147)
 LADRILHO_CENTRO = (200, 166)
 
 #: Proporções internas, acompanhando o tamanho de cada ladrilho.

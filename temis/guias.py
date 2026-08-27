@@ -673,6 +673,70 @@ GUIAS: dict[str, Guia] = {
         ),
     ),
 
+    "planilha": Guia(
+        finalidade=(
+            "Examina planilha de auditoria sem quebrar a cadeia de "
+            "custódia. Abrir o arquivo no Excel e ir filtrando resolve o "
+            "problema prático e destrói o jurídico: ao fim existe um "
+            "resultado, e não existe como demonstrar de onde ele veio. "
+            "Filtro aplicado é filtro perdido, e quem lê o relatório "
+            "precisa acreditar em quem o escreveu.\n\n"
+            "Aqui cada operação é declarada, e a análise inteira vira um "
+            "roteiro que pode ser re-executado por terceiro sobre o "
+            "arquivo original, chegando ao mesmo resultado. A peça deixa "
+            "de afirmar e passa a ser conferível — que é uma garantia de "
+            "outra natureza."),
+        quando=(
+            "Chegou planilha de auditoria e é preciso refinar os dados "
+            "até o que interessa à apuração.",
+            "O resultado da análise vai instruir procedimento, e será "
+            "preciso demonstrar como se chegou a ele.",
+            "A mesma análise terá de ser repetida no mês seguinte, sobre "
+            "outra remessa dos mesmos dados.",
+        ),
+        passos=(
+            "Clique em <b>Abrir planilha</b>. Aceita xlsx, xls, xlsb, ods "
+            "e csv. O resumo criptográfico do arquivo é tomado neste "
+            "momento — é daí que a cadeia passa a correr.",
+            "Se a tabela não começa na primeira linha, ajuste a "
+            "<b>Linha do cabeçalho</b>. Havendo mais de uma aba, escolha "
+            "a que interessa.",
+            "Em <b>Acrescentar</b>, monte cada operação: filtrar linhas, "
+            "ordenar, escolher colunas ou remover duplicidades. Cada "
+            "passo mostra quantas linhas entraram e quantas saíram.",
+            "Use <b>↑</b> e <b>↓</b> para mudar a ordem. A ordem importa: "
+            "filtrar antes ou depois de remover duplicidades dá "
+            "resultados diferentes.",
+            "Clique em <b>Salvar resultado</b> e escolha onde gravar.",
+            "Clique em <b>Gerar termo de análise</b>. Antes de montar a "
+            "peça, a ferramenta refaz a análise a partir do arquivo "
+            "original e confere se chega ao mesmo resultado.",
+            "Salve também o roteiro, em <b>Salvar roteiro</b>, e junte-o "
+            "aos autos: é ele que permite a terceiro refazer a análise "
+            "sem depender desta máquina.",
+        ),
+        limites=(
+            "A ferramenta não permite editar célula, e é essa ausência "
+            "que sustenta a peça: como não há outro caminho para alterar "
+            "dado, a relação de passos é necessariamente completa.",
+            "A conferência de reprodutibilidade é feita sobre o resumo do "
+            "conteúdo — colunas e células —, e não sobre os bytes do "
+            "arquivo gerado. O formato de planilha guarda a hora da "
+            "gravação dentro de si, de modo que o mesmo conteúdo gravado "
+            "duas vezes produz arquivos de resumos diferentes.",
+            "Filtro de texto não distingue maiúsculas nem acentos, salvo "
+            "se marcada a opção. A escolha vai declarada no termo, porque "
+            "muda o resultado.",
+            "Planilha gerada por sistema, que nunca passou pelo Excel, "
+            "pode guardar a fórmula sem guardar o resultado dela. A "
+            "ferramenta avisa quando é o caso — filtrar por essas colunas "
+            "levaria a conclusão errada.",
+            "A peça responde pelo arquivo a partir do momento em que ele "
+            "foi aberto aqui. Nada afirma sobre a origem dele antes "
+            "disso.",
+        ),
+    ),
+
     # ── o registro do próprio trabalho ────
     "atividades": Guia(
         finalidade=(

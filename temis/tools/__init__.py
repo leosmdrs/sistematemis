@@ -18,6 +18,7 @@ from .espelhamento import EspelhamentoTool
 from .extracao import ExtracaoTool
 from .gravacao import GravacaoTool
 from .ocrpdf import OCRPDFTool
+from .planilha import PlanilhaTool
 from .quadro import QuadroTool
 from .tarja_preta import TarjaPretaTool
 from .transcricao import TranscricaoTool
@@ -51,6 +52,7 @@ REGISTRY: list[tuple[ToolMeta, type | None]] = [
     # preparo e apoio
     (TarjaPretaTool.meta,    TarjaPretaTool),
     (AntiInjectionTool.meta, AntiInjectionTool),
+    (PlanilhaTool.meta,      PlanilhaTool),
     (QuadroTool.meta,        QuadroTool),
     (VideoTool.meta,         VideoTool),
     # o registro do próprio trabalho, que corre sozinho

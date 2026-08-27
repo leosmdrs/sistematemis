@@ -36,6 +36,10 @@ WINRT = [
 #: PyInstaller recolhe código, não dados: sem esta linha a biblioteca vai
 #: para o pacote e falha ao abrir a placa, na estação de quem instalou.
 SOM = collect_submodules("soundcard") + collect_submodules("cffi")
+# A Análise de Planilha só toca nestas duas dentro das funções
+# que leem e gravam arquivo; o empacotador não as enxerga.
+PLANILHA = (collect_submodules("python_calamine")
+            + collect_submodules("openpyxl"))
 
 WINRT += collect_submodules("winrt")
 
@@ -102,7 +106,7 @@ a = Analysis(
     pathex=[ROOT],
     binaries=WINRT_BINARIOS,
     datas=FFMPEG + SCRCPY + DADOS_DE_PACOTE,
-    hiddenimports=WINRT + SOM,
+    hiddenimports=WINRT + SOM + PLANILHA,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

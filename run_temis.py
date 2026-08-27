@@ -144,6 +144,31 @@ def autoteste() -> int:
                 f"esta estação não grava o som do computador: {detalhe}")
         return f"captura de retorno em “{detalhe}”"
 
+    def planilhas():
+        # A Análise de Planilha depende de duas bibliotecas que o
+        # empacotador não descobre sozinho, porque só entram em cena
+        # quando a ferramenta abre ou grava um arquivo. Faltando uma
+        # delas, o programa abre normalmente e a falha só apareceria na
+        # hora de ler a planilha — no meio do trabalho.
+        import pathlib
+        from tempfile import TemporaryDirectory
+
+        from temis.tools import planilha_core as pc
+
+        with TemporaryDirectory() as pasta:
+            arquivo = pathlib.Path(pasta) / "conferencia.xlsx"
+            antes = pc.Tabela(colunas=["a", "b"],
+                              linhas=[("01", 2.0), ("03", 4.0)])
+            pc.gravar(antes, arquivo)
+            depois = pc.carregar(arquivo)
+        if depois.resumo() != antes.resumo():
+            raise RuntimeError("a planilha gravada não releu igual")
+        # O zero à esquerda é o estrago clássico: se a leitura o perdeu,
+        # todo CPF e toda placa da análise saem errados.
+        if depois.linhas[0][0] != "01":
+            raise RuntimeError("o zero à esquerda se perdeu na leitura")
+        return "leitura e gravação conferem, com o zero à esquerda intacto"
+
     def identificacao():
         # O perfil chega às ferramentas por convenção de nome: os campos
         # se chamam `_in_nome`/`_e_nome` e afins, e cada diálogo de termo
@@ -287,6 +312,7 @@ def autoteste() -> int:
         ("espelhamento de celular", espelhamento),
         ("registro de ferramentas", ferramentas),
         ("som do computador", som_do_sistema),
+        ("leitura de planilhas", planilhas),
         ("identificação do operador", identificacao),
         ("cabeçalho das peças", timbre),
         ("geometria do portal", portal),

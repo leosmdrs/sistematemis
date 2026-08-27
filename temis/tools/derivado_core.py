@@ -215,6 +215,13 @@ def _quadro(d: Derivacao, numero: int) -> str:
     )
 
 
+#: Nome público do quadro de arquivos. A Análise de Planilha monta uma
+#: peça própria — com o roteiro no meio —, mas o quadro que identifica
+#: original e resultado é o mesmo, e duplicá-lo faria as duas peças
+#: divergirem com o tempo.
+quadro_de_arquivos = _quadro
+
+
 def build_html(t: TermoDerivado) -> str:
     """A peça em HTML, para exibir e exportar."""
     from ..impressao import cabecalho_html
