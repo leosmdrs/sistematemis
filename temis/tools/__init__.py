@@ -32,30 +32,28 @@ from .video import VideoTool
 
 #: (meta, classe da ferramenta ou None se ainda não implementada)
 #:
-#: A ordem é a da pirâmide do portal, lida de cima para baixo. No
-#: vértice, a peça que instrui o procedimento; na fileira seguinte, o
-#: que identifica e captura a prova onde ela está; depois, o que extrai
-#: conteúdo do material apreendido; na base, o preparo e o apoio.
+#: **Esta lista é a ordem do portal**, lida da esquerda para a direita e
+#: de cima para baixo, em fileiras de cinco. Mudar a ordem aqui muda a
+#: tela — não há segunda lista a acertar junto, e `provas/prova_readme.py`
+#: obriga a tabela do README a acompanhar.
 REGISTRY: list[tuple[ToolMeta, type | None]] = [
-    # vértice — o procedimento
+    # primeira fileira — a peça, e o preparo do documento que a instrui
     (IPSTool.meta,           IPSTool),
-    # identificação e captura da prova
+    (TarjaPretaTool.meta,    TarjaPretaTool),
+    (AntiInjectionTool.meta, AntiInjectionTool),
     (MetadadosTool.meta,     MetadadosTool),
-    (ConstatacaoTool.meta,   ConstatacaoTool),
-    # extração de conteúdo do material apreendido
-    (VarreduraTool.meta,     VarreduraTool),
     (OCRPDFTool.meta,        OCRPDFTool),
-    (TranscricaoTool.meta,   TranscricaoTool),
+    # segunda fileira — o registro da prova onde ela está
+    (ConstatacaoTool.meta,   ConstatacaoTool),
     (ExtracaoTool.meta,      ExtracaoTool),
     (GravacaoTool.meta,      GravacaoTool),
     (EspelhamentoTool.meta,  EspelhamentoTool),
-    # preparo e apoio
-    (TarjaPretaTool.meta,    TarjaPretaTool),
-    (AntiInjectionTool.meta, AntiInjectionTool),
-    (PlanilhaTool.meta,      PlanilhaTool),
+    (VarreduraTool.meta,     VarreduraTool),
+    # terceira fileira — o exame do material e o registro do trabalho
     (QuadroTool.meta,        QuadroTool),
     (VideoTool.meta,         VideoTool),
-    # o registro do próprio trabalho, que corre sozinho
+    (TranscricaoTool.meta,   TranscricaoTool),
+    (PlanilhaTool.meta,      PlanilhaTool),
     (AtividadesTool.meta,    AtividadesTool),
 ]
 

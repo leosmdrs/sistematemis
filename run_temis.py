@@ -258,24 +258,24 @@ def autoteste() -> int:
         return "todas as peças abrem com o mesmo cabeçalho"
 
     def portal():
-        # A constelação do portal reparte os ladrilhos numa elipse, e o
-        # que cabe ali depende do tamanho do ladrilho, do tamanho da
+        # A grade do portal reparte os ladrilhos em fileiras de cinco, e
+        # o que cabe ali depende do tamanho do ladrilho, do tamanho da
         # letra e de quantas ferramentas existem. Acrescentar uma
-        # ferramenta pode fazer dois ladrilhos se sobreporem sem que
-        # nada mais quebre — e ninguém repara olhando o código. Aqui se
-        # mede: monta-se o portal na área que o notebook de catorze
-        # polegadas entrega e conferem-se os retângulos.
+        # ferramenta pode fazer o nome quebrar em mais uma linha e
+        # transbordar do ladrilho sem que nada mais quebre — e ninguém
+        # repara olhando o código. Aqui se mede: monta-se o portal na
+        # menor área prevista e conferem-se os retângulos.
         import os as _os
         _os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         from PyQt6.QtWidgets import QApplication, QLabel
 
         from temis import theme
-        from temis.shell import ConstelacaoPortal
+        from temis.shell import GradePortal
 
         app = QApplication.instance() or QApplication([])
         app.setStyleSheet(theme.stylesheet())
-        c = ConstelacaoPortal()
-        c.resize(*ConstelacaoPortal.MINIMO)
+        c = GradePortal()
+        c.resize(*GradePortal.MINIMO)
         c.show()
         app.processEvents()
         c._reposicionar()
@@ -287,7 +287,7 @@ def autoteste() -> int:
         # rótulo que quebra — quem responde é `heightForWidth`.
         cortados = [
             t._meta.name
-            for t in [c._centro] + c._orbita
+            for t in c._ladrilhos
             for lb in t.findChildren(QLabel)
             if lb.wordWrap() and lb.heightForWidth(lb.width()) > lb.height()
         ]
@@ -297,8 +297,9 @@ def autoteste() -> int:
                 f"{len(colisoes)} sobreposição(ões), {len(fora)} ladrilho(s) "
                 f"fora da área e {len(cortados)} rótulo(s) cortado(s) na "
                 f"menor tela prevista")
-        return (f"{len(c._orbita) + 1} ladrilhos, sem sobreposição nem texto "
-                f"cortado em {c.MINIMO[0]}×{c.MINIMO[1]}")
+        return (f"{len(c._ladrilhos)} ladrilhos em {c._FILEIRAS} fileira(s) de "
+                f"{c.COLUNAS}, sem sobreposição nem texto cortado em "
+                f"{c.MINIMO[0]}×{c.MINIMO[1]}")
 
     for rotulo, funcao in (
         ("interface", qt),

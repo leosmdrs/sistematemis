@@ -11,10 +11,9 @@ A janela não conhece nenhuma ferramenta em particular: monta tudo a
 partir de `tools.REGISTRY` e apenas encaminha os sinais de status.
 """
 
-import math
 
 from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import (QColor, QKeySequence, QPainter, QPen,
+from PyQt6.QtGui import (QColor, QKeySequence,
                          QShortcut)
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFrame, QLabel, QVBoxLayout,
@@ -34,12 +33,9 @@ from .widgets import field_label, fit_to_screen, hsep
 #  LADRILHO DE FERRAMENTA
 # ─────────────────────────────────────────
 
-#: A ferramenta que ocupa o centro da constelação; as demais orbitam.
-CHAVE_CENTRAL = "ips"
-
 #: Tamanho dos ladrilhos, em pixels de widget.
 #:
-#: A constelação inteira precisa caber sem barra de rolagem num notebook
+#: A grade inteira precisa caber sem barra de rolagem num notebook
 #: de catorze polegadas — que, medido, entrega 1310×520 ao portal, seja a
 #: 1366×768, seja a 1920×1080 com escala de 150% do Windows.
 #:
@@ -59,49 +55,40 @@ CHAVE_CENTRAL = "ips"
 #: tocam na janela solta. Entre um e outro, 156 sobra folga de nove
 #: pixels no pior caso e treze nos demais.
 #:
-#: O do centro é maior porque é o procedimento, e os demais o instruem —
-#: a diferença de tamanho diz isso sem precisar de legenda.
+#: Todos da mesma medida: na grade, quem diz a hierarquia é a ordem das
+#: fileiras, e um ladrilho fora de medida quebraria o alinhamento.
 LADRILHO = (148, 147)
-LADRILHO_CENTRO = (200, 166)
 
 #: Proporções internas, acompanhando o tamanho de cada ladrilho.
 #: Encolher a moldura sem encolher o conteúdo apertaria o texto contra a
 #: borda.
 ICONE_LADRILHO = 29
-ICONE_CENTRO = 40
 
 
 
 class ToolTile(QFrame):
     """Ladrilho clicável do portal: ícone, nome e a frase que resume.
 
-    Vem em duas medidas. A do centro, maior e dourada, é o procedimento;
-    as demais, os instrumentos que o instruem.
+    Todos do mesmo tamanho. Houve uma medida maior e dourada, para a
+    ferramenta que ficava no centro da constelação; com a grade, a
+    hierarquia passou a ser dita pela ordem das fileiras, e um ladrilho
+    fora de medida quebraria o alinhamento em vez de destacar.
     """
 
     clicked = pyqtSignal(str)   # emite meta.key
 
-    def __init__(self, meta: ToolMeta, parent=None, centro: bool = False):
+    def __init__(self, meta: ToolMeta, parent=None):
         super().__init__(parent)
         self._meta = meta
-        self._centro = centro
-        if not meta.available:
-            estilo = "tile_soon"
-        else:
-            estilo = "tile_centro" if centro else "tile"
-        self.setObjectName(estilo)
-        self.setFixedSize(*(LADRILHO_CENTRO if centro else LADRILHO))
+        self.setObjectName("tile" if meta.available else "tile_soon")
+        self.setFixedSize(*LADRILHO)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setToolTip(
             f"{meta.name} — {meta.tagline}"
             + ("" if meta.available else "   (em desenvolvimento)")
         )
 
-        # No centro a moldura é dourada, então o traço do ícone tem de ser
-        # escuro para aparecer. Nos demais é o contrário.
-        accent = (PALETTE["surface"] if centro and meta.available
-                  else PALETTE["gold"] if meta.available
-                  else PALETTE["text3"])
+        accent = (PALETTE["gold"] if meta.available else PALETTE["text3"])
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 10, 12, 8)
@@ -111,7 +98,7 @@ class ToolTile(QFrame):
         # topo e sobrava todo o vão embaixo do quadrado.
         layout.addStretch()
 
-        corpo_icone = ICONE_CENTRO if centro else ICONE_LADRILHO
+        corpo_icone = ICONE_LADRILHO
         icon = QLabel()
         icon.setPixmap(draw_icon(meta.icon, corpo_icone, accent, width=2.0)
                        .pixmap(corpo_icone, corpo_icone))
@@ -123,13 +110,10 @@ class ToolTile(QFrame):
         name = QLabel(meta.name)
         name.setAlignment(Qt.AlignmentFlag.AlignCenter)
         name.setWordWrap(True)
-        cor_nome = (PALETTE["surface"] if centro and meta.available
-                    else PALETTE["text"] if meta.available
+        cor_nome = (PALETTE["text"] if meta.available
                     else PALETTE["text2"])
         name.setStyleSheet(
-            f"font-size: {15 if centro else 12}px; font-weight: 700; "
-            f"color: {cor_nome};"
-        )
+            f"font-size: 12px; font-weight: 700; color: {cor_nome};")
         layout.addWidget(name)
 
         layout.addSpacing(5)
@@ -137,11 +121,9 @@ class ToolTile(QFrame):
         tagline = QLabel(meta.tagline)
         tagline.setAlignment(Qt.AlignmentFlag.AlignCenter)
         tagline.setWordWrap(True)
-        cor_frase = (PALETTE["surface2"] if centro and meta.available
-                     else PALETTE["text3"])
         tagline.setStyleSheet(
-            f"font-size: {11 if centro else 10}px; color: {cor_frase}; "
-            f"line-height: 130%;")
+            f"font-size: 10px; color: {PALETTE['text3']}; "
+            "line-height: 130%;")
         # A frase toma as linhas de que precisar. Havia aqui uma altura
         # fixa de duas linhas, para que os ícones ficassem alinhados ao
         # longo da fileira — e ela cortava a última linha de onze das
@@ -206,187 +188,78 @@ def enumerar(nomes: list[str]) -> str:
 #  CONSTELAÇÃO DO PORTAL
 # ─────────────────────────────────────────
 
-class ConstelacaoPortal(QWidget):
-    """O procedimento ao centro; os instrumentos em volta, ligados a ele.
+class GradePortal(QWidget):
+    """As ferramentas em fileiras de cinco, na ordem do registro.
 
-    A disposição não é enfeite. As ferramentas existem em função da peça
-    que instruem, e uma grade de fileiras iguais diz o contrário — diz
-    que são treze coisas equivalentes. Aqui o Encarregado de IPS fica no
-    meio, em cor própria e maior, e cada instrumento é ligado a ele por
-    uma linha.
+    Substituiu uma constelação: o Encarregado de IPS ao centro, maior e
+    dourado, e os demais em órbita numa elipse, ligados a ele por linhas.
+    A disposição afirmava que os instrumentos existem em função da peça
+    que instruem, o que é verdade — mas cobrava caro por dizê-lo.
+    Catorze ladrilhos sobre uma elipse só fechavam a volta sem
+    sobreposição a partir de 1224×500, e cada ferramenta nova apertava a
+    volta outra vez: a repartição por arco igual precisou de um
+    afrouxamento iterativo para as quinas pararem de se tocar.
 
-    As posições são recalculadas a cada redimensionamento, e não fixadas:
-    a elipse se ajusta ao espaço, de modo que o conjunto caiba tanto num
-    monitor grande quanto no notebook de catorze polegadas — que é onde
-    ele aperta.
+    A grade não precisa de nada disso. Cabe em menos tela, a décima sexta
+    ferramenta entra sem redesenhar coisa alguma, e a hierarquia que a
+    elipse desenhava passa a ser dita pela ordem — o procedimento abre a
+    primeira fileira.
     """
 
     tool_requested = pyqtSignal(str)
 
-    #: Distância mínima que se exige entre dois ladrilhos vizinhos, em
-    #: cada eixo. Não é folga estética: abaixo disto as molduras se tocam
-    #: e o conjunto vira amontoado.
+    #: Ladrilhos por fileira.
+    COLUNAS = 5
+
+    #: Distância entre dois ladrilhos vizinhos, em cada eixo. Não é folga
+    #: estética: abaixo disto as molduras se tocam.
     FOLGA = 12
 
-    #: Espaço a deixar entre a borda do widget e o ladrilho mais externo.
+    #: Espaço entre a borda do widget e o ladrilho mais externo.
     MARGEM = 8
 
-    #: Menor área em que a volta ainda se fecha com folga de verdade.
-    #:
-    #: Com catorze ferramentas — treze em volta —, a volta ainda se
-    #: fecha em 1224×500, com quatro pixels entre os dois ladrilhos mais
-    #: próximos; em 1224×510 sobram nove.
-    #:
-    #: O piso é o segundo, e não o primeiro, porque ele tem de caber no
-    #: que a tela realmente entrega. O notebook de catorze polegadas
-    #: maximizado dá ao portal 1300×506 — medido —, e um piso de 520 de
-    #: altura, que parecia folgado, punha barra de rolagem justamente
-    #: nessa tela. Piso alto demais é tão defeito quanto piso baixo
-    #: demais: um sobrepõe ladrilho, o outro faz rolar.
-    #:
-    #: Declarar o mínimo faz com que, numa janela menor que isso, o
-    #: portal role — feio, mas honesto — em vez de sobrepor os ladrilhos,
-    #: que seria defeito calado. O notebook de catorze polegadas entrega
-    #: 1310×520 ao portal, logo acima deste piso.
-    MINIMO = (1224, 500)
+    _FILEIRAS = -(-len(REGISTRY) // COLUNAS)
+
+    #: Menor área em que as fileiras cabem inteiras. Calculado, e não
+    #: escrito: com a elipse este número era medido a cada ferramenta
+    #: nova, e envelhecia calado entre uma medição e outra.
+    MINIMO = (COLUNAS * LADRILHO[0] + (COLUNAS - 1) * FOLGA + 2 * MARGEM,
+              _FILEIRAS * LADRILHO[1] + (_FILEIRAS - 1) * FOLGA + 2 * MARGEM)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._centro: ToolTile | None = None
-        self._orbita: list[ToolTile] = []
-
+        self._ladrilhos: list[ToolTile] = []
         for meta, _cls in REGISTRY:
-            tile = ToolTile(meta, self, centro=(meta.key == CHAVE_CENTRAL))
+            tile = ToolTile(meta, self)
             tile.clicked.connect(self.tool_requested)
-            if meta.key == CHAVE_CENTRAL and self._centro is None:
-                self._centro = tile
-            else:
-                self._orbita.append(tile)
-
-        # Sem um central declarado, o primeiro do registro assume o posto:
-        # melhor um centro arbitrário do que um buraco no meio da tela.
-        if self._centro is None and self._orbita:
-            self._centro = self._orbita.pop(0)
-
+            self._ladrilhos.append(tile)
         self.setMinimumSize(*self.MINIMO)
 
     # ── geometria ────────────────────────────────
-    def _elipse(self) -> tuple[int, int, float, float]:
-        """Centro e semieixos da órbita, ajustados ao espaço disponível."""
+    def _reposicionar(self):
+        """Assenta a grade no meio do espaço disponível."""
+        if not self._ladrilhos:
+            return
         largura, altura = LADRILHO
-        cx, cy = self.width() / 2, self.height() / 2
-        # O ladrilho é posicionado pelo próprio centro sobre a curva, de
-        # modo que a elipse tem de recuar meio ladrilho da borda.
-        rx = max(largura, cx - largura / 2 - self.MARGEM)
-        ry = max(altura, cy - altura / 2 - self.MARGEM)
-        return int(cx), int(cy), rx, ry
+        colunas = self.COLUNAS
+        quantos = len(self._ladrilhos)
+        fileiras = -(-quantos // colunas)
 
-    #: Passos em que a elipse é percorrida para medir o arco. Não há
-    #: fórmula fechada para o perímetro de uma elipse; somar os passos é
-    #: exato o bastante para posicionar pixels.
-    PASSOS = 1024
+        passo_x = largura + self.FOLGA
+        passo_y = altura + self.FOLGA
+        bloco_l = colunas * largura + (colunas - 1) * self.FOLGA
+        bloco_a = fileiras * altura + (fileiras - 1) * self.FOLGA
+        x0 = max(self.MARGEM, (self.width() - bloco_l) // 2)
+        y0 = max(self.MARGEM, (self.height() - bloco_a) // 2)
 
-    def _arco(self, rx: float, ry: float) -> list[float]:
-        """Comprimento de arco acumulado, passo a passo, a partir de 0°."""
-        acumulado = [0.0]
-        anterior = (rx, 0.0)
-        for i in range(1, self.PASSOS + 1):
-            t = 2 * math.pi * i / self.PASSOS
-            ponto = (rx * math.cos(t), ry * math.sin(t))
-            acumulado.append(acumulado[-1]
-                             + math.hypot(ponto[0] - anterior[0],
-                                          ponto[1] - anterior[1]))
-            anterior = ponto
-        return acumulado
-
-    def _angulo(self, arco: float, acumulado: list[float]) -> float:
-        """O ângulo em que a curva já percorreu esse comprimento de arco.
-
-        Meia volta de recuo no fim: o primeiro satélite fica no alto, e a
-        roda segue o sentido horário — que é como se lê uma lista
-        disposta em círculo.
-        """
-        arco %= acumulado[-1]
-        baixo, alto = 0, self.PASSOS
-        while baixo < alto:
-            meio = (baixo + alto) // 2
-            if acumulado[meio] < arco:
-                baixo = meio + 1
-            else:
-                alto = meio
-        return 2 * math.pi * baixo / self.PASSOS - math.pi / 2
-
-    def _pontos(self) -> list[QPoint]:
-        """Onde fica o centro de cada satélite.
-
-        A repartição parte de arco igual, e não de ângulo igual: numa
-        elipse achatada o ângulo constante amontoa os ladrilhos nas
-        pontas do eixo maior e os rareia em cima e embaixo.
-
-        Mas arco igual, sozinho, também não basta — e isso foi medido,
-        não suposto. Dois ladrilhos lado a lado no alto da elipse se
-        separam com o arco que vale a largura de um deles; dois na quina,
-        onde a curva corre na diagonal, precisam de quase metade a mais
-        do mesmo arco para se descolarem. Repartido por igual, o portal
-        sobrava em cima e faltava nas quinas, e quatro pares se tocavam
-        na tela de catorze polegadas.
-
-        Daí o afrouxamento: enquanto houver par sobreposto, empurra-se
-        cada um ao longo da própria curva, na medida da invasão. O que a
-        quina toma vem da folga de cima, e nenhum ladrilho sai da elipse
-        — de modo que a ligação com o centro continua radial e o desenho,
-        redondo.
-        """
-        cx, cy, rx, ry = self._elipse()
-        largura, altura = LADRILHO
-        quantos = len(self._orbita)
-        if quantos == 0:
-            return []
-
-        acumulado = self._arco(rx, ry)
-        volta = acumulado[-1]
-        posicao = [volta * k / quantos for k in range(quantos)]
-
-        def coordenadas():
-            saida = []
-            for u in posicao:
-                t = self._angulo(u, acumulado)
-                saida.append((cx + rx * math.cos(t), cy + ry * math.sin(t)))
-            return saida
-
-        exigido_x = largura + self.FOLGA
-        exigido_y = altura + self.FOLGA
-        for _ in range(200):
-            pontos = coordenadas()
-            empurrao = [0.0] * quantos
-            sossegou = True
-            for i in range(quantos):
-                j = (i + 1) % quantos
-                if j == i:
-                    break
-                ax, ay = pontos[i]
-                bx, by = pontos[j]
-                invasao = min(exigido_x - abs(ax - bx),
-                              exigido_y - abs(ay - by))
-                if invasao <= 0:
-                    continue
-                sossegou = False
-                # Um terço da invasão de cada lado por volta: mais que
-                # isso faz o anel oscilar sem assentar.
-                empurrao[i] -= invasao / 3
-                empurrao[j] += invasao / 3
-            if sossegou:
-                break
-            # Nenhum passo maior que um quarto do vão até o vizinho: sem
-            # esse limite dois ladrilhos trocam de lugar e o portal muda
-            # de ordem a cada redimensionamento.
-            for i in range(quantos):
-                anterior = (posicao[i] - posicao[i - 1]) % volta
-                seguinte = (posicao[(i + 1) % quantos] - posicao[i]) % volta
-                limite = min(anterior, seguinte) / 4
-                posicao[i] += max(-limite, min(limite, empurrao[i]))
-
-        return [QPoint(int(x), int(y)) for x, y in coordenadas()]
+        for i, tile in enumerate(self._ladrilhos):
+            fileira, coluna = divmod(i, colunas)
+            # Fileira incompleta fica centrada sob as demais. Encostada à
+            # esquerda, o portal parece truncado — e uma ferramenta nova
+            # não deve exigir que alguém repare nisso depois.
+            nesta = min(colunas, quantos - fileira * colunas)
+            recuo = (colunas - nesta) * passo_x // 2
+            tile.move(x0 + recuo + coluna * passo_x, y0 + fileira * passo_y)
 
     def resizeEvent(self, ev):
         super().resizeEvent(ev)
@@ -394,46 +267,11 @@ class ConstelacaoPortal(QWidget):
 
     def showEvent(self, ev):
         # Também aqui, e não só no redimensionamento: um widget pode
-        # receber o tamanho sem que o evento de redimensionamento chegue
-        # — e aí os treze ladrilhos ficam empilhados no canto superior
-        # esquerdo, uns por cima dos outros. Aconteceu ao montar o portal
-        # dentro de um pai ainda não exibido.
+        # receber o tamanho sem que o evento de redimensionamento chegue,
+        # e aí os ladrilhos ficam empilhados no canto superior esquerdo.
+        # Aconteceu ao montar o portal dentro de um pai ainda não exibido.
         super().showEvent(ev)
         self._reposicionar()
-
-    def _reposicionar(self):
-        cx, cy, _rx, _ry = self._elipse()
-        if self._centro is not None:
-            largura, altura = LADRILHO_CENTRO
-            self._centro.move(cx - largura // 2, cy - altura // 2)
-        largura, altura = LADRILHO
-        for tile, p in zip(self._orbita, self._pontos()):
-            tile.move(p.x() - largura // 2, p.y() - altura // 2)
-
-    # ── desenho ──────────────────────────────────
-    def paintEvent(self, _ev):
-        """As linhas que ligam cada instrumento ao procedimento.
-
-        Desenhadas aqui, e não sobre os ladrilhos: os ladrilhos são
-        filhos e pintam depois, de modo que as linhas saem de trás deles
-        sem cruzar o texto.
-        """
-        pintor = QPainter(self)
-        pintor.setRenderHint(QPainter.RenderHint.Antialiasing)
-        cx, cy, _rx, _ry = self._elipse()
-        meio = QPoint(cx, cy)
-
-        caneta = QPen(QColor(PALETTE["border"]))
-        caneta.setWidthF(1.4)
-        pintor.setPen(caneta)
-        for p in self._pontos():
-            pintor.drawLine(meio, p)
-
-        # O nó central, atrás do ladrilho: dá peso ao ponto de encontro
-        # das linhas nas frestas entre as quinas.
-        pintor.setPen(Qt.PenStyle.NoPen)
-        pintor.setBrush(QColor(PALETTE["gold_dim"]))
-        pintor.drawEllipse(meio, 7, 7)
 
     # ── conferência ──────────────────────────────
     def sobreposicoes(self) -> list[tuple[str, str]]:
@@ -444,10 +282,9 @@ class ConstelacaoPortal(QWidget):
         substitua isso com ladrilho de largura fixa sobre elipse de
         proporção variável.
         """
-        tiles = ([self._centro] if self._centro else []) + self._orbita
         colisoes = []
-        for i, a in enumerate(tiles):
-            for b in tiles[i + 1:]:
+        for i, a in enumerate(self._ladrilhos):
+            for b in self._ladrilhos[i + 1:]:
                 if a.geometry().intersects(b.geometry()):
                     colisoes.append((a._meta.name, b._meta.name))
         return colisoes
@@ -455,8 +292,7 @@ class ConstelacaoPortal(QWidget):
     def transbordo(self) -> list[str]:
         """Ladrilhos que saíram da área visível. Existe para ser medido."""
         area = self.rect()
-        return [t._meta.name
-                for t in ([self._centro] if self._centro else []) + self._orbita
+        return [t._meta.name for t in self._ladrilhos
                 if not area.contains(t.geometry())]
 
 
@@ -607,7 +443,7 @@ class PortalPage(QWidget):
         # A constelação toma toda a altura que sobrar: ela não tem tamanho
         # "certo", tem o espaço que houver, e recalcula as posições a cada
         # redimensionamento.
-        self._constelacao = ConstelacaoPortal()
+        self._constelacao = GradePortal()
         self._constelacao.tool_requested.connect(self.tool_requested)
         layout.addWidget(self._constelacao, 1)
 

@@ -71,27 +71,28 @@ instalar.
 
 ## Ferramentas
 
-**Quinze ferramentas**, todas disponíveis. A ordem abaixo é a do portal, que não é
-alfabética: no alto a peça que instrui o procedimento, depois o que
-identifica e captura a prova onde ela está, depois o que extrai conteúdo
-do material apreendido, e na base o preparo e o apoio.
+**Quinze ferramentas**, todas disponíveis. A ordem abaixo é a do portal,
+que as dispõe em três fileiras de cinco e não em ordem alfabética: na
+primeira, a peça e o preparo do documento que a instrui; na segunda, o
+registro da prova onde ela está; na terceira, o exame do material e o
+registro do próprio trabalho.
 
 | Ferramenta | O que faz |
 |---|---|
 | **Encarregado de IPS** | Monta a Informação da Investigação Preliminar Sumária parte por parte, com o roteiro do que entra em cada uma e o respaldo normativo à mão — art. 92 da IN PRF nº 127/2024. Exporta HTML já diagramado para importar no SEI, e PDF. |
+| **Tarja Preta** | Tarjamento irreversível de PDFs — a página é rasterizada ao salvar, então o texto sob a tarja sai do arquivo, e não fica apenas coberto. Tarja manual, tarja por seleção de texto, marcação por sinal à escolha (`[ ]`, `{ }` ou `( )`) e busca automática de CPF, CNPJ, RG, telefone e e-mail. |
+| **Anti-Injection** | Detecção de texto oculto em PDFs — opacidade zero, corpo minúsculo, branco sobre branco, conteúdo fora da área da página e camadas ocultas —, usado para induzir a erro quem lê o documento, humano ou assistente de IA. Modos Normal / Revelar / Raio-X e relatório de constatação. |
 | **Metadados e Hash** | SHA-256 dos arquivos e o que eles informam sobre si: autor, programa que gerou, datas, equipamento de origem e, quando o aparelho as gravou, as coordenadas da captura. Emite termo único de juntada e metadados, com coluna de nº SEI. |
-| **Constatação Web** | **Acessa a rede.** Abre o endereço num navegador dedicado, sem extensões e sem sessão anterior, e registra o que foi exibido: a página inteira em PDF, o código-fonte, a tela, o IP do servidor e o certificado que ele apresentou — cada peça com o seu SHA-256. |
-| **Varredura** | Indexa um pendrive, um cartão ou uma pasta inteira: SHA-256 de cada arquivo e o texto que houver, inclusive o de páginas digitalizadas, por reconhecimento óptico. A busca passa a ser instantânea e não toca mais no dispositivo, que pode ser lacrado. Aponta os duplicados. |
 | **PDF Pesquisável** | Acrescenta camada de texto invisível a PDFs escaneados e a fotos de documentos, encaixada palavra por palavra sobre a imagem. O documento fica igual ao original, mas passa a permitir busca, seleção e cópia — e a ser encontrado pela Varredura. |
-| **Degravação** | Transcreve áudio e vídeo com reconhecimento de fala executado na própria máquina; nenhum trecho é enviado a serviço externo. Separa automaticamente quem fala, na cronologia da gravação, e basta nomear cada voz uma vez. |
+| **Constatação Web** | **Acessa a rede.** Abre o endereço num navegador dedicado, sem extensões e sem sessão anterior, e registra o que foi exibido: a página inteira em PDF, o código-fonte, a tela, o IP do servidor e o certificado que ele apresentou — cada peça com o seu SHA-256. |
 | **Extração Registrada** | **Acessa a rede.** Abre o sistema num navegador instrumentado e registra cada passo da extração: endereços, cliques, consultas com seus parâmetros e arquivos recebidos — cada um resumido no instante em que chega, antes de tocar qualquer pasta de trabalho. Grava a tela ao mesmo tempo. |
 | **Gravação de Tela** | Registra a diligência feita no computador, com a identificação do processo, do operador e da estação impressa no próprio vídeo, junto ao relógio e ao tempo decorrido. Grava também, em faixa própria e à escolha de quem opera, o som que o computador reproduz. |
 | **Espelhamento de Celular** | Liga um Android por cabo USB, espelha a tela e grava a sessão em resolução nativa, com fabricante, modelo, versão do Android e número de série lidos do próprio aparelho. Por padrão não repassa toque nem digitação: observa. |
-| **Tarja Preta** | Tarjamento irreversível de PDFs — a página é rasterizada ao salvar, então o texto sob a tarja sai do arquivo, e não fica apenas coberto. Tarja manual, tarja por seleção de texto, marcação por sinal à escolha (`[ ]`, `{ }` ou `( )`) e busca automática de CPF, CNPJ, RG, telefone e e-mail. |
-| **Anti-Injection** | Detecção de texto oculto em PDFs — opacidade zero, corpo minúsculo, branco sobre branco, conteúdo fora da área da página e camadas ocultas —, usado para induzir a erro quem lê o documento, humano ou assistente de IA. Modos Normal / Revelar / Raio-X e relatório de constatação. |
-| **Análise de Planilha** | Filtrar, ordenar, escolher colunas, remover duplicidades, acrescentar coluna calculada, agrupar e resumir, marcar linhas com justificativa e cruzar com outra planilha — registrando cada passo. Produz o resultado e um termo com o roteiro completo, que terceiro re-executa sobre o original para conferir. |
+| **Varredura** | Indexa um pendrive, um cartão ou uma pasta inteira: SHA-256 de cada arquivo e o texto que houver, inclusive o de páginas digitalizadas, por reconhecimento óptico. A busca passa a ser instantânea e não toca mais no dispositivo, que pode ser lacrado. Aponta os duplicados. |
 | **Quadro de Evidências** | Mural de vínculos da investigação: anotações, imagens e marcações conectadas, organizadas por caso. Serve para enxergar as relações entre pessoas, fatos e provas antes de redigir a peça. |
 | **Edição de Vídeo** | Compactar, fatiar e mesclar gravações para a juntada aos autos. Trabalha com videomonitoramento, câmeras corporais e vídeos anexados pelas partes. |
+| **Degravação** | Transcreve áudio e vídeo com reconhecimento de fala executado na própria máquina; nenhum trecho é enviado a serviço externo. Separa automaticamente quem fala, na cronologia da gravação, e basta nomear cada voz uma vez. |
+| **Análise de Planilha** | Filtrar, ordenar, escolher colunas, remover duplicidades, acrescentar coluna calculada, agrupar e resumir, marcar linhas com justificativa e cruzar com outra planilha — registrando cada passo. Produz o resultado e um termo com o roteiro completo, que terceiro re-executa sobre o original para conferir. |
 | **Relatório de Atividades** | Documenta cada execução do sistema, do abrir ao fechar, sem que ninguém precise ligá-la: ferramentas usadas e por quanto tempo, o que cada uma relatou ao concluir, e a identificação da estação e da rede. Grava enquanto a sessão corre. Fica só nesta máquina. |
 
 Duas acessam a rede, e estão marcadas acima. As outras treze leem e
