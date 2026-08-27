@@ -32,6 +32,7 @@ from ..widgets import (
     output_button, primary_button, subtext,
 )
 from . import derivado_core as derivado
+from . import tarja_core
 from .derivado_dialogo import TermoDerivadoDialog
 from .base import ToolPage, ToolMeta
 
@@ -316,13 +317,20 @@ class PaginaTarja(PaginaPDF):
 
 class SaveThread(QThread):
     progress = pyqtSignal(int, int)
-    done = pyqtSignal(str)
+    #: (caminho gravado, resumo do conteúdo produzido). O resumo vem
+    #: junto porque é dos pixels, e depois de gravado o PDF não se pode
+    #: recalculá-lo do arquivo: o formato guarda a hora da gravação, e o
+    #: resumo do arquivo muda a cada vez sem que o conteúdo mude.
+    done = pyqtSignal(str, str)
     failed = pyqtSignal(str)
 
-    #: Fator de rasterização (2.0 ≈ 144 DPI).
-    RENDER_SCALE = 2.0
+    #: Fator de rasterização (2.0 ≈ 144 DPI). Vive no núcleo porque entra
+    #: no roteiro: em fator diferente, a mesma tarja produz outro
+    #: conteúdo e outro resumo.
+    RENDER_SCALE = tarja_core.ESCALA
 
-    def __init__(self, doc: fitz.Document, tarjas_por_pagina: dict, out_path: str):
+    def __init__(self, doc: fitz.Document, tarjas_por_pagina: dict,
+                 out_path: str):
         super().__init__()
         self.doc = doc
         self.tarjas_por_pagina = tarjas_por_pagina
@@ -330,45 +338,13 @@ class SaveThread(QThread):
 
     def run(self):
         try:
-            from PIL import ImageDraw
-
-            out_doc = fitz.open()
-            total = len(self.doc)
-            k = self.RENDER_SCALE
-
-            for i in range(total):
-                self.progress.emit(i + 1, total)
-                page = self.doc[i]
-                tarjas = self.tarjas_por_pagina.get(i, [])
-
-                pix = page.get_pixmap(matrix=fitz.Matrix(k, k), alpha=False)
-                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                draw = ImageDraw.Draw(img)
-
-                for pdf_r, _ in tarjas:
-                    draw.rectangle(
-                        [round(pdf_r.x0 * k), round(pdf_r.y0 * k),
-                         round(pdf_r.x1 * k), round(pdf_r.y1 * k)],
-                        fill=(0, 0, 0),
-                    )
-
-                buf = io.BytesIO()
-                # A resolução precisa ir declarada. Sem ela o PIL grava a
-                # imagem assumindo 72 DPI, e como a página foi rasterizada
-                # a RENDER_SCALE o papel saía multiplicado pelo mesmo
-                # fator: um A4 virava 1190x1684 pt, perto de um A2. O
-                # documento censurado é peça dos autos, e peça em papel de
-                # tamanho errado é problema de quem for juntá-la.
-                img.save(buf, format="PDF", resolution=72.0 * k)
-                buf.seek(0)
-                tmp = fitz.open("pdf", buf.read())
-                out_doc.insert_pdf(tmp)
-                tmp.close()
-
-            out_doc.save(self.out_path, garbage=4, deflate=True)
-            out_doc.close()
-            self.done.emit(self.out_path)
-        except Exception as e:
+            saida, resumo = tarja_core.compor(
+                self.doc, self.tarjas_por_pagina, self.RENDER_SCALE,
+                progresso=lambda i, n: self.progress.emit(i, n))
+            saida.save(self.out_path, garbage=4, deflate=True)
+            saida.close()
+            self.done.emit(self.out_path, resumo)
+        except Exception as e:                          # noqa: BLE001
             self.failed.emit(str(e))
 
 
@@ -397,6 +373,9 @@ class TarjaPretaTool(ToolPage):
         #: precisa dos dois: ele existe para amarrar um ao outro.
         self._caminho_origem = ""
         self._ultimo_salvo = ""
+        #: Resumo do conteúdo do último arquivo gravado. Só existe depois
+        #: de compor: é dos pixels produzidos, e não dos bytes do PDF.
+        self._ultimo_conteudo = ""
         #: Palavras já lidas, por página. Ver `_palavras_da`.
         self._palavras_por_pagina: dict[int, list] = {}
 
@@ -519,6 +498,34 @@ class TarjaPretaTool(ToolPage):
         # Nasce desligado porque o termo cita o resumo criptográfico do
         # arquivo tarjado, e esse resumo só existe depois de gravar: é
         # calculado sobre os bytes finais.
+        # O roteiro é o que torna a censura conferível: com ele e o
+        # original, um terceiro re-executa e chega ao mesmo material.
+        # Nasce desligado porque só existe depois de gravar — é ali que o
+        # resumo do conteúdo é calculado, e roteiro sem ele não confronta
+        # coisa alguma.
+        linha_roteiro = QHBoxLayout()
+        self._btn_roteiro = QPushButton("  Salvar roteiro")
+        self._btn_roteiro.setIcon(draw_icon("save", 14, PALETTE["text2"]))
+        self._btn_roteiro.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_roteiro.setEnabled(False)
+        self._btn_roteiro.setToolTip(
+            "Grava a relação declarada das tarjas, com o resumo do "
+            "original e o do conteúdo produzido. Acompanha a peça: é por "
+            "ele que a censura se confere.")
+        self._btn_roteiro.clicked.connect(self._salvar_roteiro)
+        linha_roteiro.addWidget(self._btn_roteiro)
+
+        self._btn_abrir_roteiro = QPushButton("  Abrir roteiro")
+        self._btn_abrir_roteiro.setIcon(draw_icon("open", 14,
+                                                  PALETTE["text2"]))
+        self._btn_abrir_roteiro.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_abrir_roteiro.setToolTip(
+            "Carrega um roteiro salvo sobre o arquivo aberto, para "
+            "conferir a censura de outra pessoa")
+        self._btn_abrir_roteiro.clicked.connect(self._abrir_roteiro)
+        linha_roteiro.addWidget(self._btn_abrir_roteiro)
+        panel.footer.addLayout(linha_roteiro)
+
         self._btn_termo = QPushButton("  Gerar termo de censura")
         self._btn_termo.setIcon(draw_icon("save", 16, PALETTE["text"]))
         self._btn_termo.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1047,13 +1054,17 @@ class TarjaPretaTool(ToolPage):
 
         self._save_thread = SaveThread(self._doc, self._tarjas_por_pagina, out_path)
         self._save_thread.progress.connect(lambda c, _t: progress.setValue(c))
-        self._save_thread.done.connect(lambda p: self._on_save_done(p, progress))
+        self._save_thread.done.connect(
+            lambda p, r: self._on_save_done(p, r, progress))
         self._save_thread.failed.connect(lambda e: self._on_save_error(e, progress))
         self._save_thread.start()
 
-    def _on_save_done(self, path: str, progress: QProgressDialog):
+    def _on_save_done(self, path: str, resumo: str,
+                      progress: QProgressDialog):
         progress.close()
         self._ultimo_salvo = path
+        self._ultimo_conteudo = resumo
+        self._btn_roteiro.setEnabled(True)
         self._btn_termo.setEnabled(bool(self._caminho_origem))
         QMessageBox.information(
             self, "Salvo com sucesso",
@@ -1061,8 +1072,89 @@ class TarjaPretaTool(ToolPage):
             "O texto nas áreas tarjadas foi removido permanentemente, e o "
             "arquivo gerado não carrega metadado algum do original.\n\n"
             "O termo de censura já pode ser gerado — ele cita os resumos "
-            "criptográficos do original e do arquivo produzido.")
+            "criptográficos do original e do arquivo produzido, e traz a "
+            "conferência de que o roteiro reproduz este resultado.")
         self.status_msg.emit(f"Salvo: {Path(path).name}")
+
+    # ─────────────────────────────────────
+    #  ROTEIRO
+    # ─────────────────────────────────────
+
+    def _roteiro_atual(self) -> "tarja_core.Roteiro":
+        roteiro = tarja_core.montar(self._caminho_origem,
+                                    self._tarjas_por_pagina,
+                                    SaveThread.RENDER_SCALE)
+        roteiro.resumo_conteudo = self._ultimo_conteudo
+        return roteiro
+
+    def _salvar_roteiro(self):
+        if not (self._caminho_origem and self._ultimo_conteudo):
+            return
+        sugerido = str(Path(self._ultimo_salvo).with_suffix(".roteiro.json")
+                       if self._ultimo_salvo else "")
+        destino, _ = QFileDialog.getSaveFileName(
+            self, "Salvar roteiro da censura", sugerido,
+            "Roteiro (*.json)")
+        if not destino:
+            return
+        if not destino.lower().endswith(".json"):
+            destino += ".json"
+        try:
+            tarja_core.salvar_roteiro(self._roteiro_atual(), destino)
+        except Exception as e:                          # noqa: BLE001
+            QMessageBox.critical(self, "Erro ao salvar o roteiro", str(e))
+            return
+        self.status_msg.emit(f"Roteiro salvo: {Path(destino).name}")
+
+    def _abrir_roteiro(self):
+        if self._doc is None:
+            QMessageBox.information(
+                self, "Abra o documento primeiro",
+                "O roteiro relaciona tarjas sobre um arquivo. Abra o "
+                "arquivo original e então carregue o roteiro.")
+            return
+        caminho, _ = QFileDialog.getOpenFileName(
+            self, "Abrir roteiro da censura", "", "Roteiro (*.json)")
+        if not caminho:
+            return
+        try:
+            roteiro = tarja_core.ler_roteiro(caminho)
+        except Exception as e:                          # noqa: BLE001
+            QMessageBox.critical(self, "Erro ao ler o roteiro", str(e))
+            return
+
+        # Roteiro montado para outro arquivo aplicado a este cobriria
+        # áreas que ali não são as mesmas — e o operador só descobriria
+        # olhando. O aviso é explícito, e a decisão fica com ele.
+        from .hash_core import sha256_file
+        try:
+            atual = sha256_file(self._caminho_origem)
+        except OSError:
+            atual = ""
+        if roteiro.resumo_origem and atual and roteiro.resumo_origem != atual:
+            resposta = QMessageBox.warning(
+                self, "O roteiro é de outro arquivo",
+                "O resumo criptográfico declarado no roteiro não "
+                "corresponde ao do arquivo aberto.\n\nAplicá-lo assim "
+                "cobriria áreas que neste documento podem não ser as "
+                "mesmas. Deseja aplicar mesmo assim?",
+                QMessageBox.StandardButton.Yes
+                | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No)
+            if resposta != QMessageBox.StandardButton.Yes:
+                return
+
+        self._tarjas_por_pagina = roteiro.por_pagina()
+        self._ultimo_conteudo = ""
+        self._ultimo_salvo = ""
+        self._btn_termo.setEnabled(False)
+        self._btn_roteiro.setEnabled(False)
+        self._update_tarja_count()
+        for pagina in self._visor.paginas():
+            pagina.update()
+        self.status_msg.emit(
+            f"Roteiro carregado: {len(roteiro.tarjas)} tarja(s) em "
+            f"{roteiro.paginas_atingidas} página(s). Salve para conferir.")
 
     # ─────────────────────────────────────
     #  TERMO DE CENSURA
@@ -1088,6 +1180,14 @@ class TarjaPretaTool(ToolPage):
         "O arquivo original permanece inalterado. Este termo o identifica "
         "pelo resumo criptográfico justamente para que a correspondência "
         "entre um e outro possa ser conferida a qualquer tempo.",
+        "A censura não é apenas relatada: é um roteiro. As áreas cobertas "
+        "constam de relação declarada, que acompanha esta peça em arquivo "
+        "próprio e que terceiro re-executa sobre o original, com esta "
+        "mesma ferramenta, para obter o mesmo material. A conferência é "
+        "feita sobre o resumo do conteúdo das páginas — e não sobre os "
+        "bytes do arquivo produzido, porque o formato PDF guarda dentro "
+        "de si a hora da gravação e gerar duas vezes a mesma censura "
+        "produz arquivos de resumos diferentes.",
     )
 
     def _gerar_termo(self):
@@ -1107,12 +1207,20 @@ class TarjaPretaTool(ToolPage):
             detalhes.insert(0, ("Conversão de formato",
                                 "imagem " + origem.lstrip(".").upper()
                                 + " convertida em PDF de uma página"))
+        roteiro = self._roteiro_atual()
+        situacao, _obtido, explicacao = tarja_core.reproduzir(roteiro)
+        if roteiro.resumo_conteudo:
+            detalhes.append(("Resumo do conteúdo (SHA-256)",
+                             roteiro.resumo_conteudo))
+        detalhes.append(("Fator de rasterização", f"{roteiro.escala:g}×"))
+
         item = derivado.medir(self._caminho_origem, self._ultimo_salvo,
                               detalhes=detalhes)
         termo = derivado.TermoDerivado(
             titulo="Termo de Censura em Dados e Informações Protegidas",
             operacao="tarjamento de dados e informações protegidas",
-            ressalvas=self.RESSALVAS,
+            ressalvas=self.RESSALVAS + (
+                tarja_core.frase_reproducao(situacao, explicacao),),
             motores=("pdf", "imagem"),
             itens=[item])
         TermoDerivadoDialog(termo, self).exec()

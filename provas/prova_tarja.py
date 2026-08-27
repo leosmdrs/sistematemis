@@ -24,6 +24,7 @@ import fitz                                            # noqa: E402
 from PIL import Image                                  # noqa: E402
 from PyQt6.QtWidgets import QApplication               # noqa: E402
 
+from temis.tools import tarja_core as tc               # noqa: E402
 from temis.tools import tarja_preta as tp              # noqa: E402
 
 SIGILOSO = "CPF 123.456.789-00"
@@ -181,6 +182,86 @@ class ACamadaDeTextoESeAusenciaSeDeclaram(Base):
 
     def test_a_explicacao_aponta_a_ferramenta_que_resolve(self):
         self.assertIn("PDF Pesquisável", tp.SEM_CAMADA_DE_TEXTO)
+
+
+class ACensuraViraRoteiroConferivel(Base):
+    """A peça deixa de afirmar e passa a ser conferível."""
+
+    def montar(self):
+        entrada = self.pdf_com_texto()
+        doc = fitz.open(entrada)
+        alvo = doc[0].search_for(SIGILOSO)[0]
+        saida, resumo = tc.compor(doc, {0: [(alvo, "manual")]})
+        saida.close()
+        doc.close()
+        roteiro = tc.montar(entrada, {0: [(alvo, "manual")]})
+        roteiro.resumo_conteudo = resumo
+        return entrada, roteiro
+
+    def test_o_roteiro_faz_a_ida_e_a_volta(self):
+        _, roteiro = self.montar()
+        caminho = self.caminho("r.json")
+        tc.salvar_roteiro(roteiro, caminho)
+        self.assertEqual(tc.ler_roteiro(caminho).dados(), roteiro.dados())
+
+    def test_re_executar_o_roteiro_reproduz_o_mesmo_conteudo(self):
+        # A prova que dá razão a todo o resto: com o original e o
+        # roteiro, um terceiro chega ao mesmo material censurado.
+        _, roteiro = self.montar()
+        self.assertEqual(tc.reproduzir(roteiro)[0], "sim")
+
+    def test_o_resumo_e_do_conteudo_e_nao_dos_bytes(self):
+        # Gravar duas vezes a mesma censura produz PDFs de bytes
+        # diferentes: o formato guarda a hora da gravação. Conferir pelo
+        # arquivo acusaria divergência onde não há.
+        import hashlib
+        entrada, roteiro = self.montar()
+        arquivos, conteudos = set(), set()
+        for n in range(2):
+            doc = fitz.open(entrada)
+            saida, resumo = tc.compor(doc, roteiro.por_pagina())
+            destino = self.caminho(f"s{n}.pdf")
+            saida.save(destino)
+            saida.close()
+            doc.close()
+            arquivos.add(hashlib.sha256(Path(destino).read_bytes()).hexdigest())
+            conteudos.add(resumo)
+        self.assertEqual(len(conteudos), 1, "o conteúdo tinha de ser o mesmo")
+        self.assertEqual(len(arquivos), 2, "os bytes do PDF variam mesmo")
+
+    def test_original_que_mudou_nao_e_censura_que_nao_reproduz(self):
+        # "Impossível" e "não reproduz" são coisas diferentes, e a peça
+        # não pode chamar uma pela outra.
+        entrada, roteiro = self.montar()
+        Path(entrada).write_bytes(Path(entrada).read_bytes() + b"%%mais")
+        situacao, _, explicacao = tc.reproduzir(roteiro)
+        self.assertEqual(situacao, "impossivel")
+        self.assertIn("não é mais o mesmo", explicacao)
+
+    def test_original_que_sumiu_tambem_e_impossivel(self):
+        entrada, roteiro = self.montar()
+        Path(entrada).unlink()
+        self.assertEqual(tc.reproduzir(roteiro)[0], "impossivel")
+
+    def test_tarja_diferente_nao_reproduz(self):
+        _, roteiro = self.montar()
+        roteiro.resumo_conteudo = "0" * 64
+        situacao, _, _ = tc.reproduzir(roteiro)
+        self.assertEqual(situacao, "nao")
+
+    def test_a_escala_entra_no_roteiro_porque_muda_o_resultado(self):
+        entrada, roteiro = self.montar()
+        doc = fitz.open(entrada)
+        _, outro = tc.compor(doc, roteiro.por_pagina(), escala=3.0)
+        doc.close()
+        self.assertNotEqual(outro, roteiro.resumo_conteudo)
+
+    def test_a_peca_diz_o_que_a_conferencia_significa(self):
+        for situacao, marca in (("sim", "reproduziu resumo de conteúdo"),
+                                ("nao", "não deve ser tratado como"),
+                                ("impossivel", "segue possível por quem")):
+            with self.subTest(situacao):
+                self.assertIn(marca, tc.frase_reproducao(situacao))
 
 
 if __name__ == "__main__":

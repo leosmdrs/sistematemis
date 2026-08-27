@@ -187,10 +187,13 @@ linha de `sha256sum` — "arquivo.pdf" contribui a, d e f. Agora se procura
 antes uma palavra que já seja o resumo inteiro. Achado por prova, não em
 uso.
 
-**Três das cinco ideias do artigo continuam abertas:** registrar o meio
-de entrega e o momento do recebimento; hora com fuso nas peças, e a
-fonte do relógio declarada; e roteiro re-executável na Tarja Preta e na
-Edição de Vídeo, no molde da Análise de Planilha.
+**Das cinco ideias do artigo, resta meia.** O meio de entrega e o
+momento do recebimento, a hora com fuso e o relógio qualificado, e o
+roteiro re-executável da Tarja Preta estão feitos. Falta o roteiro da
+**Edição de Vídeo** — e ficou medido que ele é possível: o mesmo build
+do FFmpeg, com os mesmos parâmetros, produz saída **byte a byte
+idêntica**, de modo que ali a conferência pode ser do próprio arquivo, e
+não do conteúdo como na censura.
 
 ### Nitidez da interface — o fator 0,85 saiu (27/08/2026)
 
