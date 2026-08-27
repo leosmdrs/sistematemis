@@ -31,7 +31,8 @@ from ..icons import draw_icon
 from ..impressao import (documento_html, imprimir_documento,
                          limpar_para_sei, preparar_escritor)
 from ..theme import PALETTE
-from ..widgets import (
+from ..widgets import (preparar_procedimento, ler_procedimento,
+    
     NoScrollComboBox, SidebarPanel, ViewerToolbar, field_label,
     fit_to_screen, hsep, output_button, primary_button, subtext,
 )
@@ -208,8 +209,7 @@ class TermoDialog(QDialog):
         # Segunda fileira: o vínculo aos autos e a data por extenso. Sem
         # eles o texto não passa de relatório técnico.
         self._cb_tipo = NoScrollComboBox()
-        for t in ("IPS", "PAD"):
-            self._cb_tipo.addItem(t)
+        preparar_procedimento(self._cb_tipo)
         self._cb_tipo.currentIndexChanged.connect(self._remontar)
         self._in_processo = QLineEdit()
         self._in_processo.setPlaceholderText("Ex.: 08650.000123/2026-11")
@@ -278,7 +278,7 @@ class TermoDialog(QDialog):
     def _juntada(self) -> core.Juntada:
         d = self._data.date()
         return core.Juntada(
-            tipo_processo=self._cb_tipo.currentText(),
+            tipo_processo=ler_procedimento(self._cb_tipo),
             numero_processo=self._in_processo.text().strip(),
             dia=d.day(), mes=d.month(), ano=d.year(),
             recebido_de=self._in_recebido_de.text().strip(),

@@ -31,7 +31,8 @@ from ..icons import draw_icon
 from ..impressao import (documento_html, imprimir_documento,
                          limpar_para_sei, preparar_escritor)
 from ..theme import PALETTE
-from ..widgets import (
+from ..widgets import (preparar_procedimento, ler_procedimento,
+    
     NoScrollComboBox, SidebarPanel, danger_button, field_label,
     fit_to_screen, hsep, output_button, primary_button, subtext,
 )
@@ -225,8 +226,8 @@ class TermoDialog(QDialog):
             campo.textChanged.connect(self._remontar)
 
         self._e_tipo = NoScrollComboBox()
-        for t in ("IPS", "PAD"):
-            self._e_tipo.addItem(t)
+
+        preparar_procedimento(self._e_tipo)
         self._e_tipo.currentIndexChanged.connect(self._remontar)
         self._e_processo = QLineEdit()
         self._e_processo.setPlaceholderText("Ex.: 08650.000123/2026-11")
@@ -297,7 +298,7 @@ class TermoDialog(QDialog):
         t.nome = self._e_nome.text().strip()
         t.matricula = self._e_matricula.text().strip()
         t.lotacao = self._e_lotacao.text().strip()
-        t.tipo_processo = self._e_tipo.currentText()
+        t.tipo_processo = ler_procedimento(self._e_tipo)
         t.numero_processo = self._e_processo.text().strip()
         t.dia, t.mes, t.ano = d.day(), d.month(), d.year()
         return t

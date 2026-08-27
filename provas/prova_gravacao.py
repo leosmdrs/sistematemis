@@ -155,5 +155,63 @@ class OTermoRelacionaOsArquivos(unittest.TestCase):
         self.assertIn("Extração Registrada", texto)
 
 
+class ORegistroDeJanelas(unittest.TestCase):
+    """Índice do vídeo, sem capturar conteúdo."""
+
+    def monitor(self, sequencia):
+        i = [0]
+        def leitor():
+            v = sequencia[min(i[0], len(sequencia) - 1)]
+            i[0] += 1
+            return v
+        return gc.MonitorJanelas(leitor=leitor)
+
+    def test_registra_a_troca_de_janela(self):
+        m = self.monitor([("chrome.exe", "Portal"), ("notepad.exe", "Notas")])
+        m.varrer(1.0)
+        m.varrer(2.0)
+        self.assertEqual([(j.aplicativo, j.titulo) for j in m.registros],
+                         [("chrome.exe", "Portal"), ("notepad.exe", "Notas")])
+
+    def test_janela_repetida_nao_duplica(self):
+        m = self.monitor([("chrome.exe", "Portal")])
+        for d in (1.0, 2.0, 3.0):
+            m.varrer(d)
+        self.assertEqual(len(m.registros), 1)
+
+    def test_foco_vazio_e_ignorado(self):
+        m = self.monitor([("", "")])
+        m.varrer(1.0)
+        self.assertEqual(m.registros, [])
+
+    def test_nao_captura_conteudo_so_titulo_e_app(self):
+        # O modelo tem exatamente estes campos: quando, decorrido,
+        # aplicativo, título. Nada de tecla nem clique.
+        campos = set(gc.Janela().__dataclass_fields__)
+        self.assertEqual(campos, {"quando", "decorrido", "aplicativo",
+                                  "titulo"})
+
+    def test_o_termo_lista_as_janelas_e_a_ressalva(self):
+        import os, re
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PyQt6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+        j = gc.Janela(quando="2026-08-27T15:01:00-03:00", decorrido=60.0,
+                      aplicativo="chrome.exe", titulo="Portal X")
+        r = gc.Resultado(arquivo="v.mp4", inicio="2026-08-27T15:00:00-03:00",
+                         fim="2026-08-27T15:10:00-03:00", segundos=600,
+                         tamanho=1, sha256="a" * 64, largura=1920, altura=1080,
+                         quadros=10, contexto=gc.ler_contexto(),
+                         opcoes=gc.Opcoes(), janelas=[j])
+        termo = gc.TermoGravacao(nome="F", matricula="1", lotacao="X",
+                                 numero_processo="1", objeto="t", registros=[r])
+        texto = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ",
+                                            gc.build_html(termo)))
+        self.assertIn("Janelas em primeiro plano", texto)
+        self.assertIn("chrome.exe", texto)
+        self.assertIn("Portal X", texto)
+        self.assertIn("não captura o que foi digitado", texto)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

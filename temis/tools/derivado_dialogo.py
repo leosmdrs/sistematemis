@@ -29,7 +29,8 @@ from ..icons import draw_icon
 from ..impressao import (documento_html, imprimir_documento,
                          limpar_para_sei, preparar_escritor)
 from ..theme import PALETTE
-from ..widgets import (NoScrollComboBox, field_label, fit_to_screen, hsep,
+from ..widgets import (preparar_procedimento, ler_procedimento,
+    NoScrollComboBox, field_label, fit_to_screen, hsep,
                        output_button, subtext)
 from . import derivado_core as core
 
@@ -107,7 +108,8 @@ class TermoDerivadoDialog(QDialog):
             campo.textChanged.connect(self._remontar)
 
         self._e_tipo = NoScrollComboBox()
-        self._e_tipo.addItems(["IPS", "PAD"])
+
+        preparar_procedimento(self._e_tipo)
         self._e_tipo.currentTextChanged.connect(self._remontar)
         grade.addWidget(field_label("Procedimento"), 2, 0)
         grade.addWidget(self._e_tipo, 3, 0)
@@ -178,7 +180,7 @@ class TermoDerivadoDialog(QDialog):
         t.cargo = self._e_cargo.text().strip()
         t.matricula = self._e_matricula.text().strip()
         t.lotacao = self._e_lotacao.text().strip()
-        t.tipo_processo = self._e_tipo.currentText()
+        t.tipo_processo = ler_procedimento(self._e_tipo)
         t.numero_processo = self._e_processo.text().strip()
         t.dia, t.mes, t.ano = d.day(), d.month(), d.year()
         return t

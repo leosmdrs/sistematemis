@@ -41,7 +41,8 @@ from ..icons import draw_icon
 from ..impressao import (documento_html, imprimir_documento,
                          limpar_para_sei, preparar_escritor)
 from ..theme import PALETTE
-from ..widgets import (
+from ..widgets import (preparar_procedimento, ler_procedimento,
+    
     NoScrollComboBox, SidebarPanel, danger_button, field_label, fit_to_screen, hsep,
     output_button, primary_button, subtext,
 )
@@ -241,8 +242,7 @@ class TermoDialog(QDialog):
         # corregedoria: quem grava a extração costuma ser de outra área.
         self._e_cargo = QLineEdit(t.cargo)
         self._e_tipo = NoScrollComboBox()
-        for x in ("IPS", "PAD"):
-            self._e_tipo.addItem(x)
+        preparar_procedimento(self._e_tipo)
         self._e_tipo.currentIndexChanged.connect(self._remontar)
         self._e_processo = QLineEdit(t.numero_processo)
         self._e_processo.setPlaceholderText("Ex.: 08650.000123/2026-11")
@@ -324,7 +324,7 @@ class TermoDialog(QDialog):
         t.matricula = self._e_matricula.text().strip()
         t.lotacao = self._e_lotacao.text().strip()
         t.cargo = self._e_cargo.text().strip() or "Servidor"
-        t.tipo_processo = self._e_tipo.currentText()
+        t.tipo_processo = ler_procedimento(self._e_tipo)
         t.numero_processo = self._e_processo.text().strip()
         t.sistema_consultado = self._e_sistema.text().strip()
         t.dia, t.mes, t.ano = d.day(), d.month(), d.year()
@@ -521,6 +521,13 @@ class GravacaoTool(ToolPage):
         linha_pasta.addWidget(self._b_pasta)
         painel.body.addLayout(linha_pasta)
 
+        self._chk_janelas = QCheckBox("Registrar janelas em primeiro plano")
+        self._chk_janelas.setToolTip(
+            "Anota quais aplicativos e janelas estiveram à frente durante "
+            "a gravação, e quando — o índice navegável do vídeo. Não "
+            "captura o que se digita nem em que se clica.")
+        painel.body.addWidget(self._chk_janelas)
+
         painel.body.addWidget(hsep())
         painel.body.addWidget(field_label("ESTAÇÃO"))
         self._rot_contexto = QLabel()
@@ -655,6 +662,18 @@ class GravacaoTool(ToolPage):
     def _iniciar(self):
         if self._gravador is not None:
             return
+        if self._chk_janelas.isChecked():
+            resposta = QMessageBox.question(
+                self, "Registro de ações nesta gravação",
+                "Esta gravação vai registrar, além da imagem, as janelas "
+                "que passarem ao primeiro plano — qual aplicativo e qual "
+                "janela estiveram à frente, e quando.\n\nO registro não "
+                "captura o que se digita nem em que se clica, e a relação "
+                "sai no termo. Iniciar assim?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes)
+            if resposta != QMessageBox.StandardButton.Yes:
+                return
         if not self._e_processo.text().strip():
             resposta = QMessageBox.question(
                 self, "Sem número de processo",
@@ -682,7 +701,8 @@ class GravacaoTool(ToolPage):
             identificacao=self._identificacao(),
             resistente=self._op_resistente.isChecked(),
             pasta_monitorada=(self._e_pasta.text().strip()
-                              if self._chk_downloads.isChecked() else ""))
+                              if self._chk_downloads.isChecked() else ""),
+            registrar_janelas=self._chk_janelas.isChecked())
 
         self._gravador = core.Gravador(destino, opcoes)
         try:

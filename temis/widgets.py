@@ -100,6 +100,48 @@ class NoScrollDoubleSpinBox(QDoubleSpinBox):
 
 
 # ─────────────────────────────────────────
+#  PROCEDIMENTO
+# ─────────────────────────────────────────
+
+#: O item que abre a digitação livre no seletor de procedimento.
+OUTRO_PROCEDIMENTO = "Outro…"
+
+
+def preparar_procedimento(combo: QComboBox) -> QComboBox:
+    """Deixa o seletor de procedimento aceitar um tipo fora de IPS/PAD.
+
+    Nem toda diligência instrui um IPS ou um PAD — há sindicância,
+    apuração preliminar, procedimento de outro órgão. Escolhido "Outro…",
+    o combo passa a aceitar texto livre; voltando a IPS ou PAD, fecha de
+    novo. O valor é lido por `ler_procedimento`, que descarta o rótulo
+    "Outro…" e devolve o que ficou.
+    """
+    combo.clear()
+    combo.addItems(["IPS", "PAD", OUTRO_PROCEDIMENTO])
+
+    def _ajustar(_=0):
+        if combo.currentText() == OUTRO_PROCEDIMENTO:
+            combo.setEditable(True)
+            combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+            edit = combo.lineEdit()
+            if edit is not None:
+                edit.setPlaceholderText("Escreva o tipo de procedimento")
+            combo.clearEditText()
+            combo.setFocus()
+        elif combo.isEditable() and combo.currentText() in ("IPS", "PAD"):
+            combo.setEditable(False)
+
+    combo.currentIndexChanged.connect(_ajustar)
+    return combo
+
+
+def ler_procedimento(combo: QComboBox) -> str:
+    """O tipo escolhido ou digitado, sem o rótulo 'Outro…'."""
+    texto = combo.currentText().strip()
+    return "" if texto == OUTRO_PROCEDIMENTO else texto
+
+
+# ─────────────────────────────────────────
 #  SEPARADORES E RÓTULOS
 # ─────────────────────────────────────────
 

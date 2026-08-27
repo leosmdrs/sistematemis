@@ -46,7 +46,8 @@ from ..icons import draw_icon
 from ..impressao import (documento_html, imprimir_documento,
                          limpar_para_sei, preparar_escritor)
 from ..theme import PALETTE
-from ..widgets import (
+from ..widgets import (preparar_procedimento, ler_procedimento,
+    
     NoScrollComboBox, SidebarPanel, field_label, fit_to_screen, hsep,
     output_button, primary_button, subtext,
 )
@@ -195,8 +196,7 @@ class TermoDialog(QDialog):
         # corregedoria: o cargo não pode vir fixo.
         self._e_cargo = QLineEdit(t.cargo)
         self._e_tipo = NoScrollComboBox()
-        for x in ("IPS", "PAD"):
-            self._e_tipo.addItem(x)
+        preparar_procedimento(self._e_tipo)
         self._e_tipo.currentIndexChanged.connect(self._remontar)
         self._e_data = QDateEdit()
         self._e_data.setCalendarPopup(True)
@@ -278,7 +278,7 @@ class TermoDialog(QDialog):
         t.matricula = self._e_matricula.text().strip()
         t.lotacao = self._e_lotacao.text().strip()
         t.cargo = self._e_cargo.text().strip() or "Servidor"
-        t.tipo_processo = self._e_tipo.currentText()
+        t.tipo_processo = ler_procedimento(self._e_tipo)
         t.numero_processo = self._e_processo.text().strip()
         t.solicitacao = self._e_solicitacao.text().strip()
         t.dia, t.mes, t.ano = d.day(), d.month(), d.year()
@@ -592,6 +592,19 @@ class ExtracaoTool(ToolPage):
                 self, "Falta identificar a diligência",
                 "Preencha: " + ", ".join(faltando) + ".\n\nSão esses campos "
                 "que dizem, no termo, o que se foi buscar e onde.")
+            return
+
+        resposta = QMessageBox.question(
+            self, "Registro de ações nesta diligência",
+            "A Extração Registrada documenta cada passo desta diligência: "
+            "os endereços visitados, os cliques, os formulários submetidos "
+            "com seus parâmetros e os arquivos recebidos, cada um resumido "
+            "em SHA-256.\n\nCampo de senha nunca é registrado. Tudo fica "
+            "apenas nesta máquina, e a relação sai no termo. Iniciar a "
+            "diligência assim?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes)
+        if resposta != QMessageBox.StandardButton.Yes:
             return
 
         base = core.pasta_padrao() / core.nome_de_sessao(

@@ -442,6 +442,9 @@ class Opcoes:
     #: ferramenta sempre faz, e resumir downloads é um acréscimo que quem
     #: opera liga quando a diligência envolve baixar arquivo.
     pasta_monitorada: str = ""
+    #: Registrar as janelas que passam ao primeiro plano — o índice da
+    #: diligência, sem capturar conteúdo. Opção, pelo mesmo motivo.
+    registrar_janelas: bool = False
 
     @property
     def quadros(self) -> int:
@@ -476,6 +479,7 @@ class Resultado:
     contexto: Contexto | None = None
     opcoes: Opcoes | None = None
     baixados: list = field(default_factory=list)
+    janelas: list = field(default_factory=list)
     erro: str = ""
 
     @property
@@ -602,6 +606,109 @@ class MonitorDownloads:
                     or nome.startswith("~$")):
                 continue
             self._resumir(arquivo, decorrido)
+
+
+@dataclass
+class Janela:
+    """Uma janela que esteve em primeiro plano durante a gravação."""
+
+    quando: str = ""
+    decorrido: float = 0.0
+    aplicativo: str = ""
+    titulo: str = ""
+
+
+def janela_em_foco() -> tuple:
+    """(aplicativo, título) da janela em primeiro plano. ('', '') se não der.
+
+    Só o nome do executável e o título que a janela publicou — nada do
+    que se digitou ou clicou. O título é o mesmo que já aparece na barra
+    filmada pelo vídeo; registrá-lo apenas torna pesquisável o que a
+    imagem já mostra.
+    """
+    if sys.platform != "win32":
+        return "", ""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        u = ctypes.windll.user32
+        k = ctypes.windll.kernel32
+        # Sem argtypes/restype, o ctypes trata handle de 64 bits como
+        # inteiro de 32 e o trunca — o defeito clássico, silencioso, que
+        # faria a leitura apontar para janela nenhuma.
+        u.GetForegroundWindow.restype = wintypes.HWND
+        u.GetWindowTextLengthW.argtypes = [wintypes.HWND]
+        u.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR,
+                                     ctypes.c_int]
+        u.GetWindowThreadProcessId.argtypes = [
+            wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+        k.OpenProcess.restype = wintypes.HANDLE
+        k.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL,
+                                  wintypes.DWORD]
+        k.QueryFullProcessImageNameW.argtypes = [
+            wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR,
+            ctypes.POINTER(wintypes.DWORD)]
+        k.CloseHandle.argtypes = [wintypes.HANDLE]
+
+        hwnd = u.GetForegroundWindow()
+        if not hwnd:
+            return "", ""
+        n = u.GetWindowTextLengthW(hwnd)
+        buf = ctypes.create_unicode_buffer(n + 1)
+        u.GetWindowTextW(hwnd, buf, n + 1)
+        titulo = buf.value
+
+        pid = wintypes.DWORD()
+        u.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        aplicativo = ""
+        # PROCESS_QUERY_LIMITED_INFORMATION: o suficiente para ler o
+        # nome, e o que uma estação sem privilégio consegue abrir.
+        h = k.OpenProcess(0x1000, False, pid.value)
+        if h:
+            tamanho = wintypes.DWORD(260)
+            nome = ctypes.create_unicode_buffer(260)
+            if k.QueryFullProcessImageNameW(h, 0, nome, ctypes.byref(tamanho)):
+                aplicativo = Path(nome.value).name
+            k.CloseHandle(h)
+        return aplicativo, titulo
+    except Exception:                                   # noqa: BLE001
+        return "", ""
+
+
+class MonitorJanelas:
+    """Anota cada troca de janela em primeiro plano durante a gravação.
+
+    Registra a mudança, e não cada exame: uma linha por janela que
+    assume a frente, com a hora e o tempo decorrido. Anotar a cada pulso
+    encheria a peça de milhares de repetições da mesma janela.
+
+    Não captura conteúdo — nem tecla, nem clique. Diz **qual** janela
+    esteve à frente e **quando**, que é o índice navegável de uma imagem
+    que o vídeo já contém por inteiro. Para o registro da transação em si,
+    com endereço e parâmetros, existe a Extração Registrada; para o
+    conteúdo, existe a própria imagem gravada.
+    """
+
+    def __init__(self, leitor=None):
+        #: Injetável para poder provar sem tela: por padrão, lê o Windows.
+        self._leitor = leitor or janela_em_foco
+        self.registros: list[Janela] = []
+        self._ultima = None
+
+    def varrer(self, decorrido: float):
+        import datetime
+        aplicativo, titulo = self._leitor()
+        if not aplicativo and not titulo:
+            return
+        atual = (aplicativo, titulo)
+        if atual == self._ultima:
+            return
+        self._ultima = atual
+        self.registros.append(Janela(
+            quando=datetime.datetime.now().astimezone().isoformat(
+                timespec="seconds"),
+            decorrido=decorrido, aplicativo=aplicativo, titulo=titulo))
 
 
 class Gravador:
@@ -770,6 +877,8 @@ class Gravador:
         if self.opcoes.pasta_monitorada:
             self._monitor = MonitorDownloads(self.opcoes.pasta_monitorada)
             self._monitor.iniciar()
+        self._janelas = (MonitorJanelas()
+                         if self.opcoes.registrar_janelas else None)
 
     #: Quanto se espera para saber se o codificador ficou de pé.
     #:
@@ -812,6 +921,8 @@ class Gravador:
         """
         if getattr(self, "_monitor", None) is not None:
             self._monitor.varrer(self.decorrido, time.time())
+        if getattr(self, "_janelas", None) is not None:
+            self._janelas.varrer(self.decorrido)
 
     def encerrar(self, espera: float = 25.0) -> Resultado:
         """Fecha a gravação e devolve o que ela produziu."""
@@ -868,6 +979,10 @@ class Gravador:
             self._monitor.concluir(self.decorrido, time.time())
             resultado.baixados = list(self._monitor.baixados)
             self._monitor = None
+        if getattr(self, "_janelas", None) is not None:
+            self._janelas.varrer(self.decorrido)
+            resultado.janelas = list(self._janelas.registros)
+            self._janelas = None
 
         resultado.tamanho = self.destino.stat().st_size
         resultado.sha256 = sha256(self.destino)
@@ -972,6 +1087,17 @@ RESSALVA_DOWNLOADS = (
     "da própria transação, com endereço e parâmetros, existe a Extração "
     "Registrada. O resumo permite conferir, a qualquer tempo, que o "
     "arquivo é o mesmo que se observou chegar."
+)
+
+#: O que a relação de janelas é, e o que não é. Vai impresso quando
+#: houver janelas na peça.
+RESSALVA_JANELAS = (
+    "A relação de janelas indica quais aplicativos e janelas estiveram em "
+    "primeiro plano durante a gravação, e em que momento. Os títulos são "
+    "os que os próprios aplicativos exibiam — o mesmo texto que a barra "
+    "de título mostra na imagem gravada —, e servem de índice navegável "
+    "do vídeo. A relação não captura o que foi digitado nem em que se "
+    "clicou: registra qual janela esteve à frente, e quando."
 )
 
 RESSALVAS = (
@@ -1154,6 +1280,30 @@ def _quadro_downloads(baixados: list) -> str:
         f"{''.join(linhas)}</table>")
 
 
+def _quadro_janelas(janelas: list) -> str:
+    """A linha do tempo das janelas em primeiro plano."""
+    linhas = []
+    for i, j in enumerate(janelas, 1):
+        segundos = int(j.decorrido)
+        decorrido = (f"{segundos // 3600:02d}:{(segundos % 3600) // 60:02d}:"
+                     f"{segundos % 60:02d}")
+        linhas.append(
+            "<tr>"
+            + _cel(i, "center")
+            + _cel(decorrido, "center", "Courier New")
+            + _cel(j.aplicativo or "—")
+            + _cel(j.titulo or "(sem título)")
+            + "</tr>")
+    return (
+        '<table width="100%" cellspacing="0" cellpadding="4" border="1" '
+        'style="border-collapse:collapse; font-size:8.5pt;">'
+        '<tr style="background-color:#0a2442; color:#ffd633;">'
+        '<th width="4%">Nº</th><th width="14%">Decorrido</th>'
+        '<th width="28%">Aplicativo</th><th width="54%">Título da janela</th>'
+        '</tr>'
+        f"{''.join(linhas)}</table>")
+
+
 def build_html(t: TermoGravacao) -> str:
     """Termo em HTML, para exibir e exportar."""
     from ..impressao import cabecalho_html, rodape_html
@@ -1171,7 +1321,19 @@ def build_html(t: TermoGravacao) -> str:
         "<hr/>",
         f'<p align="justify" style="font-size:11pt; line-height:160%;">'
         f"{e(intro_gravacao(t))}</p>",
-        '<p style="font-size:11pt;"><b>1. Objeto da diligência</b></p>',
+    ]
+
+    # A numeração das seções é contada, e não escrita à mão: duas seções
+    # são opcionais (arquivos recebidos, janelas), e número fixo já
+    # obrigava a acertar método e ressalvas a cada uma que entrasse.
+    _n = [0]
+    def secao(titulo):
+        _n[0] += 1
+        return (f'<p style="font-size:11pt;"><b>{_n[0]}. '
+                + titulo + "</b></p>")
+
+    partes += [
+        secao("Objeto da diligência"),
         f'<p align="justify" style="font-size:10.5pt; line-height:150%;">'
         f"{e(t.objeto)}</p>",
     ]
@@ -1182,8 +1344,7 @@ def build_html(t: TermoGravacao) -> str:
 
     # ── estação e operador ────────────────
     contexto = t.bons[0].contexto if t.bons else None
-    partes.append('<p style="font-size:11pt;">'
-                  "<b>2. Estação em que se realizou o registro</b></p>")
+    partes.append(secao("Estação em que se realizou o registro"))
     if contexto is not None:
         partes.append(_quadro(contexto.linhas()))
     partes.append(
@@ -1193,8 +1354,7 @@ def build_html(t: TermoGravacao) -> str:
         "gravação teve início.</p>")
 
     # ── os registros ──────────────────────
-    partes.append('<p style="font-size:11pt;">'
-                  "<b>3. Registro(s) produzido(s)</b></p>")
+    partes.append(secao("Registro(s) produzido(s)"))
     partes.append(_quadro_registros(t))
     partes.append(
         '<p align="justify" style="font-size:10.5pt; line-height:150%; '
@@ -1207,16 +1367,23 @@ def build_html(t: TermoGravacao) -> str:
     # ── downloads observados ──────────────
     baixados = [b for r in t.bons for b in getattr(r, "baixados", [])]
     if baixados:
-        partes.append('<p style="font-size:11pt;">'
-                      "<b>4. Arquivos recebidos durante a diligência</b></p>")
+        partes.append(secao("Arquivos recebidos durante a diligência"))
         partes.append(_quadro_downloads(baixados))
         partes.append(
             '<p align="justify" style="font-size:10.5pt; line-height:150%; '
             'margin-top:8px;">' + e(RESSALVA_DOWNLOADS) + "</p>")
 
+    # ── janelas em primeiro plano ─────────
+    janelas = [j for r in t.bons for j in getattr(r, "janelas", [])]
+    if janelas:
+        partes.append(secao("Janelas em primeiro plano durante a diligência"))
+        partes.append(_quadro_janelas(janelas))
+        partes.append(
+            '<p align="justify" style="font-size:10.5pt; line-height:150%; '
+            'margin-top:8px;">' + e(RESSALVA_JANELAS) + "</p>")
+
     # ── método ────────────────────────────
-    n_metodo = 5 if baixados else 4
-    partes.append(f'<p style="font-size:11pt;"><b>{n_metodo}. Método</b></p>')
+    partes.append(secao("Método"))
     metodo = [
         "A imagem exibida na tela foi capturada de modo contínuo, do "
         "início ao encerramento indicados, e gravada em arquivo de vídeo "
@@ -1274,8 +1441,7 @@ def build_html(t: TermoGravacao) -> str:
                f'line-height:150%;">{e(linha)}</p>' for linha in metodo]
 
     # ── ressalvas ─────────────────────────
-    partes.append(f'<p style="font-size:11pt;">'
-                  f"<b>{n_metodo + 1}. Ressalvas</b></p>")
+    partes.append(secao("Ressalvas"))
     partes += [f'<p align="justify" style="font-size:10.5pt; '
                f'line-height:150%;">{e(linha)}</p>' for linha in RESSALVAS]
 
