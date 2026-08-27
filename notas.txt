@@ -165,3 +165,61 @@ nome do arquivo. Nada disso apareceria em uso.
 O autoteste ganhou duas verificações: a procedência das peças, que
 reprova ferramenta cuja peça não declare com o que foi produzida; e a
 geometria do portal, refeita para a grade.
+
+
+CONFERÊNCIA DE INTEGRIDADE — o sistema passa a conferir resumo, não só gerar
+
+O Metadados e Hash recebe o resumo declarado na entrega — do ofício, da
+mídia lacrada, do termo de quem entregou —, recalcula sobre os bytes e
+confronta, emitindo Termo de Juntada e Conferência de Integridade. São
+três estados, e não dois: confere, não confere, e não perguntado. O
+alcance vai impresso: a conferência diz que o arquivo não mudou desde a
+declaração, não que a declaração estava certa.
+
+
+CONSTATAÇÃO WEB — quem registrou o domínio
+
+A captura passa a consultar o registro do domínio pelo protocolo RDAP,
+junto ao servidor que a IANA indica. Onde o certificado diz quem o
+servidor afirma ser, o registro diz quem respondeu pelo nome — nos
+domínios .br, o titular e o CNPJ. A resposta bruta é guardada com resumo
+próprio, e a peça declara que são dados de terceiro, não apuração do
+sistema.
+
+
+O PROGRAMA RESPONDE POR SI
+
+Toda peça passou a declarar, no pé, com o que foi produzida: a versão do
+sistema, o sistema operacional, os motores empregados e o resumo
+criptográfico do próprio executável. Método cuja ferramenta e cuja
+versão não constam não se reexecuta nem se contesta. As peças também
+citam as normas ABNT NBR ISO/IEC 27037 e RFC 3227, com o alcance da
+observância e o que fica fora dela relacionados em NORMAS.md.
+
+
+RELATÓRIO DE ATIVIDADES — registro encadeado, e avisos de sessão
+
+Cada anotação da sessão passou a carregar o resumo da anterior: alterar,
+remover ou inserir uma linha rompe a corrente, e a conferência aponta
+onde. Ao abrir o sistema, um aviso informa que a sessão será registrada
+localmente; ao fechar, recomenda-se juntar o registro aos autos com os
+termos e arquivos gerados. O que a corrente não prova — deter quem
+recalcule tudo — vai dito na peça.
+
+
+GRAVAÇÃO DE TELA — arquivos recebidos e janelas em primeiro plano
+
+Por opção, a Gravação de Tela passa a vigiar uma pasta e a resumir em
+SHA-256 cada arquivo que nela chega durante a diligência, e a registrar
+as janelas que assumem o primeiro plano — o índice navegável do vídeo.
+Nenhuma das duas captura o que se digita ou em que se clica; para o
+registro da transação em sistema web, com endereço e parâmetros, existe a
+Extração Registrada. Iniciar a captura de ações pede confirmação, para
+que o operador saiba, de forma inequívoca, o que será registrado.
+
+
+PROCEDIMENTO ALÉM DE IPS E PAD
+
+O seletor de procedimento, em todas as peças, ganhou "Outro", que abre
+digitação livre — para sindicância, apuração preliminar ou procedimento
+de outro órgão.
