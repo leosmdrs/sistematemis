@@ -43,7 +43,7 @@ class ToraPecaDizComOQueFoiProduzida(unittest.TestCase):
                 frase = procedencia.frase(procedencia.motores(*chaves))
                 self.assertIn(__version__, frase)
                 self.assertNotIn("com .", frase)
-                self.assertTrue(frase.endswith("por terceiro."))
+                self.assertIn("reexecutado e conferido por terceiro", frase)
 
     def test_motor_que_nao_existe_nao_entra_na_peca(self):
         # Declarar dependência que não houve é afirmação falsa, e numa
@@ -238,6 +238,128 @@ class OMeioDeEntradaSeRegistra(unittest.TestCase):
         j = mc.Juntada(meio_entrega="ofício")
         self.assertIn("a partir da leitura", j.frase_recebimento())
         self.assertIn("declarado por quem a promoveu", j.frase_recebimento())
+
+
+class OProgramaResumeASiMesmo(unittest.TestCase):
+    """Declarar a versão diz qual programa; o resumo diz que é aquele."""
+
+    def setUp(self):
+        procedencia._RESUMO_PROGRAMA.clear()
+        self.addCleanup(procedencia._RESUMO_PROGRAMA.clear)
+
+    def test_do_codigo_fonte_nao_ha_executavel_a_resumir(self):
+        # O executável seria o interpretador Python, e resumi-lo não
+        # diria nada sobre o Têmis. A peça declara o que é verdade.
+        self.assertEqual(procedencia.resumo_do_programa(), "")
+        self.assertIn("a partir do código-fonte",
+                      procedencia.frase(procedencia.motores()))
+
+    def test_empacotado_resume_o_proprio_executavel(self):
+        import sys
+        import tempfile
+        from temis.tools.hash_core import sha256_file
+        with tempfile.TemporaryDirectory() as pasta:
+            falso = Path(pasta) / "SistemaTemis.exe"
+            falso.write_bytes(b"conteudo do executavel")
+            guardado = (getattr(sys, "frozen", None), sys.executable)
+            sys.frozen = True
+            sys.executable = str(falso)
+            try:
+                resumo = procedencia.resumo_do_programa()
+                frase = procedencia.frase([])
+            finally:
+                if guardado[0] is None:
+                    del sys.frozen
+                else:
+                    sys.frozen = guardado[0]
+                sys.executable = guardado[1]
+            self.assertEqual(resumo, sha256_file(str(falso)))
+            self.assertIn(resumo, frase)
+            self.assertIn("executável que produziu esta peça", frase)
+
+
+class ORegistroDeAtividadesSeEncadeia(unittest.TestCase):
+
+    def sessao(self, quantas=3):
+        from temis.tools import atividades_core as ac
+        s = ac.Sessao(identificador="s1", versao=__version__,
+                      inicio="2026-08-27T15:00:00-03:00",
+                      maquina={"estacao": "Leonardo"})
+        s.usos.append(ac.Uso(chave="tarja", nome="Tarja Preta",
+                             abriu="2026-08-27T15:00:10-03:00",
+                             fechou="2026-08-27T15:04:00-03:00",
+                             segundos=230.0))
+        elo = ""
+        for n in range(1, quantas + 1):
+            quando = f"2026-08-27T15:0{n}:00-03:00"
+            texto = f"ato {n}"
+            elo = ac.elo_de(elo, quando, "tarja", texto)
+            s.anotacoes.append(ac.Anotacao(quando=quando, ferramenta="tarja",
+                                           texto=texto, elo=elo))
+        s.fim = "2026-08-27T15:10:00-03:00"
+        s.encerrada = True
+        s.elo_final = ac.fecho_de(s)
+        return ac, s
+
+    def test_sessao_intacta_confere(self):
+        ac, s = self.sessao()
+        self.assertEqual(ac.conferir(s), ("integro", ""))
+
+    def test_alterar_uma_linha_rompe_a_corrente_e_aponta_onde(self):
+        ac, s = self.sessao()
+        s.anotacoes[1].texto = "ato 2, adulterado"
+        situacao, explicacao = ac.conferir(s)
+        self.assertEqual(situacao, "rompido")
+        self.assertIn("anotação 2", explicacao)
+
+    def test_remover_uma_linha_rompe(self):
+        ac, s = self.sessao()
+        del s.anotacoes[1]
+        self.assertEqual(ac.conferir(s)[0], "rompido")
+
+    def test_inserir_uma_linha_rompe(self):
+        ac, s = self.sessao()
+        s.anotacoes.insert(1, ac.Anotacao(quando="2026-08-27T15:01:30-03:00",
+                                          ferramenta="tarja",
+                                          texto="ato inventado", elo="x"))
+        self.assertEqual(ac.conferir(s)[0], "rompido")
+
+    def test_mover_texto_de_um_campo_para_o_outro_tambem_rompe(self):
+        # Sem separador que o conteúdo não consiga imitar, trocar
+        # "tarja"+"ato 1" por "tarj"+"aato 1" daria o mesmo resumo.
+        ac, s = self.sessao()
+        s.anotacoes[0].ferramenta = "tarj"
+        s.anotacoes[0].texto = "aato 1"
+        self.assertEqual(ac.conferir(s)[0], "rompido")
+
+    def test_mexer_no_que_a_corrente_nao_cobre_o_fecho_pega(self):
+        # A corrente é das anotações; o fecho é da sessão inteira. Mudar
+        # a duração de uma ferramenta não rompe a primeira, e não pode
+        # passar em silêncio.
+        ac, s = self.sessao()
+        s.usos[0].segundos = 9999.0
+        situacao, explicacao = ac.conferir(s)
+        self.assertEqual(situacao, "rompido")
+        self.assertIn("resumo de fecho", explicacao)
+
+    def test_sessao_interrompida_nao_e_sessao_adulterada(self):
+        # Queda de energia não é adulteração, e chamar uma pela outra
+        # seria acusar o que não se constatou.
+        ac, s = self.sessao()
+        s.encerrada = False
+        s.elo_final = ""
+        self.assertEqual(ac.conferir(s)[0], "aberto")
+
+    def test_o_relatorio_declara_o_alcance_da_corrente(self):
+        ac, s = self.sessao()
+        QApplication.instance() or QApplication([])
+        texto = sem_marcacao(ac.relatorio_html(s))
+        self.assertIn("Integridade do registro", texto)
+        self.assertIn(s.elo_final, texto)
+        # A limitação vai impressa: registro que se apresentasse como
+        # inviolável prometeria o que não tem.
+        self.assertIn("não detém quem reproduza", texto)
+        self.assertIn("citado fora deste arquivo", texto)
 
 
 if __name__ == "__main__":

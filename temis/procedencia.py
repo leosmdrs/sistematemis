@@ -155,6 +155,40 @@ def sistema() -> str:
     return f"{__appname__} {__version__}"
 
 
+#: O resumo do executável, apurado uma vez. Ler doze megabytes por peça
+#: emitida seria gasto sem retorno: o arquivo não muda enquanto o
+#: programa está aberto.
+_RESUMO_PROGRAMA: list = []
+
+
+def resumo_do_programa() -> str:
+    """O resumo criptográfico do executável que está rodando.
+
+    Declarar a versão diz **qual** programa produziu a peça; declarar o
+    resumo diz que é **aquele mesmo** programa, e não uma cópia alterada
+    com o mesmo nome e o mesmo número. O Superior Tribunal de Justiça, ao
+    tratar da mesmidade pelo hash, exigiu que ela venha acompanhada de
+    software confiável e auditável — e software cujo binário não se possa
+    conferir não se audita.
+
+    Só existe no programa empacotado. Rodando a partir do código, o
+    executável é o interpretador Python, e resumi-lo não diria nada sobre
+    o Têmis: nesse caso a peça declara que rodou do código-fonte, que é a
+    informação verdadeira disponível.
+    """
+    if _RESUMO_PROGRAMA:
+        return _RESUMO_PROGRAMA[0]
+    resumo = ""
+    if getattr(sys, "frozen", False):
+        try:
+            from .tools.hash_core import sha256_file
+            resumo = sha256_file(sys.executable)
+        except Exception:                               # noqa: BLE001
+            resumo = ""
+    _RESUMO_PROGRAMA.append(resumo)
+    return resumo
+
+
 def plataforma() -> str:
     """O sistema operacional, como ele se identifica."""
     try:
@@ -205,5 +239,13 @@ def frase(lista: list) -> str:
         # A vírgula do meio e o "e" do fim. Com um motor só, a montagem
         # por fatia deixava um "com ." solto na peça.
         texto += ", com " + ", ".join(partes[:-1]) + " e " + partes[-1]
-    return (texto + ". As versões constam para que o método possa ser "
-            "reexecutado e conferido por terceiro.")
+    texto += (". As versões constam para que o método possa ser "
+              "reexecutado e conferido por terceiro.")
+    resumo = resumo_do_programa()
+    if resumo:
+        texto += (" O executável que produziu esta peça tem resumo SHA-256 "
+                  + resumo + ".")
+    elif getattr(sys, "frozen", False) is False:
+        texto += (" Esta peça foi produzida a partir do código-fonte, e não "
+                  "de executável empacotado.")
+    return texto

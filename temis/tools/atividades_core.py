@@ -37,6 +37,7 @@ from __future__ import annotations
 import datetime
 import getpass
 import html
+import hashlib
 import json
 import os
 import platform
@@ -109,6 +110,24 @@ class Anotacao:
     quando: str
     ferramenta: str
     texto: str
+    #: O elo com a anotação anterior: resumo do elo dela somado ao
+    #: conteúdo desta. Alterar, remover ou inserir uma linha no meio
+    #: rompe a corrente a partir dali, e a conferência aponta onde.
+    elo: str = ""
+
+
+def elo_de(anterior: str, quando: str, ferramenta: str, texto: str) -> str:
+    """O elo de uma anotação, a partir do elo da anterior.
+
+    Os separadores são caracteres de controle para que nenhum conteúdo
+    consiga imitá-los: sem isso, mover texto de um campo para o outro
+    produziria o mesmo elo, e a corrente deixaria passar a alteração.
+    """
+    h = hashlib.sha256()
+    for parte in (anterior, quando, ferramenta, texto):
+        h.update(parte.encode("utf-8"))
+        h.update(b"\x1f")
+    return h.hexdigest()
 
 
 @dataclass
@@ -131,6 +150,11 @@ class Sessao:
     #: isso tem de aparecer no relatório — silêncio aqui seria pior do
     #: que a falha.
     erros: list[str] = field(default_factory=list)
+    #: Resumo de fecho, calculado no encerramento sobre a sessão inteira.
+    #: É ele que se cita fora daqui — num termo, num ofício —, e é dessa
+    #: citação que vem a força do registro: publicado o resumo, qualquer
+    #: alteração posterior no arquivo passa a ser detectável contra ele.
+    elo_final: str = ""
 
     # ── leitura ──────────────────────────────
     @property
@@ -219,10 +243,14 @@ class Registrador:
         if (self.sessao.anotacoes
                 and self.sessao.anotacoes[-1].texto == texto):
             return
+        quando = datetime.datetime.now().astimezone().isoformat(
+            timespec="seconds")
+        corte = texto[:400]
+        anterior = (self.sessao.anotacoes[-1].elo
+                    if self.sessao.anotacoes else "")
         self.sessao.anotacoes.append(Anotacao(
-            quando=datetime.datetime.now().astimezone().isoformat(
-                timespec="seconds"),
-            ferramenta=ferramenta, texto=texto[:400]))
+            quando=quando, ferramenta=ferramenta, texto=corte,
+            elo=elo_de(anterior, quando, ferramenta, corte)))
         self.gravar()
 
     def encerrar(self) -> Path | None:
@@ -231,6 +259,7 @@ class Registrador:
         self.sessao.fim = datetime.datetime.now().astimezone().isoformat(
             timespec="seconds")
         self.sessao.encerrada = True
+        self.sessao.elo_final = fecho_de(self.sessao)
         self.gravar(forcar=True)
         try:
             destino = self.caminho_relatorio()
@@ -309,6 +338,64 @@ class Registrador:
 # ─────────────────────────────────────────
 #  LEITURA DAS SESSÕES GRAVADAS
 # ─────────────────────────────────────────
+
+def fecho_de(s: Sessao) -> str:
+    """O resumo da sessão inteira, para ser citado fora dela.
+
+    Cobre a identificação, a máquina, quem operava, cada passagem por
+    ferramenta e cada anotação, na ordem em que estão. Não cobre a si
+    mesmo, evidentemente — por isso é calculado uma vez, no encerramento.
+    """
+    h = hashlib.sha256()
+
+    def somar(*partes):
+        for parte in partes:
+            h.update(str(parte).encode("utf-8"))
+            h.update(b"\x1f")
+        h.update(b"\x1e")
+
+    somar(s.identificador, s.versao, s.inicio, s.fim)
+    somar(*(f"{k}={v}" for k, v in sorted(s.maquina.items())))
+    somar(*(f"{k}={v}" for k, v in sorted(s.operador.items())))
+    for u in s.usos:
+        somar(u.chave, u.nome, u.abriu, u.fechou, round(u.segundos, 3))
+    for a in s.anotacoes:
+        somar(a.quando, a.ferramenta, a.texto, a.elo)
+    return h.hexdigest()
+
+
+def conferir(s: Sessao) -> tuple:
+    """Confere a corrente e o fecho. Devolve (situação, explicação).
+
+    A situação é "integro", "rompido" ou "aberto" — a última para a
+    sessão que não chegou a ser encerrada, e que por isso não tem fecho a
+    conferir. Sessão interrompida não é sessão adulterada, e chamar uma
+    pela outra seria acusar o que não se constatou.
+
+    **O alcance disto precisa ficar claro, e o relatório o diz.** A
+    corrente detecta a alteração feita à mão sobre o arquivo: mudar uma
+    linha, remover outra, inserir uma terceira. Não detém quem reproduza
+    o algoritmo e recalcule a corrente inteira, porque não há aqui chave
+    que só o sistema conheça. A força do registro vem de outro lugar: do
+    resumo de fecho ser citado numa peça que circula. Publicado ele, a
+    alteração posterior passa a ser detectável contra o que foi
+    publicado — e aí não adianta recalcular.
+    """
+    anterior = ""
+    for i, a in enumerate(s.anotacoes, 1):
+        if a.elo != elo_de(anterior, a.quando, a.ferramenta, a.texto):
+            return "rompido", (
+                f"a corrente se rompe na anotação {i} de "
+                f"{len(s.anotacoes)}, de {a.quando}")
+        anterior = a.elo
+    if not s.encerrada or not s.elo_final:
+        return "aberto", "a sessão não foi encerrada, e não tem fecho a conferir"
+    if fecho_de(s) != s.elo_final:
+        return "rompido", (
+            "a corrente das anotações está inteira, mas o resumo de fecho "
+            "não corresponde ao conteúdo da sessão")
+    return "integro", ""
+
 
 def sessoes(pasta: Path | None = None) -> list[Sessao]:
     """Todas as sessões em disco, da mais recente para a mais antiga."""
@@ -395,6 +482,53 @@ CAMPOS_MAQUINA = (
     ("fuso", "Fuso horário"),
     ("python", "Interpretador"),
 )
+
+
+#: O que a corrente prova, e o que ela não prova. Vai impresso junto do
+#: veredito: um registro que se apresentasse como inviolável prometeria o
+#: que não tem, e é a promessa exagerada que derruba a peça, não a
+#: limitação declarada.
+ALCANCE_CORRENTE = (
+    "Cada anotação carrega o resumo criptográfico da anterior, de modo que "
+    "alterar, remover ou inserir uma linha rompe a corrente a partir dali. "
+    "A conferência acima percorre essa corrente e o resumo de fecho, "
+    "calculado sobre a sessão inteira no encerramento.",
+    "O alcance disto é o seguinte, e convém que fique dito: a corrente "
+    "detecta a alteração feita sobre o arquivo, e não detém quem reproduza "
+    "o algoritmo e recalcule a corrente inteira — não há aqui chave que só "
+    "o sistema conheça. A força do registro está em o resumo de fecho ser "
+    "citado fora deste arquivo, num termo ou num ofício: publicado ele, "
+    "qualquer alteração posterior passa a ser detectável contra o que foi "
+    "publicado, e recalcular deixa de adiantar.",
+)
+
+
+def _bloco_integridade(s: Sessao) -> str:
+    """O veredito da conferência, e o resumo de fecho a citar."""
+    import html as _h
+
+    e = _h.escape
+    situacao, explicacao = conferir(s)
+    cores = {"integro": "#1B6E3C", "rompido": "#8A2B18", "aberto": "#5A6B85"}
+    frases = {
+        "integro": "A corrente das anotações está inteira e o resumo de "
+                   "fecho corresponde ao conteúdo desta sessão.",
+        "rompido": "ATENÇÃO — a conferência não fechou: " + explicacao + ".",
+        "aberto": "A sessão não foi encerrada normalmente, e por isso não "
+                  "tem resumo de fecho a conferir. A corrente das "
+                  "anotações, até onde vai, está inteira.",
+    }
+    partes = ["<h2 style='font-size:12pt;margin-top:22px'>"
+              "Integridade do registro</h2>",
+              f"<p style='color:{cores.get(situacao, cores['aberto'])}'>"
+              f"<b>{e(frases.get(situacao, ''))}</b></p>"]
+    if s.elo_final:
+        partes.append(
+            "<p style='font-size:10pt'>Resumo de fecho (SHA-256):<br>"
+            f"<code style='font-size:9pt'>{e(s.elo_final)}</code></p>")
+    partes += [f"<p style='font-size:9pt'>{e(x)}</p>"
+               for x in ALCANCE_CORRENTE]
+    return "".join(partes)
 
 
 def relatorio_html(s: Sessao) -> str:
@@ -507,6 +641,8 @@ def relatorio_html(s: Sessao) -> str:
                       "trechos que podem não ter sido anotados.</p><ul>")
         partes += [f"<li>{e(x)}</li>" for x in s.erros]
         partes.append("</ul>")
+
+    partes.append(_bloco_integridade(s))
 
     partes.append(
         "<p style='font-size:9pt'>Relatório composto automaticamente pelo "
