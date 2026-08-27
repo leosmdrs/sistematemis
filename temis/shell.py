@@ -181,6 +181,18 @@ class ToolTile(QFrame):
 #  PORTAL
 # ─────────────────────────────────────────
 
+def ferramentas_online() -> list[str]:
+    """As ferramentas disponíveis que saem à rede.
+
+    O portal e o Sobre dizem a mesma coisa ao usuário e por isso partem
+    da mesma lista. Já partiram de duas: o Sobre passou versões falando
+    no singular de duas ferramentas, e chamando de "página oficial
+    externa" o endereço que o operador é quem indica. Promessa de
+    privacidade escrita duas vezes é promessa que diverge.
+    """
+    return [m.name for m, _ in REGISTRY if m.online and m.available]
+
+
 def enumerar(nomes: list[str]) -> str:
     """Lista nomes em português: "A", "A e B", "A, B e C"."""
     if not nomes:
@@ -542,7 +554,7 @@ class PortalPage(QWidget):
 
         # A frase nomeia a exceção em vez de generalizar: com uma ferramenta
         # que abre página externa, um "tudo é local" seco seria falso.
-        online = [m.name for m, _ in REGISTRY if m.online and m.available]
+        online = ferramentas_online()
         texto = ("Os arquivos não saem desta máquina: tudo é lido e "
                  "processado aqui.")
         if online:
@@ -947,22 +959,37 @@ class SobreDialog(QDialog):
         lay.addWidget(hsep())
 
         disponiveis = sum(1 for m, _ in REGISTRY if m.available)
-        online = [m.name for m, _ in REGISTRY if m.online and m.available]
+        online = ferramentas_online()
+        # Sem número escrito na frase. "Em apenas duas situações" virou
+        # falso no instante em que a segunda ferramenta de rede entrou, e
+        # continuou impresso por duas versões. Aqui a redação se monta a
+        # partir do registro: concorda em número e nomeia quem sai.
+        if online:
+            abertura = (
+                "O sistema acessa a rede <b>apenas</b> nestas situações, "
+                "todas visíveis: "
+                + ("a ferramenta " if len(online) == 1
+                   else "as ferramentas ")
+                + enumerar(["<b>" + n + "</b>" for n in online])
+                + (", que abre " if len(online) == 1 else ", que abrem ")
+                + "num navegador dedicado o endereço que o operador "
+                  "indicar; e a ")
+        else:
+            abertura = "O sistema acessa a rede <b>apenas</b> para a "
         texto = QLabel(
             f"<p>Versão <b>{__version__}</b> — {disponiveis} de "
             f"{len(REGISTRY)} ferramentas disponíveis.</p>"
             "<p>Reúne num só lugar os instrumentos de apoio à atividade de "
-            "corregedoria: tarjamento de documentos, integridade de "
-            "arquivos, detecção de conteúdo oculto, extração de metadados, "
-            "organização de evidências e montagem da Informação.</p>"
+            "corregedoria: tarjamento e exame de documentos, integridade e "
+            "metadados de arquivos, registro de diligências feitas no "
+            "computador e em celular, degravação de oitivas, indexação de "
+            "acervo apreendido, análise auditável de planilha e montagem "
+            "da Informação.</p>"
             "<p><b>Os arquivos não saem desta máquina.</b> Nenhum documento, "
             "hash ou metadado é enviado a servidor algum — tudo é lido e "
             "processado localmente.</p>"
-            "<p>O sistema acessa a rede em apenas duas situações, ambas "
-            "visíveis: "
-            + (f"a ferramenta <b>{', '.join(online)}</b>, que abre uma "
-               "página oficial externa; e " if online else "")
-            + "a <b>verificação de atualização</b>, que lê um arquivo de "
+            "<p>" + abertura
+            + "<b>verificação de atualização</b>, que lê um arquivo de "
             "versão e não envia identificação do usuário nem da estação.</p>"
             f"<p style='margin-top:12px;color:{PALETTE['text2']}'>"
             f"Criado por <b style='color:{PALETTE['text']}'>{__author__}"

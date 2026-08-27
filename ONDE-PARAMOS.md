@@ -245,11 +245,15 @@ corrigidas, e `provas/prova_readme.py` passa a reprovar a defasagem:
 confere a tabela contra o `REGISTRY`, na mesma ordem, a marca de rede em
 quem tem `online=True`, e as contagens escritas por extenso.
 
-Fica **um resto**, que não é do README: o diálogo **Sobre**
-(`shell.py`, por volta da linha 960) ainda diz "a ferramenta X, Y, que
-abre uma página oficial externa" — no singular para duas, e com uma
-redação que o próprio código, na frase do portal, declara imprecisa. É
-texto de privacidade visto pelo usuário; convém acertar com cuidado.
+O diálogo **Sobre** foi junto, no mesmo dia. Ele dizia "em apenas duas
+situações" quando eram três, falava no singular de duas ferramentas, e
+chamava de "página oficial externa" o endereço que quem opera é que
+indica — redação que o próprio código, na frase do portal, já declarava
+imprecisa em comentário. O portal e o Sobre passam a partir da mesma
+`shell.ferramentas_online()`, e `provas/prova_sobre.py` monta o diálogo
+sem tela para conferir o que ele promete: que nomeia toda ferramenta de
+rede e só elas, que concorda em número, e que não volta a escrever a
+conta em prosa ao lado de uma lista que cresce.
 
 ### 5.3 Testes que só podem ser feitos com material real
 
