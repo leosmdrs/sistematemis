@@ -40,15 +40,66 @@ META = ToolMeta(
     key="tarja",
     name="Tarja Preta",
     icon="tool_tarja",
-    tagline="Tarjamento seguro de PDFs",
+    tagline="Tarjamento seguro de PDFs e imagens",
     description=(
-        "Oculta dados pessoais e sigilosos em PDFs de forma irreversível. "
-        "A página é rasterizada ao salvar, então o texto sob a tarja é "
-        "removido do arquivo — não fica apenas coberto. Aceita tarja manual "
-        "com o mouse, marcação por [colchetes] no texto-fonte e busca "
-        "automática por CPF, CNPJ, RG, telefone e e-mail."
+        "Oculta dados pessoais e sigilosos de forma irreversível, em PDF e "
+        "em imagem — fotografia de documento, digitalização, captura de "
+        "tela. A página é rasterizada ao salvar, então o texto sob a tarja "
+        "é removido do arquivo, e não fica apenas coberto. Aceita tarja "
+        "manual com o mouse e, havendo camada de texto, tarja por seleção, "
+        "marcação por sinal escolhido e busca automática por CPF, CNPJ, "
+        "RG, telefone e e-mail."
     ),
 )
+
+
+#: Imagens que a ferramenta abre. Não é lista inventada: o PyMuPDF abre
+#: cada uma como documento de uma página, com retângulo e rasterização
+#: iguais aos de um PDF — daí em diante o visor, a tarja e a gravação não
+#: distinguem uma coisa da outra.
+#:
+#: Documento do Word não está aqui, e não por esquecimento: tarjá-lo
+#: exigiria convertê-lo em PDF antes, e não há conversor que se possa
+#: embutir no instalador. O caminho é exportar para PDF no próprio Word
+#: e abrir o PDF.
+FORMATOS_IMAGEM = (".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp",
+                   ".gif", ".pnm", ".pgm", ".ppm", ".jp2", ".jpx")
+
+_CURINGAS = " ".join("*" + e for e in FORMATOS_IMAGEM)
+FILTRO_ABERTURA = (
+    f"Documentos e imagens (*.pdf {_CURINGAS})"
+    ";;Arquivos PDF (*.pdf)"
+    f";;Imagens ({_CURINGAS})"
+    ";;Todos os arquivos (*)"
+)
+
+#: Dito a quem abrir arquivo sem texto extraível.
+SEM_CAMADA_DE_TEXTO = (
+    "Indisponível neste arquivo: ele não tem camada de texto — é imagem, "
+    "ou PDF de digitalização. A tarja por retângulo continua servindo a "
+    "tudo. Para habilitar a busca automática e a seleção de palavras, "
+    "passe o arquivo antes pela ferramenta PDF Pesquisável, que "
+    "acrescenta a camada por reconhecimento óptico."
+)
+
+
+def tem_camada_de_texto(doc, ate: int = 20) -> bool:
+    """Se há texto extraível no documento aberto.
+
+    A pergunta não é sobre formato. PDF de digitalização — que é a maior
+    parte do que chega a uma corregedoria — também não tem camada de
+    texto, e nele a busca automática sempre respondeu "nada encontrado"
+    sobre páginas cheias de CPF, sem dizer por quê. Quem lê essa resposta
+    conclui que não há CPF ali, que é a conclusão oposta à verdadeira.
+
+    Olha as primeiras páginas e para na primeira que tiver texto: num
+    documento de trezentas páginas digitalizadas, varrer todas custaria
+    caro para responder o que a primeira já responde.
+    """
+    for i in range(min(len(doc), ate)):
+        if doc[i].get_text("words"):
+            return True
+    return False
 
 
 # ─────────────────────────────────────────
@@ -302,7 +353,13 @@ class SaveThread(QThread):
                     )
 
                 buf = io.BytesIO()
-                img.save(buf, format="PDF")
+                # A resolução precisa ir declarada. Sem ela o PIL grava a
+                # imagem assumindo 72 DPI, e como a página foi rasterizada
+                # a RENDER_SCALE o papel saía multiplicado pelo mesmo
+                # fator: um A4 virava 1190x1684 pt, perto de um A2. O
+                # documento censurado é peça dos autos, e peça em papel de
+                # tamanho errado é problema de quem for juntá-la.
+                img.save(buf, format="PDF", resolution=72.0 * k)
                 buf.seek(0)
                 tmp = fitz.open("pdf", buf.read())
                 out_doc.insert_pdf(tmp)
@@ -364,6 +421,24 @@ class TarjaPretaTool(ToolPage):
             guardadas = palavras_da_pagina(self._doc[indice])
             self._palavras_por_pagina[indice] = guardadas
         return guardadas
+
+    def _ajustar_por_camada_de_texto(self):
+        """Liga ou desliga o que só funciona havendo texto extraível.
+
+        Deixar essas ações ligadas sobre uma digitalização não é
+        neutro: a ferramenta responderia "nada encontrado" a um
+        documento cheio de dado protegido, e quem lê isso arquiva
+        acreditando ter conferido.
+        """
+        for w in (self._btn_search, self._btn_bracket,
+                  self._btn_preview_brackets, self._btn_modo_texto):
+            if w.property("dica_original") is None:
+                w.setProperty("dica_original", w.toolTip())
+            w.setEnabled(self._tem_texto)
+            w.setToolTip(w.property("dica_original") if self._tem_texto
+                         else SEM_CAMADA_DE_TEXTO)
+        if not self._tem_texto:
+            self._definir_modo(PaginaTarja.MODO_RETANGULO)
 
     def _tarjas_da(self, indice: int) -> list:
         return self._tarjas_por_pagina.get(indice, [])
@@ -665,13 +740,18 @@ class TarjaPretaTool(ToolPage):
                              else Qt.CursorShape.CrossCursor)
             pagina.update()
         if self._dica is not None:
-            self._dica.setText(
-                ("Marque as palavras a tarjar   •   Ctrl+Z desfaz"
-                 if texto else
-                 "Arraste para cobrir a área   •   Ctrl+Z desfaz"))
+            if not getattr(self, "_tem_texto", True):
+                self._dica.setText(
+                    "Sem camada de texto — tarja por retângulo   •   "
+                    "Ctrl+Z desfaz")
+            else:
+                self._dica.setText(
+                    ("Marque as palavras a tarjar   •   Ctrl+Z desfaz"
+                     if texto else
+                     "Arraste para cobrir a área   •   Ctrl+Z desfaz"))
 
     def _set_welcome_state(self):
-        self._visor.mensagem("Abra um PDF para começar")
+        self._visor.mensagem("Abra um PDF ou uma imagem para começar")
 
     def _ao_mudar_pagina(self, indice: int):
         self._toolbar.set_page(indice, self._visor.total())
@@ -694,7 +774,7 @@ class TarjaPretaTool(ToolPage):
 
     def _open_file(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Abrir PDF", "", "Arquivos PDF (*.pdf)")
+            self, "Abrir documento ou imagem", "", FILTRO_ABERTURA)
         if not path:
             return
         try:
@@ -720,13 +800,19 @@ class TarjaPretaTool(ToolPage):
             self._toolbar.set_page(0, len(self._doc))
             self._toolbar.set_zoom(self._visor.zoom())
             self._update_tarja_count()
-            for w in (self._btn_search, self._btn_save, self._btn_undo,
-                      self._btn_clear_page, self._btn_clear_all,
-                      self._btn_bracket, self._btn_preview_brackets):
+            for w in (self._btn_save, self._btn_undo,
+                      self._btn_clear_page, self._btn_clear_all):
                 w.setEnabled(True)
-            self.status_msg.emit(f"PDF aberto: {len(self._doc)} página(s)")
+            self._tem_texto = tem_camada_de_texto(self._doc)
+            self._ajustar_por_camada_de_texto()
+            quantas = f"{len(self._doc)} página(s)"
+            self.status_msg.emit(
+                f"Aberto: {quantas}" if self._tem_texto else
+                f"Aberto: {quantas}, sem camada de texto — só a tarja por "
+                "retângulo está disponível")
         except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Não foi possível abrir o PDF:\n{e}")
+            QMessageBox.critical(
+                self, "Erro", f"Não foi possível abrir o arquivo:\n{e}")
 
     # ─────────────────────────────────────
     #  AÇÕES DE TARJA
@@ -1009,12 +1095,20 @@ class TarjaPretaTool(ToolPage):
             return
         contagem = sum(len(v) for v in self._tarjas_por_pagina.values())
         paginas = len([p for p, v in self._tarjas_por_pagina.items() if v])
-        item = derivado.medir(
-            self._caminho_origem, self._ultimo_salvo,
-            detalhes=[
-                ("Áreas censuradas", str(contagem)),
-                ("Páginas com censura", f"{paginas} de {len(self._doc)}"),
-            ])
+        detalhes = [
+            ("Áreas censuradas", str(contagem)),
+            ("Páginas com censura", f"{paginas} de {len(self._doc)}"),
+        ]
+        # Imagem entra e PDF sai. A peça precisa dizer isso: quem confere
+        # os dois resumos veria arquivos de formatos diferentes e ficaria
+        # sem saber se houve conversão ou se houve troca de material.
+        origem = Path(self._caminho_origem).suffix.lower()
+        if origem != ".pdf":
+            detalhes.insert(0, ("Conversão de formato",
+                                "imagem " + origem.lstrip(".").upper()
+                                + " convertida em PDF de uma página"))
+        item = derivado.medir(self._caminho_origem, self._ultimo_salvo,
+                              detalhes=detalhes)
         termo = derivado.TermoDerivado(
             titulo="Termo de Censura em Dados e Informações Protegidas",
             operacao="tarjamento de dados e informações protegidas",
