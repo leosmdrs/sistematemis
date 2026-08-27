@@ -187,13 +187,22 @@ linha de `sha256sum` — "arquivo.pdf" contribui a, d e f. Agora se procura
 antes uma palavra que já seja o resumo inteiro. Achado por prova, não em
 uso.
 
-**Das cinco ideias do artigo, resta meia.** O meio de entrega e o
-momento do recebimento, a hora com fuso e o relógio qualificado, e o
-roteiro re-executável da Tarja Preta estão feitos. Falta o roteiro da
-**Edição de Vídeo** — e ficou medido que ele é possível: o mesmo build
-do FFmpeg, com os mesmos parâmetros, produz saída **byte a byte
-idêntica**, de modo que ali a conferência pode ser do próprio arquivo, e
-não do conteúdo como na censura.
+**As cinco ideias do artigo estão feitas.** Procedência em toda peça,
+conferência de integridade, meio de entrega e momento do recebimento,
+hora com fuso e relógio qualificado, e roteiro re-executável nas duas
+ferramentas que derivam arquivo.
+
+Três ferramentas emitem peça conferível agora, e cada uma confere o que
+pode conferir. A **Análise de Planilha** compara o resumo do conteúdo da
+tabela. A **Tarja Preta** compara o resumo dos pixels, porque gravar duas
+vezes a mesma censura produz PDFs de bytes diferentes — o formato guarda
+a hora da gravação. A **Edição de Vídeo** compara os próprios bytes: ficou
+medido que as cinco formas que ela produz saem byte a byte idênticas com
+o mesmo FFmpeg, e podendo conferir os bytes, conferem-se os bytes.
+
+Nas três, "não reproduz" e "não foi possível" são situações distintas.
+Original que sumiu, que mudou, ou motor de outra versão não é operação
+que deixou de reproduzir — e a peça não chama uma pela outra.
 
 ### Nitidez da interface — o fator 0,85 saiu (27/08/2026)
 

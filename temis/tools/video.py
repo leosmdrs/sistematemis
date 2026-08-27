@@ -267,6 +267,20 @@ class VideoTool(ToolPage):
         self._btn_termo.clicked.connect(self._gerar_termo)
         panel.footer.addWidget(self._btn_termo)
 
+        # O roteiro é o que torna a edição conferível: com os originais,
+        # ele e o mesmo FFmpeg, um terceiro reexecuta e obtém o mesmo
+        # arquivo, byte a byte. Nasce desligado pelo mesmo motivo do
+        # termo — o resumo da saída é dos bytes finais.
+        self._btn_roteiro = QPushButton("  Salvar roteiro")
+        self._btn_roteiro.setEnabled(False)
+        self._btn_roteiro.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_roteiro.setToolTip(
+            "Grava a operação e seus parâmetros em forma de máquina, com "
+            "os resumos dos originais e o do arquivo produzido. Acompanha "
+            "a peça: é por ele que a edição se confere.")
+        self._btn_roteiro.clicked.connect(self._salvar_roteiro)
+        panel.footer.addWidget(self._btn_roteiro)
+
         self._btn_processar = output_button("Processar")
         self._btn_processar.clicked.connect(self._processar)
         self._btn_processar.setEnabled(False)
@@ -618,12 +632,18 @@ class VideoTool(ToolPage):
 
         tarefas = []
         self._derivacoes = []
+        self._parametros = []
         for v in self._videos:
             saida = str(Path(pasta) / f"{Path(v.nome).stem}-compactado.mp4")
             tarefas.append((
                 core.cmd_compactar(v.caminho, saida, preset, altura,
                                    sem_audio, v.codec_audio),
                 v.duracao, v.nome, saida))
+            self._parametros.append((
+                "compactar", [v.caminho],
+                {"preset": preset.chave, "altura": altura,
+                 "sem_audio": sem_audio, "codec_audio": v.codec_audio},
+                saida))
             self._derivacoes.append((
                 [v.caminho], saida,
                 [("Operação", "compactação"),
@@ -654,6 +674,10 @@ class VideoTool(ToolPage):
             saida += ".mp4"
         cmd = core.cmd_fatiar(v.caminho, saida, inicio, fim,
                               self._chk_preciso.isChecked())
+        self._parametros = [(
+            "fatiar", [v.caminho],
+            {"inicio": inicio, "fim": fim,
+             "recodificar": self._chk_preciso.isChecked()}, saida)]
         self._derivacoes = [(
             [v.caminho], saida,
             [("Operação", "recorte de trecho"),
@@ -684,6 +708,9 @@ class VideoTool(ToolPage):
             Path(self._tmpdir.name) / "lista.txt")
         recodificar = core.precisa_recodificar(self._videos)
         duracao = sum(v.duracao for v in self._videos)
+        self._parametros = [(
+            "mesclar", [v.caminho for v in self._videos],
+            {"recodificar": recodificar}, saida)]
         self._derivacoes = [(
             [v.caminho for v in self._videos], saida,
             [("Operação", "mesclagem"),
@@ -719,8 +746,26 @@ class VideoTool(ToolPage):
         produzidas = getattr(self, "_produzidas", [])
         if not produzidas:
             return
-        itens = [derivado.medir(origens, saida, detalhes)
-                 for origens, saida, detalhes in produzidas]
+        roteiros = getattr(self, "_roteiros", [])
+        itens = []
+        for i, (origens, saida, detalhes) in enumerate(produzidas):
+            extras = list(detalhes)
+            if i < len(roteiros) and roteiros[i].ffmpeg:
+                extras.append(("FFmpeg empregado", roteiros[i].ffmpeg))
+            itens.append(derivado.medir(origens, saida, extras))
+
+        # Uma conferência por arquivo produzido, e a peça relata o pior
+        # dos resultados: dizer "reproduz" quando uma das saídas não
+        # reproduziu seria a peça respondendo pela média.
+        situacoes = [core.reproduzir(r) for r in roteiros]
+        if any(s == "nao" for s, _o, _e in situacoes):
+            veredito = next((x for x in situacoes if x[0] == "nao"))
+        elif situacoes and all(s == "sim" for s, _o, _e in situacoes):
+            veredito = ("sim", "", "")
+        elif situacoes:
+            veredito = next((x for x in situacoes if x[0] == "impossivel"))
+        else:
+            veredito = ("impossivel", "", "não há roteiro a conferir")
         operacao = {
             "compactar": "compactação",
             "fatiar": "recorte",
@@ -729,10 +774,41 @@ class VideoTool(ToolPage):
         termo = derivado.TermoDerivado(
             titulo="Termo de Edição de Material Audiovisual",
             operacao=f"{operacao} audiovisual",
-            ressalvas=self.RESSALVAS,
+            ressalvas=self.RESSALVAS + (
+                core.frase_reproducao(veredito[0], veredito[2]),),
             motores=("video",),
             itens=itens)
         TermoDerivadoDialog(termo, self).exec()
+
+    def _salvar_roteiro(self):
+        roteiros = getattr(self, "_roteiros", [])
+        if not roteiros:
+            return
+        # Uma operação produz um roteiro; a compactação de vários vídeos
+        # produz vários. Num arquivo só, porque foram um gesto só e é
+        # assim que a peça os relaciona.
+        sugerido = str(Path(roteiros[0].origens[0][0]).with_suffix(
+            ".roteiro.json")) if roteiros[0].origens else ""
+        destino, _ = QFileDialog.getSaveFileName(
+            self, "Salvar roteiro da edição", sugerido, "Roteiro (*.json)")
+        if not destino:
+            return
+        if not destino.lower().endswith(".json"):
+            destino += ".json"
+        try:
+            if len(roteiros) == 1:
+                core.salvar_roteiro(roteiros[0], destino)
+            else:
+                import json
+                Path(destino).write_text(
+                    json.dumps({"versao": 1,
+                                "roteiros": [r.dados() for r in roteiros]},
+                               ensure_ascii=False, indent=2),
+                    encoding="utf-8")
+        except Exception as e:                          # noqa: BLE001
+            QMessageBox.critical(self, "Erro ao salvar o roteiro", str(e))
+            return
+        self.status_msg.emit(f"Roteiro salvo: {Path(destino).name}")
 
     def _ao_iniciar_etapa(self, atual: int, total: int, rotulo: str):
         self._progresso.setLabelText(
@@ -765,7 +841,17 @@ class VideoTool(ToolPage):
             for origens, saida, detalhes in getattr(self, "_derivacoes", [])
             if saida in saidas
         ]
+        # O roteiro só pode nascer aqui: o resumo do arquivo produzido é
+        # dos bytes finais, e antes de existir arquivo não há bytes a
+        # resumir. Operação que falhou não vira roteiro — roteiro que não
+        # produziu nada não se confere contra coisa alguma.
+        self._roteiros = [
+            core.montar_roteiro(operacao, entradas, parametros, saida)
+            for operacao, entradas, parametros, saida
+            in getattr(self, "_parametros", []) if saida in saidas
+        ]
         self._btn_termo.setEnabled(bool(self._produzidas))
+        self._btn_roteiro.setEnabled(bool(self._roteiros))
         self._relatar(saidas)
 
     def _relatar(self, saidas: list[str]):

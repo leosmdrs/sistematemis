@@ -16,7 +16,7 @@ import json
 import re
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 # ─────────────────────────────────────────
@@ -365,3 +365,209 @@ def executar(cmd: list[str], duracao: float = 0.0,
     if progresso:
         progresso(1.0)
     return True, ""
+
+# ─────────────────────────────────────────
+#  ROTEIRO
+# ─────────────────────────────────────────
+
+#: Nomes das operações no roteiro, e como se leem na peça.
+OPERACOES = {
+    "compactar": "compactação",
+    "fatiar": "recorte de trecho",
+    "mesclar": "mesclagem",
+}
+
+
+@dataclass
+class Roteiro:
+    """A operação declarada, com o que ela precisa para ser refeita.
+
+    A Edição de Vídeo declarava os parâmetros em prosa no termo — "CRF
+    20", "720p", "de 00:01:12 a 00:03:40". Prosa se lê, e não se
+    executa: um terceiro que quisesse conferir teria de adivinhar o
+    comando. Aqui os parâmetros ficam em forma de máquina, e a própria
+    ferramenta reconstrói o comando a partir deles.
+
+    **A conferência é do arquivo, e não do conteúdo** — ao contrário da
+    censura, e por um motivo medido: as cinco formas que esta ferramenta
+    produz (compactar, fatiar copiando, fatiar recodificando, mesclar
+    copiando, mesclar recodificando) saem byte a byte idênticas quando
+    reexecutadas com o mesmo FFmpeg e os mesmos parâmetros. Podendo
+    conferir os bytes, confere-se os bytes: é a garantia mais forte.
+
+    Daí a versão do FFmpeg entrar no roteiro. A promessa vale para
+    aquele motor; com outro, o resultado pode ser equivalente e não
+    idêntico, e a peça precisa poder dizer qual dos dois casos é.
+    """
+
+    operacao: str = ""
+    #: [(caminho, resumo)] na ordem em que entraram — que, na mesclagem,
+    #: é o que decide o resultado.
+    origens: list = field(default_factory=list)
+    parametros: dict = field(default_factory=dict)
+    resumo_saida: str = ""
+    ffmpeg: str = ""
+    criado_em: str = ""
+
+    @property
+    def caminhos(self) -> list:
+        return [c for c, _ in self.origens]
+
+    def descrever(self) -> str:
+        return OPERACOES.get(self.operacao, self.operacao)
+
+    def comando(self, destino: str, pasta_trabalho=None) -> list:
+        """Reconstrói o comando do FFmpeg a partir dos parâmetros.
+
+        Pelos mesmos montadores que a ferramenta usa ao produzir. Dois
+        montadores para o mesmo comando divergiriam com o tempo, e a
+        conferência passaria a comparar contra coisa diferente da que
+        foi gravada.
+        """
+        p = dict(self.parametros)
+        entradas = self.caminhos
+        if self.operacao == "compactar":
+            return cmd_compactar(entradas[0], destino,
+                                 preset_por_chave(p.get("preset", "")),
+                                 int(p.get("altura", 0)),
+                                 bool(p.get("sem_audio", False)),
+                                 p.get("codec_audio", ""))
+        if self.operacao == "fatiar":
+            return cmd_fatiar(entradas[0], destino, float(p.get("inicio", 0)),
+                              float(p.get("fim", 0)),
+                              bool(p.get("recodificar", False)))
+        if self.operacao == "mesclar":
+            pasta = Path(pasta_trabalho or Path(destino).parent)
+            lista = escrever_lista_concat(entradas, pasta / "lista.txt")
+            return cmd_mesclar(lista, destino,
+                               bool(p.get("recodificar", False)))
+        raise ValueError("operação desconhecida: " + self.operacao)
+
+    def dados(self) -> dict:
+        return {"versao": 1, "operacao": self.operacao,
+                "origens": [{"caminho": c, "resumo": r}
+                            for c, r in self.origens],
+                "parametros": dict(self.parametros),
+                "resumo_saida": self.resumo_saida, "ffmpeg": self.ffmpeg,
+                "criado_em": self.criado_em}
+
+    @classmethod
+    def de_dados(cls, d: dict) -> "Roteiro":
+        return cls(operacao=d.get("operacao", ""),
+                   origens=[(x.get("caminho", ""), x.get("resumo", ""))
+                            for x in d.get("origens", [])],
+                   parametros=dict(d.get("parametros", {})),
+                   resumo_saida=d.get("resumo_saida", ""),
+                   ffmpeg=d.get("ffmpeg", ""),
+                   criado_em=d.get("criado_em", ""))
+
+
+def versao_curta() -> str:
+    """Só o número da versão do FFmpeg, sem a faixa de compilação."""
+    achado = re.search(r"ffmpeg version (\S+)", versao() or "")
+    return achado.group(1) if achado else ""
+
+
+def montar_roteiro(operacao: str, entradas: list, parametros: dict,
+                   saida: str = "") -> Roteiro:
+    """O roteiro correspondente a uma operação que acabou de rodar."""
+    from ..relogio import carimbo
+    from .hash_core import sha256_file
+
+    def resumo(caminho):
+        try:
+            return sha256_file(str(caminho))
+        except OSError:
+            return ""
+
+    return Roteiro(operacao=operacao,
+                   origens=[(str(e), resumo(e)) for e in entradas],
+                   parametros=dict(parametros),
+                   resumo_saida=resumo(saida) if saida else "",
+                   ffmpeg=versao_curta(), criado_em=carimbo())
+
+
+def salvar_roteiro(roteiro: Roteiro, caminho) -> None:
+    Path(caminho).write_text(
+        json.dumps(roteiro.dados(), ensure_ascii=False, indent=2),
+        encoding="utf-8")
+
+
+def ler_roteiro(caminho) -> Roteiro:
+    return Roteiro.de_dados(
+        json.loads(Path(caminho).read_text(encoding="utf-8")))
+
+
+def reproduzir(roteiro: Roteiro, esperado: str = "") -> tuple:
+    """Re-executa o roteiro e confere o arquivo produzido.
+
+    Devolve (situação, resumo obtido, explicação), com "sim", "nao" ou
+    "impossivel". A terceira não é a segunda: original que sumiu, ou
+    FFmpeg de outra versão, não é edição que deixou de reproduzir — e
+    chamar uma pela outra seria a peça acusando divergência que não
+    constatou.
+    """
+    import tempfile
+
+    from .hash_core import sha256_file
+
+    alvo = esperado or roteiro.resumo_saida
+    if ffmpeg_path() is None:
+        return "impossivel", "", "o FFmpeg não está disponível nesta estação"
+
+    for caminho, declarado in roteiro.origens:
+        arquivo = Path(caminho)
+        if not arquivo.is_file():
+            return "impossivel", "", (
+                "arquivo de origem não encontrado: " + arquivo.name)
+        try:
+            atual = sha256_file(str(arquivo))
+        except OSError as e:
+            return "impossivel", "", f"não foi possível ler {arquivo.name}: {e}"
+        if declarado and atual != declarado:
+            return "impossivel", "", (
+                "o arquivo de origem não é mais o mesmo: " + arquivo.name)
+
+    aqui = versao_curta()
+    with tempfile.TemporaryDirectory() as pasta:
+        destino = str(Path(pasta) / "conferencia.mp4")
+        try:
+            cmd = roteiro.comando(destino, pasta)
+        except ValueError as e:
+            return "impossivel", "", str(e)
+        deu_certo, erro = executar(cmd)
+        if not deu_certo:
+            return "impossivel", "", "o FFmpeg falhou na re-execução: " + erro
+        obtido = sha256_file(destino)
+
+    if not alvo:
+        return "impossivel", obtido, "não há resumo declarado a conferir"
+    if obtido == alvo:
+        return "sim", obtido, ""
+    if roteiro.ffmpeg and aqui and roteiro.ffmpeg != aqui:
+        return "impossivel", obtido, (
+            "o FFmpeg desta estação (" + aqui + ") não é o que produziu o "
+            "arquivo (" + roteiro.ffmpeg + "), e a identidade byte a byte "
+            "só é prometida para o mesmo motor")
+    return "nao", obtido, "o arquivo produzido não corresponde ao declarado"
+
+
+def frase_reproducao(situacao: str, explicacao: str = "") -> str:
+    """Como a conferência se lê na peça."""
+    if situacao == "sim":
+        return ("A operação foi re-executada a partir dos arquivos "
+                "originais, pelo roteiro que acompanha esta peça, e "
+                "produziu arquivo de resumo criptográfico idêntico ao "
+                "declarado. O resultado é, portanto, conferível por "
+                "terceiro que disponha dos originais, do roteiro e do "
+                "mesmo FFmpeg.")
+    if situacao == "nao":
+        return ("A re-execução do roteiro sobre os arquivos originais não "
+                "reproduziu o arquivo declarado, ainda que com o mesmo "
+                "FFmpeg. Enquanto a divergência não for esclarecida, o "
+                "arquivo produzido não deve ser tratado como resultado "
+                "deste roteiro.")
+    return ("Não foi possível re-executar o roteiro nesta oportunidade"
+            + (": " + explicacao if explicacao else "")
+            + ". A conferência segue possível por quem disponha dos "
+            "arquivos originais, do roteiro e do mesmo FFmpeg.")
