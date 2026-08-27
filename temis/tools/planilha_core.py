@@ -392,6 +392,12 @@ class Passo:
     #: Falha que não impede a análise de seguir, mas que precisa aparecer
     #: na peça (coluna que sumiu, por exemplo).
     aviso: str = ""
+    #: Como a peça diz o que aconteceu com as incomparáveis. O padrão
+    #: serve ao filtro, onde a linha some do resultado. A coluna derivada
+    #: e o agrupamento trocam esta frase, porque ali a linha permanece e
+    #: só o valor calculado fica vazio — dizer que "ficaram de fora"
+    #: seria a peça afirmando uma perda que não houve.
+    destino_incomparaveis: str = "ficaram de fora"
 
 
 class Operacao:
@@ -458,6 +464,91 @@ ORDINAIS = ("maior", "maior_igual", "menor", "menor_igual", "entre")
 SEPARA_LISTA = re.compile(r"[\r\n;]+")
 
 
+def _grandeza(v):
+    """O valor comparável por grandeza — data vira número de dias."""
+    d = como_data(v)
+    return float(d.toordinal()) if d is not None else como_numero(v)
+
+
+def avaliar(condicao: str, celula, valor: str = "", valor2: str = "",
+            sensivel: bool = False):
+    """A condição aplicada a uma célula: True, False, ou None.
+
+    None é o terceiro resultado, e o que não pode ser perdido: significa
+    que a comparação não pôde ser feita — texto onde se pediu número,
+    data ilegível. Quem chama decide o destino da linha, mas ninguém
+    pode confundir "não atende" com "não deu para saber".
+
+    Vive aqui fora, e não dentro do Filtro, porque a Marcação de linhas
+    usa exatamente as mesmas catorze condições. Duas implementações da
+    palavra "contém" divergiriam com o tempo, e aí a peça descreveria
+    uma coisa enquanto a ferramenta fazia outra.
+    """
+    c = condicao
+    if c == "vazio":
+        return not texto(celula)
+    if c == "preenchido":
+        return bool(texto(celula))
+
+    if c in ORDINAIS:
+        a = _grandeza(celula)
+        b = _grandeza(valor)
+        if a is None or b is None:
+            return None
+        if c == "maior":
+            return a > b
+        if c == "maior_igual":
+            return a >= b
+        if c == "menor":
+            return a < b
+        if c == "menor_igual":
+            return a <= b
+        b2 = _grandeza(valor2)
+        if b2 is None:
+            return None
+        baixo, alto = min(b, b2), max(b, b2)
+        return baixo <= a <= alto
+
+    arruma = (str.strip) if sensivel else sem_acento
+    x = arruma(texto(celula))
+    ref = arruma(valor)
+    if c == "igual":
+        return x == ref
+    if c == "diferente":
+        return x != ref
+    if c == "contem":
+        return ref in x
+    if c == "nao_contem":
+        return ref not in x
+    if c == "comeca":
+        return x.startswith(ref)
+    if c == "termina":
+        return x.endswith(ref)
+    if c == "na_lista":
+        lista = {arruma(v) for v in SEPARA_LISTA.split(valor) if v.strip()}
+        return x in lista
+    return False
+
+
+def frase_condicao(coluna: str, condicao: str, valor: str = "",
+                   valor2: str = "", sensivel: bool = False) -> str:
+    """Como a condição se lê na peça. Uma redação só, para os dois usos."""
+    rotulo, quantos = CONDICOES.get(condicao, (condicao, 1))
+    frase = '"' + coluna + '" ' + rotulo
+    if quantos == 1:
+        valores = [v for v in SEPARA_LISTA.split(valor) if v.strip()]
+        if condicao == "na_lista" and len(valores) > 6:
+            frase += " (" + str(len(valores)) + " valores relacionados)"
+        else:
+            frase += ' "' + valor + '"'
+    elif quantos == 2:
+        frase += ' "' + valor + '" e "' + valor2 + '"'
+    if quantos and condicao not in ORDINAIS:
+        frase += (", distinguindo maiúsculas e acentos" if sensivel
+                  else ", sem distinguir maiúsculas nem acentos")
+    return frase
+
+
 @dataclass
 class Filtro(Operacao):
     """Mantém (ou descarta) as linhas que atendem a uma condição."""
@@ -475,57 +566,9 @@ class Filtro(Operacao):
 
     tipo = "filtro"
 
-    def _grandeza(self, v):
-        d = como_data(v)
-        return float(d.toordinal()) if d is not None else como_numero(v)
-
     def _casa(self, celula):
-        """Verdadeiro, falso, ou None quando não deu para comparar."""
-        c = self.condicao
-        if c == "vazio":
-            return not texto(celula)
-        if c == "preenchido":
-            return bool(texto(celula))
-
-        if c in ORDINAIS:
-            a = self._grandeza(celula)
-            b = self._grandeza(self.valor)
-            if a is None or b is None:
-                return None
-            if c == "maior":
-                return a > b
-            if c == "maior_igual":
-                return a >= b
-            if c == "menor":
-                return a < b
-            if c == "menor_igual":
-                return a <= b
-            b2 = self._grandeza(self.valor2)
-            if b2 is None:
-                return None
-            baixo, alto = min(b, b2), max(b, b2)
-            return baixo <= a <= alto
-
-        arruma = (str.strip) if self.sensivel else sem_acento
-        alvo = arruma(texto(celula))
-        ref = arruma(self.valor)
-        if c == "igual":
-            return alvo == ref
-        if c == "diferente":
-            return alvo != ref
-        if c == "contem":
-            return ref in alvo
-        if c == "nao_contem":
-            return ref not in alvo
-        if c == "comeca":
-            return alvo.startswith(ref)
-        if c == "termina":
-            return alvo.endswith(ref)
-        if c == "na_lista":
-            lista = {arruma(x) for x in SEPARA_LISTA.split(self.valor)
-                     if x.strip()}
-            return alvo in lista
-        return False
+        return avaliar(self.condicao, celula, self.valor, self.valor2,
+                       self.sensivel)
 
     def aplicar(self, t: Tabela) -> tuple[Tabela, Passo]:
         p = self._falta(t, self.coluna)
@@ -545,21 +588,10 @@ class Filtro(Operacao):
                       depois=len(guardadas), incomparaveis=incomparaveis))
 
     def descrever(self) -> str:
-        rotulo, quantos = CONDICOES.get(self.condicao, (self.condicao, 1))
         verbo = "Mantidas" if self.manter else "Descartadas"
-        frase = verbo + ' as linhas em que "' + self.coluna + '" ' + rotulo
-        if quantos == 1:
-            valores = [v for v in SEPARA_LISTA.split(self.valor) if v.strip()]
-            if self.condicao == "na_lista" and len(valores) > 6:
-                frase += " (" + str(len(valores)) + " valores relacionados)"
-            else:
-                frase += ' "' + self.valor + '"'
-        elif quantos == 2:
-            frase += ' "' + self.valor + '" e "' + self.valor2 + '"'
-        if quantos and self.condicao not in ORDINAIS:
-            frase += (", distinguindo maiúsculas e acentos" if self.sensivel
-                      else ", sem distinguir maiúsculas nem acentos")
-        return frase
+        return (verbo + " as linhas em que "
+                + frase_condicao(self.coluna, self.condicao, self.valor,
+                                 self.valor2, self.sensivel))
 
     def dados(self) -> dict:
         return {"tipo": self.tipo, "coluna": self.coluna,
@@ -715,6 +747,395 @@ class Duplicidades(Operacao):
                    manter=d.get("manter", "primeira"))
 
 
+# ── coluna derivada ──────────────────────
+
+#: Cálculo -> (como se escreve na peça, quantas colunas de origem
+#: consome; 0 é lista sem limite).
+CALCULOS: dict[str, tuple[str, int]] = {
+    "juntar":  ("juntar textos", 0),
+    "extrair": ("extrair parte do texto", 1),
+    "dias":    ("contar dias entre datas", 2),
+}
+
+
+def _nome_livre(usados: list, base: str) -> str:
+    """Um nome de coluna que ainda não está na lista.
+
+    Duas colunas com o mesmo nome quebrariam `Tabela.indice`, que devolve
+    sempre a primeira: o passo seguinte leria a coluna errada sem que
+    nada avisasse.
+    """
+    if base not in usados:
+        return base
+    n = 2
+    while base + " (" + str(n) + ")" in usados:
+        n += 1
+    return base + " (" + str(n) + ")"
+
+
+@dataclass
+class Derivada(Operacao):
+    """Acrescenta uma coluna calculada a partir das que já existem.
+
+    Coluna derivada é dado novo dentro da análise, e por isso é operação
+    declarada como qualquer outra — quem lê a peça precisa poder refazer
+    a conta. Nenhum dos três cálculos consulta coisa alguma fora da
+    própria linha, e é isso que os torna reproduzíveis em outra estação.
+
+    A operação **não sobrescreve coluna existente**. Se o nome escolhido
+    já estiver em uso, ela não executa e a peça registra o motivo:
+    substituir uma coluna apagaria dado, e apagar dado sem que o termo
+    diga é exatamente a porta lateral que este módulo não pode ter.
+    """
+
+    nome: str = ""
+    calculo: str = "juntar"
+    origens: list = field(default_factory=list)
+    #: Só o "juntar" usa: o que vai entre um pedaço e outro.
+    separador: str = " "
+    #: Só o "extrair" usa: posição do primeiro caractere, contando de 1,
+    #: e quantos levar — zero leva até o fim.
+    inicio: int = 1
+    tamanho: int = 0
+
+    tipo = "derivada"
+
+    def _calcular(self, valores: list) -> tuple:
+        """O valor da célula nova, e se foi possível calculá-lo."""
+        if self.calculo == "juntar":
+            partes = [texto(v) for v in valores]
+            return self.separador.join(p for p in partes if p), True
+        if self.calculo == "extrair":
+            s = texto(valores[0]) if valores else ""
+            ini = max(1, int(self.inicio))
+            fim = (ini - 1 + int(self.tamanho)) if self.tamanho > 0 else len(s)
+            return s[ini - 1:fim], True
+        if self.calculo == "dias":
+            if len(valores) < 2:
+                return VAZIO, False
+            d1, d2 = como_data(valores[0]), como_data(valores[1])
+            if d1 is None or d2 is None:
+                return VAZIO, False
+            return (d2 - d1).days, True
+        return VAZIO, False
+
+    def _parado(self, t: Tabela, motivo: str) -> Passo:
+        return Passo(descricao=self.descrever(), antes=t.n_linhas,
+                     depois=t.n_linhas, aviso="não executado: " + motivo)
+
+    def aplicar(self, t: Tabela) -> tuple[Tabela, Passo]:
+        nome = self.nome.strip()
+        if not nome:
+            return t, self._parado(t, "a coluna nova não recebeu nome")
+        if t.indice(nome) >= 0:
+            return t, self._parado(
+                t, 'já existe uma coluna chamada "' + nome
+                + '", e substituí-la apagaria dado')
+        p = self._falta(t, *self.origens)
+        if p is not None:
+            return t, p
+        indices = [t.indice(c) for c in self.origens]
+        linhas, incomparaveis = [], 0
+        for linha in t.linhas:
+            valor, deu = self._calcular([linha[i] for i in indices])
+            if not deu:
+                incomparaveis += 1
+            linhas.append(tuple(linha) + (valor,))
+        return (Tabela(colunas=list(t.colunas) + [nome], linhas=linhas),
+                Passo(descricao=self.descrever(), antes=t.n_linhas,
+                      depois=len(linhas), incomparaveis=incomparaveis,
+                      destino_incomparaveis="ficaram com a coluna nova vazia"))
+
+    def descrever(self) -> str:
+        quais = ", ".join('"' + c + '"' for c in self.origens)
+        frase = 'Acrescentada a coluna "' + self.nome.strip() + '", '
+        if self.calculo == "juntar":
+            return (frase + "juntando o texto de " + quais + ' separado por "'
+                    + self.separador + '" (os vazios não entram)')
+        if self.calculo == "extrair":
+            quanto = ("até o fim" if self.tamanho <= 0
+                      else str(self.tamanho) + " caractere(s)")
+            return (frase + "extraindo de " + quais + " " + quanto
+                    + ", a partir do caractere " + str(max(1, self.inicio)))
+        if self.calculo == "dias":
+            de, ate = (list(self.origens) + ["", ""])[:2]
+            return (frase + 'com os dias corridos de "' + de + '" até "'
+                    + ate + '"')
+        return frase + "por cálculo desconhecido"
+
+    def dados(self) -> dict:
+        return {"tipo": self.tipo, "nome": self.nome,
+                "calculo": self.calculo, "origens": list(self.origens),
+                "separador": self.separador, "inicio": int(self.inicio),
+                "tamanho": int(self.tamanho)}
+
+    @classmethod
+    def de_dados(cls, d: dict) -> "Derivada":
+        return cls(nome=d.get("nome", ""), calculo=d.get("calculo", "juntar"),
+                   origens=list(d.get("origens", [])),
+                   separador=d.get("separador", " "),
+                   inicio=int(d.get("inicio", 1)),
+                   tamanho=int(d.get("tamanho", 0)))
+
+
+# ── agrupamento ──────────────────────────
+
+#: Resumo -> (como a coluna se chama no resultado, se precisa de coluna).
+RESUMOS: dict[str, tuple[str, bool]] = {
+    "contar": ("Quantidade", False),
+    "somar":  ("Soma", True),
+    "media":  ("Média", True),
+    "maximo": ("Maior", True),
+    "minimo": ("Menor", True),
+}
+
+
+@dataclass
+class Agrupamento(Operacao):
+    """Reduz a tabela a um quadro-resumo: uma linha por grupo.
+
+    É a tabela dinâmica, e costuma ser o que vai impresso na peça — o
+    quadro por unidade, por ano, por servidor.
+
+    Duas escolhas ficam declaradas porque mudam o resultado:
+
+    **Os grupos se formam pelo texto exato da célula.** "São Paulo" e
+    "SAO PAULO" ficam em grupos separados. Juntá-los por conta própria
+    seria a ferramenta decidindo que duas grafias são a mesma coisa —
+    juízo que é de quem analisa, e que tem lugar próprio: um filtro ou
+    uma coluna derivada, declarados antes deste passo.
+
+    **A ordem dos grupos é a da primeira aparição**, e não alfabética.
+    Assim uma ordenação feita antes continua valendo, e o resultado não
+    depende de configuração regional nenhuma.
+
+    A média sai como o cálculo a produziu, sem arredondamento — cem
+    dividido por três aparece com todas as casas. Arredondar seria
+    alterar valor fora de operação declarada, que é o que este módulo
+    não faz; quem quiser a casa decimal certa acrescenta, adiante, uma
+    coluna derivada que a produza e diga que produziu.
+    """
+
+    chaves: list = field(default_factory=list)
+    #: [(resumo, coluna)] — a coluna fica vazia quando o resumo é contar.
+    resumos: list = field(default_factory=list)
+
+    tipo = "agrupamento"
+
+    def _titulo(self, resumo: str, coluna: str) -> str:
+        rotulo, usa_coluna = RESUMOS.get(resumo, (resumo, True))
+        return rotulo + " de " + coluna if usa_coluna else rotulo
+
+    def aplicar(self, t: Tabela) -> tuple[Tabela, Passo]:
+        precisa = list(self.chaves) + [c for r, c in self.resumos
+                                       if RESUMOS.get(r, ("", True))[1]]
+        p = self._falta(t, *precisa)
+        if p is not None:
+            return t, p
+        if not self.chaves:
+            return t, Passo(descricao=self.descrever(), antes=t.n_linhas,
+                            depois=t.n_linhas,
+                            aviso="não executado: nenhuma coluna de grupo")
+
+        ik = [t.indice(c) for c in self.chaves]
+        # dict comum: em Python a ordem de inserção é preservada, e é ela
+        # que dá a ordem de primeira aparição prometida na docstring.
+        grupos: dict = {}
+        for linha in t.linhas:
+            chave = tuple(texto(linha[i]) for i in ik)
+            grupos.setdefault(chave, []).append(linha)
+
+        colunas = list(self.chaves)
+        titulos = []
+        for resumo, coluna in self.resumos:
+            titulo = _nome_livre(colunas + titulos,
+                                 self._titulo(resumo, coluna))
+            titulos.append(titulo)
+        colunas += titulos
+
+        linhas, incomparaveis = [], 0
+        for chave, membros in grupos.items():
+            saida = list(chave)
+            perdeu = False
+            for resumo, coluna in self.resumos:
+                # "Contar" não olha coluna nenhuma: conta as linhas do
+                # grupo. Buscar a coluna vazia devolveria -1 e a conta
+                # sairia zero em todo grupo — quadro-resumo de auditoria
+                # com a quantidade zerada é peça que informa o contrário
+                # do que aconteceu.
+                if not RESUMOS.get(resumo, ("", True))[1]:
+                    celulas = list(membros)
+                else:
+                    i = t.indice(coluna)
+                    celulas = [m[i] for m in membros] if i >= 0 else []
+                valor, faltou = self._resumir(resumo, celulas)
+                perdeu = perdeu or faltou
+                saida.append(valor)
+            if perdeu:
+                incomparaveis += 1
+            linhas.append(tuple(saida))
+        return (Tabela(colunas=colunas, linhas=linhas),
+                Passo(descricao=self.descrever(), antes=t.n_linhas,
+                      depois=len(linhas), incomparaveis=incomparaveis,
+                      destino_incomparaveis=(
+                          "tinham célula que não é número, "
+                          "e ela não entrou na conta do grupo")))
+
+    @staticmethod
+    def _resumir(resumo: str, celulas: list) -> tuple:
+        """O valor do resumo, e se alguma célula ficou de fora da conta."""
+        if resumo == "contar":
+            return len(celulas), False
+        if resumo in ("maximo", "minimo"):
+            # Por `chave_ordem`, e não por número: assim o maior e o menor
+            # servem também a data e a texto, com a mesma regra de ordem
+            # que a Ordenação usa — e o valor devolvido é o original, do
+            # jeito que estava na planilha.
+            cheias = [c for c in celulas if texto(c)]
+            if not cheias:
+                return VAZIO, False
+            escolha = (max if resumo == "maximo" else min)
+            return escolha(cheias, key=chave_ordem), False
+        numeros = [como_numero(c) for c in celulas]
+        validos = [n for n in numeros if n is not None]
+        faltou = len(validos) != len([c for c in celulas if texto(c)])
+        if not validos:
+            return VAZIO, faltou
+        total = sum(validos)
+        if resumo == "somar":
+            return total, faltou
+        if resumo == "media":
+            return total / len(validos), faltou
+        return VAZIO, faltou
+
+    def descrever(self) -> str:
+        por = ", ".join('"' + c + '"' for c in self.chaves)
+        quais = ", ".join(self._titulo(r, c) for r, c in self.resumos)
+        frase = "Agrupadas as linhas por " + por
+        if quais:
+            frase += ", resumindo em " + quais
+        return (frase + ". Os grupos se formam pelo texto exato da célula, "
+                "e saem na ordem em que apareceram")
+
+    def dados(self) -> dict:
+        return {"tipo": self.tipo, "chaves": list(self.chaves),
+                "resumos": [[r, c] for r, c in self.resumos]}
+
+    @classmethod
+    def de_dados(cls, d: dict) -> "Agrupamento":
+        return cls(chaves=list(d.get("chaves", [])),
+                   resumos=[(r, c) for r, c in d.get("resumos", [])])
+
+
+# ── marcação ─────────────────────────────
+
+@dataclass
+class Marcacao(Operacao):
+    """Marca as linhas que atendem a uma condição, com justificativa.
+
+    É a operação que ocupa o lugar de pintar a célula de amarelo no
+    Excel, e a diferença não é de estética. A marca aqui nasce de uma
+    regra declarada: a condição que a produziu está escrita na peça, a
+    razão de tê-la aplicado está junto, e qualquer pessoa re-executa o
+    roteiro e obtém exatamente as mesmas linhas marcadas. Célula pintada
+    não se re-executa, não se justifica e não se confere.
+
+    A marca **se acumula, nunca substitui**. Marcando duas vezes na mesma
+    coluna, a linha que atende às duas condições carrega as duas marcas,
+    lado a lado. Sobrescrever apagaria o resultado do passo anterior sem
+    que o termo dissesse — e o termo continuaria relacionando os dois
+    passos, afirmando o que já não estaria lá.
+    """
+
+    coluna_marca: str = "Marcação"
+    marca: str = "SIM"
+    #: Por que estas linhas foram marcadas. Vai na peça junto do passo;
+    #: é a diferença entre um destaque e uma decisão fundamentada.
+    justificativa: str = ""
+    coluna: str = ""
+    condicao: str = "igual"
+    valor: str = ""
+    valor2: str = ""
+    sensivel: bool = False
+
+    tipo = "marcacao"
+
+    #: Entre uma marca e a seguinte, na mesma célula.
+    JUNTA = "; "
+
+    def aplicar(self, t: Tabela) -> tuple[Tabela, Passo]:
+        destino = self.coluna_marca.strip() or "Marcação"
+        marca = self.marca.strip()
+        if not marca:
+            return t, Passo(descricao=self.descrever(), antes=t.n_linhas,
+                            depois=t.n_linhas,
+                            aviso="não executado: a marca está em branco")
+        p = self._falta(t, self.coluna)
+        if p is not None:
+            return t, p
+
+        i = t.indice(self.coluna)
+        j = t.indice(destino)
+        colunas = list(t.colunas) if j >= 0 else list(t.colunas) + [destino]
+        linhas, incomparaveis, marcadas = [], 0, 0
+        for linha in t.linhas:
+            r = avaliar(self.condicao, linha[i], self.valor, self.valor2,
+                        self.sensivel)
+            antes = texto(linha[j]) if j >= 0 else ""
+            if r is None:
+                incomparaveis += 1
+                novo = antes
+            elif r:
+                marcadas += 1
+                partes = [x for x in antes.split(self.JUNTA.strip()) if x.strip()]
+                novo = (antes if marca in [x.strip() for x in partes]
+                        else (antes + self.JUNTA + marca if antes else marca))
+            else:
+                novo = antes
+            if j >= 0:
+                celulas = list(linha)
+                celulas[j] = novo
+                linhas.append(tuple(celulas))
+            else:
+                linhas.append(tuple(linha) + (novo,))
+        return (Tabela(colunas=colunas, linhas=linhas),
+                Passo(descricao=self.descrever() + " Marcadas "
+                      + str(marcadas) + " linha(s).",
+                      antes=t.n_linhas, depois=len(linhas),
+                      incomparaveis=incomparaveis,
+                      destino_incomparaveis="seguiram adiante sem marca"))
+
+    def descrever(self) -> str:
+        destino = self.coluna_marca.strip() or "Marcação"
+        frase = ('Marcadas com "' + self.marca.strip() + '", na coluna "'
+                 + destino + '", as linhas em que '
+                 + frase_condicao(self.coluna, self.condicao, self.valor,
+                                  self.valor2, self.sensivel) + ".")
+        razao = " ".join(self.justificativa.split())
+        if razao:
+            frase += " Justificativa: " + razao
+            if not razao.endswith("."):
+                frase += "."
+        return frase
+
+    def dados(self) -> dict:
+        return {"tipo": self.tipo, "coluna_marca": self.coluna_marca,
+                "marca": self.marca, "justificativa": self.justificativa,
+                "coluna": self.coluna, "condicao": self.condicao,
+                "valor": self.valor, "valor2": self.valor2,
+                "sensivel": self.sensivel}
+
+    @classmethod
+    def de_dados(cls, d: dict) -> "Marcacao":
+        return cls(coluna_marca=d.get("coluna_marca", "Marcação"),
+                   marca=d.get("marca", "SIM"),
+                   justificativa=d.get("justificativa", ""),
+                   coluna=d.get("coluna", ""),
+                   condicao=d.get("condicao", "igual"),
+                   valor=d.get("valor", ""), valor2=d.get("valor2", ""),
+                   sensivel=bool(d.get("sensivel", False)))
+
+
 #: Como o roteiro salvo volta a ser operação. Toda operação nova precisa
 #: entrar aqui, senão o roteiro grava e não relê.
 TIPOS: dict = {
@@ -722,6 +1143,9 @@ TIPOS: dict = {
     Ordenacao.tipo: Ordenacao,
     Colunas.tipo: Colunas,
     Duplicidades.tipo: Duplicidades,
+    Derivada.tipo: Derivada,
+    Agrupamento.tipo: Agrupamento,
+    Marcacao.tipo: Marcacao,
 }
 
 
@@ -977,7 +1401,7 @@ def _quadro_roteiro(t: TermoPlanilha) -> str:
         if p.incomparaveis:
             nota = (f'<br/><font color="{derivado.CINZA}" size="1">'
                     f'{p.incomparaveis} linha(s) não puderam ser comparadas '
-                    "e ficaram de fora</font>")
+                    f"e {e(p.destino_incomparaveis)}</font>")
         if p.aviso:
             nota += (f'<br/><font color="{derivado.CINZA}" size="1">'
                      f"{e(p.aviso)}</font>")

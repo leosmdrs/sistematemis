@@ -22,9 +22,9 @@ from PyQt6.QtCore import QAbstractTableModel, Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
     QAbstractItemView, QCheckBox, QDialog, QDialogButtonBox, QFileDialog,
-    QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QMessageBox,
-    QPlainTextEdit, QProgressDialog, QPushButton, QStackedWidget, QTableView,
-    QVBoxLayout, QWidget,
+    QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
+    QMessageBox, QPlainTextEdit, QProgressDialog, QPushButton,
+    QStackedWidget, QTableView, QVBoxLayout, QWidget,
 )
 
 from ..icons import draw_icon
@@ -119,6 +119,9 @@ class DialogoOperacao(QDialog):
         ("Ordenar", "ordenacao"),
         ("Escolher colunas", "colunas"),
         ("Remover duplicidades", "duplicidades"),
+        ("Acrescentar coluna calculada", "derivada"),
+        ("Agrupar e resumir", "agrupamento"),
+        ("Marcar linhas", "marcacao"),
     )
 
     def __init__(self, colunas: list, operacao=None, parent=None):
@@ -142,6 +145,9 @@ class DialogoOperacao(QDialog):
         self._paginas.addWidget(self._pagina_ordenacao())
         self._paginas.addWidget(self._pagina_colunas())
         self._paginas.addWidget(self._pagina_duplicidades())
+        self._paginas.addWidget(self._pagina_derivada())
+        self._paginas.addWidget(self._pagina_agrupamento())
+        self._paginas.addWidget(self._pagina_marcacao())
         self._familia.currentIndexChanged.connect(self._paginas.setCurrentIndex)
         fora.addWidget(self._paginas, 1)
 
@@ -161,44 +167,90 @@ class DialogoOperacao(QDialog):
         c.addItems(self._colunas)
         return c
 
+    def _bloco_condicao(self, lay, ao_mudar) -> dict:
+        """Os widgets das catorze condições, montados uma vez só.
+
+        Filtrar e Marcar escolhem linhas pela mesma regra — no núcleo é
+        a mesma função `avaliar`. Se a tela montasse a condição duas
+        vezes, uma condição nova apareceria num lugar e não no outro, e
+        o operador veria duas ferramentas que dizem julgar igual e não
+        julgam.
+        """
+        campos = {}
+        lay.addWidget(field_label("Coluna"))
+        campos["coluna"] = self._combo_colunas()
+        lay.addWidget(campos["coluna"])
+
+        lay.addWidget(field_label("Condição"))
+        condicao = NoScrollComboBox()
+        for chave, (rotulo, _) in pc.CONDICOES.items():
+            condicao.addItem(rotulo, chave)
+        condicao.currentIndexChanged.connect(ao_mudar)
+        campos["condicao"] = condicao
+        lay.addWidget(condicao)
+
+        campos["rotulo_valor"] = field_label("Valor")
+        lay.addWidget(campos["rotulo_valor"])
+        # Caixa de várias linhas porque a lista de alvos costuma vir
+        # colada de outra planilha ou de uma decisão — um valor por linha.
+        valor = QPlainTextEdit()
+        valor.setMaximumHeight(96)
+        valor.setPlaceholderText(
+            "Um valor. Para a condição de lista, um por linha.")
+        campos["valor"] = valor
+        lay.addWidget(valor)
+
+        campos["rotulo_valor2"] = field_label("Até")
+        lay.addWidget(campos["rotulo_valor2"])
+        valor2 = QPlainTextEdit()
+        valor2.setMaximumHeight(44)
+        campos["valor2"] = valor2
+        lay.addWidget(valor2)
+
+        sensivel = QCheckBox("Distinguir maiúsculas e acentos")
+        sensivel.setToolTip(
+            'Desmarcado, "José" e "JOSE" são a mesma coisa. A escolha vai '
+            "declarada no termo, porque muda o resultado.")
+        campos["sensivel"] = sensivel
+        lay.addWidget(sensivel)
+        return campos
+
+    @staticmethod
+    def _ajustar_condicao(campos: dict):
+        chave = campos["condicao"].currentData() or "igual"
+        _, quantos = pc.CONDICOES.get(chave, ("", 1))
+        campos["rotulo_valor"].setVisible(quantos >= 1)
+        campos["valor"].setVisible(quantos >= 1)
+        campos["rotulo_valor2"].setVisible(quantos >= 2)
+        campos["valor2"].setVisible(quantos >= 2)
+        campos["sensivel"].setVisible(
+            quantos >= 1 and chave not in pc.ORDINAIS)
+
+    @staticmethod
+    def _ler_condicao(campos: dict) -> dict:
+        return {"coluna": campos["coluna"].currentText(),
+                "condicao": campos["condicao"].currentData() or "igual",
+                "valor": campos["valor"].toPlainText().strip(),
+                "valor2": campos["valor2"].toPlainText().strip(),
+                "sensivel": campos["sensivel"].isChecked()}
+
+    @staticmethod
+    def _por_condicao(campos: dict, op):
+        campos["coluna"].setCurrentText(op.coluna)
+        i = campos["condicao"].findData(op.condicao)
+        if i >= 0:
+            campos["condicao"].setCurrentIndex(i)
+        campos["valor"].setPlainText(op.valor)
+        campos["valor2"].setPlainText(op.valor2)
+        campos["sensivel"].setChecked(op.sensivel)
+
     def _pagina_filtro(self) -> QWidget:
         w = QWidget()
         lay = QVBoxLayout(w)
         lay.setContentsMargins(0, 6, 0, 0)
         lay.setSpacing(8)
 
-        lay.addWidget(field_label("Coluna"))
-        self._f_coluna = self._combo_colunas()
-        lay.addWidget(self._f_coluna)
-
-        lay.addWidget(field_label("Condição"))
-        self._f_condicao = NoScrollComboBox()
-        for chave, (rotulo, _) in pc.CONDICOES.items():
-            self._f_condicao.addItem(rotulo, chave)
-        self._f_condicao.currentIndexChanged.connect(self._ajustar_filtro)
-        lay.addWidget(self._f_condicao)
-
-        self._f_rotulo_valor = field_label("Valor")
-        lay.addWidget(self._f_rotulo_valor)
-        # Caixa de várias linhas porque a lista de alvos costuma vir
-        # colada de outra planilha ou de uma decisão — um valor por linha.
-        self._f_valor = QPlainTextEdit()
-        self._f_valor.setMaximumHeight(96)
-        self._f_valor.setPlaceholderText(
-            "Um valor. Para a condição de lista, um por linha.")
-        lay.addWidget(self._f_valor)
-
-        self._f_rotulo_valor2 = field_label("Até")
-        lay.addWidget(self._f_rotulo_valor2)
-        self._f_valor2 = QPlainTextEdit()
-        self._f_valor2.setMaximumHeight(44)
-        lay.addWidget(self._f_valor2)
-
-        self._f_sensivel = QCheckBox("Distinguir maiúsculas e acentos")
-        self._f_sensivel.setToolTip(
-            'Desmarcado, "José" e "JOSE" são a mesma coisa. A escolha vai '
-            "declarada no termo, porque muda o resultado.")
-        lay.addWidget(self._f_sensivel)
+        self._f = self._bloco_condicao(lay, self._ajustar_filtro)
 
         self._f_descartar = QCheckBox("Descartar as linhas que atendem, "
                                       "em vez de mantê-las")
@@ -208,13 +260,7 @@ class DialogoOperacao(QDialog):
         return w
 
     def _ajustar_filtro(self):
-        chave = self._f_condicao.currentData() or "igual"
-        _, quantos = pc.CONDICOES.get(chave, ("", 1))
-        self._f_rotulo_valor.setVisible(quantos >= 1)
-        self._f_valor.setVisible(quantos >= 1)
-        self._f_rotulo_valor2.setVisible(quantos >= 2)
-        self._f_valor2.setVisible(quantos >= 2)
-        self._f_sensivel.setVisible(quantos >= 1 and chave not in pc.ORDINAIS)
+        self._ajustar_condicao(self._f)
 
     def _pagina_ordenacao(self) -> QWidget:
         w = QWidget()
@@ -296,19 +342,213 @@ class DialogoOperacao(QDialog):
         lay.addWidget(self._d_qual)
         return w
 
+    # ── coluna derivada ──────────────────
+    #: Resumo -> como aparece na tela. O núcleo guarda só o nome curto.
+    ROTULOS_RESUMO = (("contar", "Quantidade de linhas"), ("somar", "Soma"),
+                      ("media", "Média"), ("maximo", "Maior"),
+                      ("minimo", "Menor"))
+
+    def _pagina_derivada(self) -> QWidget:
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(0, 6, 0, 0)
+        lay.setSpacing(8)
+        lay.addWidget(subtext(
+            "A coluna nova sai de um cálculo sobre as que já existem, e o "
+            "cálculo vai declarado no termo. Coluna existente nunca é "
+            "substituída: escolhendo um nome já em uso, o passo não "
+            "executa e o termo diz por quê.", wrap=True))
+
+        lay.addWidget(field_label("Nome da coluna nova"))
+        self._r_titulo = QLineEdit()
+        self._r_titulo.setPlaceholderText("Como ela se chamará no resultado")
+        lay.addWidget(self._r_titulo)
+
+        lay.addWidget(field_label("Cálculo"))
+        self._r_calculo = NoScrollComboBox()
+        for chave, (rotulo, _) in pc.CALCULOS.items():
+            self._r_calculo.addItem(rotulo, chave)
+        lay.addWidget(self._r_calculo)
+
+        self._r_paginas = QStackedWidget()
+        self._r_paginas.addWidget(self._sub_juntar())
+        self._r_paginas.addWidget(self._sub_extrair())
+        self._r_paginas.addWidget(self._sub_dias())
+        self._r_calculo.currentIndexChanged.connect(
+            self._r_paginas.setCurrentIndex)
+        lay.addWidget(self._r_paginas, 1)
+        return w
+
+    def _sub_juntar(self) -> QWidget:
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(8)
+        lay.addWidget(subtext(
+            "Marque as colunas a juntar e arraste para definir a ordem. "
+            "Célula vazia não entra e não deixa separador sobrando.",
+            wrap=True))
+        self._r_lista = self._lista_marcavel(False)
+        self._r_lista.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection)
+        self._r_lista.setDragDropMode(
+            QAbstractItemView.DragDropMode.InternalMove)
+        self._r_lista.setDefaultDropAction(Qt.DropAction.MoveAction)
+        lay.addWidget(self._r_lista, 1)
+        lay.addWidget(field_label("Entre um pedaço e outro"))
+        self._r_sep = QLineEdit(" ")
+        lay.addWidget(self._r_sep)
+        return w
+
+    def _sub_extrair(self) -> QWidget:
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(8)
+        lay.addWidget(field_label("Da coluna"))
+        self._r_col_extrair = self._combo_colunas()
+        lay.addWidget(self._r_col_extrair)
+
+        linha = QHBoxLayout()
+        esquerda = QVBoxLayout()
+        esquerda.addWidget(field_label("A partir do caractere"))
+        self._r_inicio = NoScrollSpinBox()
+        self._r_inicio.setRange(1, 9999)
+        esquerda.addWidget(self._r_inicio)
+        direita = QVBoxLayout()
+        direita.addWidget(field_label("Quantos caracteres"))
+        self._r_tamanho = NoScrollSpinBox()
+        self._r_tamanho.setRange(0, 9999)
+        self._r_tamanho.setSpecialValueText("até o fim")
+        direita.addWidget(self._r_tamanho)
+        linha.addLayout(esquerda)
+        linha.addLayout(direita)
+        lay.addLayout(linha)
+
+        lay.addWidget(subtext(
+            "Serve ao dado que vem grudado: os primeiros dígitos de um "
+            "documento, o ano dentro de um número de protocolo.", wrap=True))
+        lay.addStretch()
+        return w
+
+    def _sub_dias(self) -> QWidget:
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(8)
+        lay.addWidget(field_label("Da data em"))
+        self._r_de = self._combo_colunas()
+        lay.addWidget(self._r_de)
+        lay.addWidget(field_label("Até a data em"))
+        self._r_ate = self._combo_colunas()
+        lay.addWidget(self._r_ate)
+        lay.addWidget(subtext(
+            "O resultado é o número de dias corridos. A linha cuja data não "
+            "puder ser lida fica com a coluna nova vazia, permanece no "
+            "resultado, e é contada no termo — não some.", wrap=True))
+        lay.addStretch()
+        return w
+
+    # ── agrupamento ──────────────────────
+    def _pagina_agrupamento(self) -> QWidget:
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(0, 6, 0, 0)
+        lay.setSpacing(8)
+        lay.addWidget(subtext(
+            "Uma linha por grupo — o quadro-resumo que vai na peça. Os "
+            "grupos se formam pelo texto exato da célula e saem na ordem "
+            "em que apareceram, de modo que uma ordenação feita antes "
+            "continua valendo.", wrap=True))
+
+        lay.addWidget(field_label("Agrupar por"))
+        self._g_lista = self._lista_marcavel(False)
+        self._g_lista.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection)
+        self._g_lista.setDragDropMode(
+            QAbstractItemView.DragDropMode.InternalMove)
+        self._g_lista.setDefaultDropAction(Qt.DropAction.MoveAction)
+        lay.addWidget(self._g_lista, 1)
+
+        lay.addWidget(field_label("Resumir"))
+        self._g_funcoes, self._g_colunas_resumo = [], []
+        for i in range(3):
+            linha = QHBoxLayout()
+            funcao = NoScrollComboBox()
+            funcao.addItem("—", "")
+            for chave, rotulo in self.ROTULOS_RESUMO:
+                funcao.addItem(rotulo, chave)
+            coluna = NoScrollComboBox()
+            coluna.addItem("—", "")
+            coluna.addItems(self._colunas)
+            funcao.currentIndexChanged.connect(
+                lambda _=0, k=i: self._ajustar_resumo(k))
+            linha.addWidget(funcao, 2)
+            linha.addWidget(coluna, 2)
+            lay.addLayout(linha)
+            self._g_funcoes.append(funcao)
+            self._g_colunas_resumo.append(coluna)
+        for i in range(3):
+            self._ajustar_resumo(i)
+        return w
+
+    def _ajustar_resumo(self, i: int):
+        """A contagem não pede coluna; as demais pedem."""
+        chave = self._g_funcoes[i].currentData() or ""
+        precisa = bool(chave) and pc.RESUMOS.get(chave, ("", True))[1]
+        self._g_colunas_resumo[i].setEnabled(precisa)
+        if not precisa:
+            self._g_colunas_resumo[i].setCurrentIndex(0)
+
+    # ── marcação ─────────────────────────
+    def _pagina_marcacao(self) -> QWidget:
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(0, 6, 0, 0)
+        lay.setSpacing(8)
+        lay.addWidget(subtext(
+            "Ocupa o lugar de pintar a célula de amarelo, com uma "
+            "diferença: a marca nasce de uma regra declarada, vai na peça "
+            "junto da razão de tê-la aplicado, e qualquer pessoa "
+            "re-executa e obtém as mesmas linhas. Marcando de novo na "
+            "mesma coluna, a marca se soma à que já estava — nada é "
+            "apagado.", wrap=True))
+
+        self._m = self._bloco_condicao(lay, self._ajustar_marcacao)
+
+        linha = QHBoxLayout()
+        esquerda = QVBoxLayout()
+        esquerda.addWidget(field_label("Coluna da marcação"))
+        self._m_destino = QLineEdit("Marcação")
+        esquerda.addWidget(self._m_destino)
+        direita = QVBoxLayout()
+        direita.addWidget(field_label("Marca"))
+        self._m_marca = QLineEdit("SIM")
+        direita.addWidget(self._m_marca)
+        linha.addLayout(esquerda)
+        linha.addLayout(direita)
+        lay.addLayout(linha)
+
+        lay.addWidget(field_label("Justificativa"))
+        self._m_justificativa = QPlainTextEdit()
+        self._m_justificativa.setMaximumHeight(70)
+        self._m_justificativa.setPlaceholderText(
+            "Por que estas linhas foram separadas. Sai impresso no termo.")
+        lay.addWidget(self._m_justificativa)
+        lay.addStretch()
+        self._ajustar_marcacao()
+        return w
+
+    def _ajustar_marcacao(self):
+        self._ajustar_condicao(self._m)
+
     # ── entrada e saída ──────────────────
     def _carregar(self, op):
         indices = {chave: i for i, (_, chave) in enumerate(self.FAMILIAS)}
         self._familia.setCurrentIndex(indices.get(op.tipo, 0))
         self._paginas.setCurrentIndex(indices.get(op.tipo, 0))
         if isinstance(op, pc.Filtro):
-            self._f_coluna.setCurrentText(op.coluna)
-            i = self._f_condicao.findData(op.condicao)
-            if i >= 0:
-                self._f_condicao.setCurrentIndex(i)
-            self._f_valor.setPlainText(op.valor)
-            self._f_valor2.setPlainText(op.valor2)
-            self._f_sensivel.setChecked(op.sensivel)
+            self._por_condicao(self._f, op)
             self._f_descartar.setChecked(not op.manter)
             self._ajustar_filtro()
         elif isinstance(op, pc.Ordenacao):
@@ -335,6 +575,55 @@ class DialogoOperacao(QDialog):
             j = self._d_qual.findData(op.manter)
             if j >= 0:
                 self._d_qual.setCurrentIndex(j)
+        elif isinstance(op, pc.Derivada):
+            self._r_titulo.setText(op.nome)
+            i = self._r_calculo.findData(op.calculo)
+            if i >= 0:
+                self._r_calculo.setCurrentIndex(i)
+                self._r_paginas.setCurrentIndex(i)
+            if op.calculo == "juntar":
+                self._reordenar(self._r_lista, op.origens)
+                self._r_sep.setText(op.separador)
+            elif op.calculo == "extrair":
+                if op.origens:
+                    self._r_col_extrair.setCurrentText(op.origens[0])
+                self._r_inicio.setValue(max(1, int(op.inicio)))
+                self._r_tamanho.setValue(max(0, int(op.tamanho)))
+            elif len(op.origens) >= 2:
+                self._r_de.setCurrentText(op.origens[0])
+                self._r_ate.setCurrentText(op.origens[1])
+        elif isinstance(op, pc.Agrupamento):
+            self._reordenar(self._g_lista, op.chaves)
+            for i, (resumo, coluna) in enumerate(op.resumos[:3]):
+                k = self._g_funcoes[i].findData(resumo)
+                if k >= 0:
+                    self._g_funcoes[i].setCurrentIndex(k)
+                self._ajustar_resumo(i)
+                if coluna:
+                    self._g_colunas_resumo[i].setCurrentText(coluna)
+        elif isinstance(op, pc.Marcacao):
+            self._por_condicao(self._m, op)
+            self._m_destino.setText(op.coluna_marca)
+            self._m_marca.setText(op.marca)
+            self._m_justificativa.setPlainText(op.justificativa)
+            self._ajustar_marcacao()
+
+    def _reordenar(self, lista: QListWidget, escolhidas: list):
+        """Repõe a lista com as escolhidas em cima, na ordem da operação.
+
+        A ordem é resultado, e não enfeite: ela decide a ordem de junção
+        e a das colunas de grupo. Reabrir uma operação para editá-la e
+        recebê-la na ordem do arquivo desfaria em silêncio uma escolha
+        deliberada — e mudaria o que a peça declara.
+        """
+        resto = [c for c in self._colunas if c not in escolhidas]
+        lista.clear()
+        for nome in list(escolhidas) + resto:
+            item = QListWidgetItem(nome)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Checked if nome in escolhidas
+                               else Qt.CheckState.Unchecked)
+            lista.addItem(item)
 
     @staticmethod
     def _marcadas(lista: QListWidget) -> list:
@@ -345,13 +634,8 @@ class DialogoOperacao(QDialog):
         """A operação montada, ou None se a escolha estiver incompleta."""
         chave = self._familia.currentData()
         if chave == "filtro":
-            return pc.Filtro(
-                coluna=self._f_coluna.currentText(),
-                condicao=self._f_condicao.currentData() or "igual",
-                valor=self._f_valor.toPlainText().strip(),
-                valor2=self._f_valor2.toPlainText().strip(),
-                sensivel=self._f_sensivel.isChecked(),
-                manter=not self._f_descartar.isChecked())
+            return pc.Filtro(manter=not self._f_descartar.isChecked(),
+                             **self._ler_condicao(self._f))
         if chave == "ordenacao":
             chaves = [(c.currentText(), bool(o.currentData()))
                       for c, o in zip(self._o_colunas, self._o_ordens)
@@ -360,8 +644,62 @@ class DialogoOperacao(QDialog):
         if chave == "colunas":
             manter = self._marcadas(self._c_lista)
             return pc.Colunas(manter=manter) if manter else None
-        return pc.Duplicidades(chaves=self._marcadas(self._d_lista),
-                               manter=self._d_qual.currentData() or "primeira")
+        if chave == "duplicidades":
+            return pc.Duplicidades(
+                chaves=self._marcadas(self._d_lista),
+                manter=self._d_qual.currentData() or "primeira")
+        if chave == "derivada":
+            return self._operacao_derivada()
+        if chave == "agrupamento":
+            return self._operacao_agrupamento()
+        if chave == "marcacao":
+            marca = self._m_marca.text().strip()
+            if not marca:
+                return None
+            return pc.Marcacao(
+                coluna_marca=self._m_destino.text().strip() or "Marcação",
+                marca=marca,
+                justificativa=self._m_justificativa.toPlainText().strip(),
+                **self._ler_condicao(self._m))
+        return None
+
+    def _operacao_derivada(self):
+        nome = self._r_titulo.text().strip()
+        if not nome:
+            return None
+        calculo = self._r_calculo.currentData() or "juntar"
+        if calculo == "juntar":
+            origens = self._marcadas(self._r_lista)
+            if not origens:
+                return None
+            return pc.Derivada(nome=nome, calculo="juntar", origens=origens,
+                               separador=self._r_sep.text())
+        if calculo == "extrair":
+            return pc.Derivada(nome=nome, calculo="extrair",
+                               origens=[self._r_col_extrair.currentText()],
+                               inicio=self._r_inicio.value(),
+                               tamanho=self._r_tamanho.value())
+        de, ate = self._r_de.currentText(), self._r_ate.currentText()
+        if not de or not ate:
+            return None
+        return pc.Derivada(nome=nome, calculo="dias", origens=[de, ate])
+
+    def _operacao_agrupamento(self):
+        chaves = self._marcadas(self._g_lista)
+        if not chaves:
+            return None
+        resumos = []
+        for funcao, coluna in zip(self._g_funcoes, self._g_colunas_resumo):
+            resumo = funcao.currentData() or ""
+            if not resumo:
+                continue
+            precisa = pc.RESUMOS.get(resumo, ("", True))[1]
+            alvo = coluna.currentText() if (precisa
+                                            and coluna.currentIndex() > 0) else ""
+            if precisa and not alvo:
+                continue
+            resumos.append((resumo, alvo))
+        return pc.Agrupamento(chaves=chaves, resumos=resumos) if resumos else None
 
 
 # ─────────────────────────────────────────

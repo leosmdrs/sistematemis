@@ -162,22 +162,33 @@ célula que permite ao termo afirmar que a relação de passos é completa.
 
 ## 5. O que falta
 
-### 5.1 Análise de Planilha — etapa 2 (combinado com o usuário)
+### 5.1 Análise de Planilha — etapa 2
 
-Ele confirmou que usa as quatro famílias de operação. Faltam duas e
-meia:
+Das quatro operações combinadas, **três estão entregues** em 27/08/2026,
+com provas em `provas/`. Sete famílias no diálogo agora.
+
+* ~~**Coluna derivada**~~ — `Derivada`: juntar textos, extrair parte,
+  contar dias entre datas. Não sobrescreve coluna existente: nome já em
+  uso faz o passo não executar, e o termo diz por quê.
+* ~~**Agrupar e somar/contar**~~ — `Agrupamento`: contar, somar, média,
+  maior e menor. Grupos pelo texto exato da célula, na ordem de primeira
+  aparição, para que uma ordenação anterior continue valendo.
+* ~~**Marcação de linhas**~~ — `Marcacao`: usa as mesmas catorze
+  condições do filtro, com a justificativa dentro da operação. A marca
+  se acumula, nunca substitui.
+
+**Falta uma:**
 
 * **Cruzar com outra planilha** (o PROCV). Em auditoria costuma ser o
   passo que produz o achado. O termo passa a citar **duas origens com
   hash** — `derivado_core.Derivacao` já aceita lista de origens, e
   `derivado.medir()` também; é só passar as duas.
-* **Agrupar e somar/contar** (a tabela dinâmica). Gera o quadro-resumo
-  que vai na peça.
-* **Coluna derivada** — juntar texto, extrair parte, diferença entre
-  datas.
-* **Marcação de linhas** com justificativa registrada. Atenção: isto tem
-  de ser uma operação declarada, com a justificativa dentro dela, e não
-  uma digitação em célula.
+
+  É a mais invasiva das quatro, e por isso ficou por último: as outras
+  três só transformam a `Tabela` em memória, enquanto esta precisa abrir
+  um segundo arquivo dentro do `aplicar`, guardar o resumo dele, e
+  responder por ele na re-execução — arquivo que sumiu ou que mudou de
+  conteúdo tem de virar aviso no passo, e não queda.
 
 **Onde mexer**, para cada operação nova:
 
@@ -186,7 +197,18 @@ meia:
 2. A entrada correspondente no dicionário `TIPOS`, no fim da seção de
    operações — **sem isso o roteiro grava e não relê**.
 3. Uma página nova em `DialogoOperacao`, e a entrada em `FAMILIAS`, em
-   `planilha.py`.
+   `planilha.py`. A ordem de `FAMILIAS` e a ordem em que as páginas
+   entram na pilha **precisam coincidir**: é por índice que uma operação
+   aberta para edição encontra a sua página.
+4. As provas em `provas/prova_planilha.py` e `prova_planilha_tela.py`.
+   A segunda confere que a família e o núcleo falam do mesmo conjunto,
+   nos dois sentidos, e reprova operação que volte diferente do diálogo.
+
+**Armadilha medida:** atributo de widget cujo nome termine em `_nome`,
+`_cargo`, `_matricula`, `_lotacao` ou `_orgao` é reprovado pelo
+autoteste — esses sufixos são reservados à identificação do operador
+(`temis/perfil.py`). O campo do nome da coluna nova chamou-se `_r_nome`
+por um instante e derrubou a verificação.
 
 ### 5.2 Decisões pendentes do usuário
 
@@ -210,16 +232,24 @@ meia:
   provas até aqui usaram planilha fabricada, ainda que com as armadilhas
   de uma real.
 
-### 5.4 Lacuna conhecida do projeto
+### 5.4 Provas: a lacuna começou a ser fechada
 
-**Não há suíte de testes no repositório.** As provas de cada entrega
-foram escritas como scripts avulsos, fora da árvore do projeto, e não
-viajam com ele. O que viaja e é permanente é o `--autoteste`, que cobre
+A pasta `provas/` existe desde 27/08/2026, e roda assim:
+
+```bash
+python -m unittest discover -s provas -p "prova_*.py"
+```
+
+Cobre hoje **só a Análise de Planilha** — 38 provas, o comportamento de
+cada operação e a ida e volta pelo diálogo, sem abrir janela (o Qt roda
+pelo motor *offscreen*). Já valeu o preço na primeira execução: o
+agrupamento contava zero em todo grupo, porque a contagem procurava uma
+coluna que ela não usa.
+
+**As demais catorze ferramentas continuam sem provas versionadas.** As
+de cada entrega anterior foram escritas como scripts avulsos, fora da
+árvore, e não viajam com o repositório. O `--autoteste` viaja, mas cobre
 integridade da instalação — não o comportamento das ferramentas.
-
-Vale considerar trazer as provas para dentro do repositório, numa pasta
-`provas/`, para que uma alteração futura não desfaça em silêncio o que
-já foi conferido.
 
 ---
 
