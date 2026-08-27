@@ -437,6 +437,11 @@ class Opcoes:
     #: energia não leve a gravação inteira. Triplica o arquivo; veja a
     #: nota no alto do módulo.
     resistente: bool = True
+    #: Pasta vigiada durante a gravação. Vazia, não se vigia nada — o
+    #: monitoramento é opção, não padrão: filmar a tela é o que a
+    #: ferramenta sempre faz, e resumir downloads é um acréscimo que quem
+    #: opera liga quando a diligência envolve baixar arquivo.
+    pasta_monitorada: str = ""
 
     @property
     def quadros(self) -> int:
@@ -470,12 +475,133 @@ class Resultado:
     captura_sistema: object = None
     contexto: Contexto | None = None
     opcoes: Opcoes | None = None
+    baixados: list = field(default_factory=list)
     erro: str = ""
 
     @property
     def duracao(self) -> str:
         s = int(self.segundos)
         return f"{s // 3600:02d}:{(s % 3600) // 60:02d}:{s % 60:02d}"
+
+
+@dataclass
+class Baixado:
+    """Um arquivo que apareceu na pasta vigiada durante a gravação.
+
+    O resumo é o elo forte, calculado sobre os bytes que estão em disco.
+    O resto — quando apareceu, quanto tempo de gravação havia decorrido —
+    é o que amarra o arquivo ao vídeo pela cronologia.
+    """
+
+    nome: str = ""
+    caminho: str = ""
+    tamanho: int = 0
+    sha256: str = ""
+    quando: str = ""
+    decorrido: float = 0.0
+    erro: str = ""
+
+
+#: Sufixos de arquivo ainda em trânsito. O navegador baixa para um
+#: `.crdownload` e só renomeia ao terminar; resumir no meio pegaria bytes
+#: incompletos, e o resumo de um arquivo pela metade não confere com
+#: nada. Espera-se o nome final.
+EM_TRANSITO = (".crdownload", ".part", ".partial", ".tmp", ".download")
+
+
+class MonitorDownloads:
+    """Vigia uma pasta e resume cada arquivo novo que se estabiliza.
+
+    Por observação de pasta, e não por instrumentação do navegador — é a
+    diferença entre esta ferramenta e a Extração Registrada. A Gravação
+    de Tela filma a área de trabalho inteira, e não é dona de navegador
+    algum: não tem como saber de que endereço o arquivo veio, nem por
+    qual clique. O que ela pode afirmar, e afirma, é mais estreito e
+    verdadeiro: **este arquivo apareceu nesta pasta durante a gravação, e
+    tem este resumo**.
+
+    Um arquivo só é resumido quando para de crescer — dois exames
+    seguidos com o mesmo tamanho —, para não pegar download pela metade.
+    O que já estava na pasta antes de a gravação começar não entra: não
+    foi esta diligência que o trouxe.
+    """
+
+    #: Segundos que um arquivo precisa ficar do mesmo tamanho para ser
+    #: dado por completo. Duas passadas do pulso de 500 ms, com folga.
+    ESTAVEL = 1.0
+
+    def __init__(self, pasta: str | Path):
+        self.pasta = Path(pasta)
+        self._ja_existiam: set = set()
+        self._tamanhos: dict = {}
+        self._estaveis_desde: dict = {}
+        self.baixados: list[Baixado] = []
+        self._resumidos: set = set()
+
+    def iniciar(self):
+        """Fotografa o que já havia na pasta, para não confundir com o novo."""
+        self._ja_existiam = set(self._listar())
+
+    def _listar(self) -> list[Path]:
+        try:
+            return [a for a in self.pasta.iterdir() if a.is_file()]
+        except OSError:
+            return []
+
+    def varrer(self, decorrido: float, agora: float):
+        """Uma passada: registra os arquivos novos que já se estabilizaram.
+
+        `agora` é o relógio monotônico de quem chama — passado de fora
+        para que o núcleo não dependa de contador de tempo próprio e
+        continue conferível numa prova.
+        """
+        for arquivo in self._listar():
+            nome = arquivo.name
+            if arquivo in self._ja_existiam or nome in self._resumidos:
+                continue
+            if nome.lower().endswith(EM_TRANSITO) or nome.startswith("~$"):
+                continue
+            try:
+                tamanho = arquivo.stat().st_size
+            except OSError:
+                continue
+            if self._tamanhos.get(nome) == tamanho and tamanho > 0:
+                if agora - self._estaveis_desde.get(nome, agora) >= self.ESTAVEL:
+                    self._resumir(arquivo, decorrido)
+            else:
+                self._tamanhos[nome] = tamanho
+                self._estaveis_desde[nome] = agora
+
+    def _resumir(self, arquivo: Path, decorrido: float):
+        import datetime
+        b = Baixado(
+            nome=arquivo.name, caminho=str(arquivo),
+            quando=datetime.datetime.now().astimezone().isoformat(
+                timespec="seconds"),
+            decorrido=decorrido)
+        try:
+            b.tamanho = arquivo.stat().st_size
+            b.sha256 = sha256(arquivo)
+        except OSError as e:
+            b.erro = f"{type(e).__name__}: {e}"
+        self.baixados.append(b)
+        self._resumidos.add(arquivo.name)
+
+    def concluir(self, decorrido: float, agora: float):
+        """Última varredura, dando por completo o que ainda restava.
+
+        No fim não se espera mais estabilização: a gravação acabou, e um
+        arquivo que ainda estivesse crescendo é anomalia que a peça
+        registra pelo tamanho do momento, em vez de deixar de fora.
+        """
+        self.varrer(decorrido, agora)
+        for arquivo in self._listar():
+            nome = arquivo.name
+            if (arquivo in self._ja_existiam or nome in self._resumidos
+                    or nome.lower().endswith(EM_TRANSITO)
+                    or nome.startswith("~$")):
+                continue
+            self._resumir(arquivo, decorrido)
 
 
 class Gravador:
@@ -637,6 +763,14 @@ class Gravador:
         self._video_comecou = time.time()
         self._conferir_partida()
 
+        # A pasta é fotografada só depois de a gravação ficar de pé: se o
+        # codificador tivesse recusado a configuração, não haveria
+        # diligência a que atribuir download algum.
+        self._monitor = None
+        if self.opcoes.pasta_monitorada:
+            self._monitor = MonitorDownloads(self.opcoes.pasta_monitorada)
+            self._monitor.iniciar()
+
     #: Quanto se espera para saber se o codificador ficou de pé.
     #:
     #: Medido, não estimado: o FFmpeg que recusa a configuração morre em
@@ -668,6 +802,16 @@ class Gravador:
 
             self._inicio = 0.0
             raise RuntimeError(_explicar_falha(erro))
+
+    def varrer_downloads(self):
+        """Uma passada do monitor. Quem grava a chama pelo próprio pulso.
+
+        Fica aqui, e não num relógio interno, porque o núcleo não conta
+        tempo por conta própria — recebe o instante de fora, e assim
+        continua conferível numa prova, sem depender de quando rodou.
+        """
+        if getattr(self, "_monitor", None) is not None:
+            self._monitor.varrer(self.decorrido, time.time())
 
     def encerrar(self, espera: float = 25.0) -> Resultado:
         """Fecha a gravação e devolve o que ela produziu."""
@@ -719,6 +863,11 @@ class Gravador:
             resultado.erro = ("A gravação não produziu arquivo.\n"
                               + "\n".join(self._erros))
             return resultado
+
+        if getattr(self, "_monitor", None) is not None:
+            self._monitor.concluir(self.decorrido, time.time())
+            resultado.baixados = list(self._monitor.baixados)
+            self._monitor = None
 
         resultado.tamanho = self.destino.stat().st_size
         resultado.sha256 = sha256(self.destino)
@@ -810,10 +959,21 @@ CINZA = "#5B6B82"
 
 ENCERRAMENTO = "Sem mais a relatar, encerro o presente termo."
 
-#: O que o registro não garante. Vai impresso, porque uma peça que se
-#: cala sobre os próprios limites convida a que se lhe atribua alcance
-#: que ela não tem — e a primeira coisa que a defesa faz é procurar esse
-#: alcance excedente.
+#: O que o monitoramento de pasta prova, e o que não prova. Vai impresso
+#: quando houver arquivo na relação — apresentar o que se observou de
+#: fora como se fosse transação capturada na origem seria atribuir à peça
+#: alcance que ela não tem.
+RESSALVA_DOWNLOADS = (
+    "Os arquivos relacionados apareceram na pasta vigiada no intervalo da "
+    "gravação, e cada um foi resumido em SHA-256 sobre os bytes gravados "
+    "em disco. O monitoramento é de pasta, e não do navegador: a peça "
+    "atesta que o arquivo surgiu ali naquele instante, com aquele resumo, "
+    "e não a origem de que veio nem o ato que o trouxe — para o registro "
+    "da própria transação, com endereço e parâmetros, existe a Extração "
+    "Registrada. O resumo permite conferir, a qualquer tempo, que o "
+    "arquivo é o mesmo que se observou chegar."
+)
+
 RESSALVAS = (
     "A faixa impressa no vídeo — número do processo, identificação do "
     "operador, nome da estação e relógio — destina-se à leitura do "
@@ -962,6 +1122,38 @@ def _quadro_registros(t: TermoGravacao) -> str:
         f"{''.join(linhas)}</table>")
 
 
+def _quadro_downloads(baixados: list) -> str:
+    """A relação de arquivos observados chegar durante a gravação."""
+    linhas = []
+    for i, b in enumerate(baixados, 1):
+        segundos = int(b.decorrido)
+        decorrido = (f"{segundos // 3600:02d}:{(segundos % 3600) // 60:02d}:"
+                     f"{segundos % 60:02d}")
+        detalhe = (formatar_tamanho(b.tamanho) if b.sha256
+                   else (b.erro or "não foi possível resumir"))
+        linhas.append(
+            "<tr>"
+            + _cel(i, "center")
+            + _cel(b.nome)
+            + _cel(f"{data_br(b.quando)}\n(decorrido {decorrido})")
+            + _cel(detalhe)
+            + "</tr>"
+            + "<tr>"
+            + _cel("", "center")
+            + (f'<td colspan="3"><font color="{INK}" face="Courier New" '
+               f'size="1">SHA-256: {b.sha256}</font></td>' if b.sha256
+               else '<td colspan="3"></td>')
+            + "</tr>")
+    return (
+        '<table width="100%" cellspacing="0" cellpadding="4" border="1" '
+        'style="border-collapse:collapse; font-size:8.5pt;">'
+        '<tr style="background-color:#0a2442; color:#ffd633;">'
+        '<th width="4%">Nº</th><th width="34%">Arquivo</th>'
+        '<th width="30%">Observado em</th>'
+        '<th width="32%">Tamanho</th></tr>'
+        f"{''.join(linhas)}</table>")
+
+
 def build_html(t: TermoGravacao) -> str:
     """Termo em HTML, para exibir e exportar."""
     from ..impressao import cabecalho_html, rodape_html
@@ -1012,8 +1204,19 @@ def build_html(t: TermoGravacao) -> str:
         "o que foi produzido nesta diligência. Valor diverso indica que o "
         "arquivo não é o mesmo.</p>")
 
+    # ── downloads observados ──────────────
+    baixados = [b for r in t.bons for b in getattr(r, "baixados", [])]
+    if baixados:
+        partes.append('<p style="font-size:11pt;">'
+                      "<b>4. Arquivos recebidos durante a diligência</b></p>")
+        partes.append(_quadro_downloads(baixados))
+        partes.append(
+            '<p align="justify" style="font-size:10.5pt; line-height:150%; '
+            'margin-top:8px;">' + e(RESSALVA_DOWNLOADS) + "</p>")
+
     # ── método ────────────────────────────
-    partes.append('<p style="font-size:11pt;"><b>4. Método</b></p>')
+    n_metodo = 5 if baixados else 4
+    partes.append(f'<p style="font-size:11pt;"><b>{n_metodo}. Método</b></p>')
     metodo = [
         "A imagem exibida na tela foi capturada de modo contínuo, do "
         "início ao encerramento indicados, e gravada em arquivo de vídeo "
@@ -1026,6 +1229,12 @@ def build_html(t: TermoGravacao) -> str:
         "Encerrada a captura, calculou-se o resumo criptográfico SHA-256 "
         "do arquivo produzido, adiante consignado.",
     ]
+    if baixados:
+        metodo.append(
+            "Durante a gravação, vigiou-se uma pasta do sistema de "
+            "arquivos, e cada arquivo novo que nela se estabilizou foi "
+            "resumido em SHA-256 sobre os bytes gravados em disco, no "
+            "instante em que se completou. A relação consta da seção 4.")
     # O que foi captado, e — o que importa tanto quanto — o que não foi.
     # Silenciar sobre a fonte do som é o tipo de omissão que a defesa
     # encontra depois: quem lê "com áudio" supõe que tudo o que se ouviu
@@ -1065,7 +1274,8 @@ def build_html(t: TermoGravacao) -> str:
                f'line-height:150%;">{e(linha)}</p>' for linha in metodo]
 
     # ── ressalvas ─────────────────────────
-    partes.append('<p style="font-size:11pt;"><b>5. Ressalvas</b></p>')
+    partes.append(f'<p style="font-size:11pt;">'
+                  f"<b>{n_metodo + 1}. Ressalvas</b></p>")
     partes += [f'<p align="justify" style="font-size:10.5pt; '
                f'line-height:150%;">{e(linha)}</p>' for linha in RESSALVAS]
 

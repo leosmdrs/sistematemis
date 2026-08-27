@@ -68,6 +68,12 @@ META = ToolMeta(
 PASTA_PADRAO = Path.home() / "Documents" / "Sistema Têmis" / "Gravações"
 
 
+def _pasta_downloads_padrao() -> Path:
+    """A pasta de Downloads do usuário, ou a home se ela não existir."""
+    candidata = Path.home() / "Downloads"
+    return candidata if candidata.is_dir() else Path.home()
+
+
 # ─────────────────────────────────────────
 #  PAINEL FLUTUANTE
 # ─────────────────────────────────────────
@@ -492,6 +498,29 @@ class GravacaoTool(ToolPage):
             "tudo. O arquivo fica cerca de três vezes maior.")
         painel.body.addWidget(self._op_resistente)
 
+        # Monitorar downloads é opção, e não padrão: filmar a tela é o que
+        # a ferramenta sempre faz; resumir arquivos recebidos é um
+        # acréscimo para a diligência que envolve baixar algo.
+        self._chk_downloads = QCheckBox("Registrar arquivos recebidos")
+        self._chk_downloads.setToolTip(
+            "Vigia uma pasta durante a gravação e resume em SHA-256 cada "
+            "arquivo que nela aparecer, relacionando-os no termo. Não "
+            "captura o que se digita nem em que se clica — observa a "
+            "pasta, e diz que o arquivo chegou ali, com aquele resumo.")
+        self._chk_downloads.toggled.connect(self._alternar_downloads)
+        painel.body.addWidget(self._chk_downloads)
+
+        linha_pasta = QHBoxLayout()
+        self._e_pasta = QLineEdit(str(_pasta_downloads_padrao()))
+        self._e_pasta.setReadOnly(True)
+        self._e_pasta.setEnabled(False)
+        self._b_pasta = QPushButton("Escolher…")
+        self._b_pasta.setEnabled(False)
+        self._b_pasta.clicked.connect(self._escolher_pasta)
+        linha_pasta.addWidget(self._e_pasta, 1)
+        linha_pasta.addWidget(self._b_pasta)
+        painel.body.addLayout(linha_pasta)
+
         painel.body.addWidget(hsep())
         painel.body.addWidget(field_label("ESTAÇÃO"))
         self._rot_contexto = QLabel()
@@ -511,6 +540,17 @@ class GravacaoTool(ToolPage):
         painel.footer.addWidget(self._b_termo)
         painel.add_note("A janela do sistema é recolhida durante a gravação.")
         return painel
+
+    def _alternar_downloads(self, ligado: bool):
+        self._e_pasta.setEnabled(ligado)
+        self._b_pasta.setEnabled(ligado)
+
+    def _escolher_pasta(self):
+        atual = self._e_pasta.text() or str(Path.home())
+        escolha = QFileDialog.getExistingDirectory(
+            self, "Pasta a vigiar durante a gravação", atual)
+        if escolha:
+            self._e_pasta.setText(escolha)
 
     def _montar_estado(self) -> QWidget:
         caixa = QFrame()
@@ -640,7 +680,9 @@ class GravacaoTool(ToolPage):
             microfone=self._cb_microfone.currentData() or "",
             audio_sistema=self._chk_som_sistema.isChecked(),
             identificacao=self._identificacao(),
-            resistente=self._op_resistente.isChecked())
+            resistente=self._op_resistente.isChecked(),
+            pasta_monitorada=(self._e_pasta.text().strip()
+                              if self._chk_downloads.isChecked() else ""))
 
         self._gravador = core.Gravador(destino, opcoes)
         try:
@@ -666,6 +708,7 @@ class GravacaoTool(ToolPage):
         if self._gravador is None:
             return
         self._painel.atualizar(self._gravador.decorrido)
+        self._gravador.varrer_downloads()
         if not self._gravador.gravando:
             # O codificador morreu sozinho — melhor encerrar e dizer isso
             # do que deixar o painel piscando sobre uma gravação parada.
