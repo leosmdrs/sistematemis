@@ -44,6 +44,10 @@ DIST = RAIZ / "dist"
 INNO = [
     Path(r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe"),
     Path(r"C:\Program Files\Inno Setup 6\ISCC.exe"),
+    # Instalação em escopo de usuário, que é onde o winget o põe quando
+    # não há administrador — o caso comum numa estação institucional.
+    Path.home() / "AppData" / "Local" / "Programs" / "Inno Setup 6"
+    / "ISCC.exe",
 ]
 
 

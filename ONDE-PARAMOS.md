@@ -105,10 +105,14 @@ Instalado, no PATH e fora dali, o Espelhamento continua se declarando
 indisponível. É também de `vendor/` que o `build/temis.spec` lê na hora
 de empacotar, então o mesmo gesto serve à execução e à compilação.
 
-Uma medida a rever antes de compilar: o `README.md` diz que `ffmpeg.exe`
-e `ffprobe.exe` somam ~196 MB. Na build **9.0.1 full** somam **424 MB**, e
-isso vai inteiro para dentro do instalador. Se pesar, a build *essentials*
-do mesmo autor atende ao Compactar e ao Fatiar.
+**Use a build *essentials*, e não a *full*.** O `TERCEIROS.md` declara
+`ffmpeg-9.0.1-essentials_build`, e é ela que tem de ir no instalador. O
+winget, no `Gyan.FFmpeg`, entrega a **full**: `ffmpeg.exe` e `ffprobe.exe`
+somam 424 MB contra os 196 MB da essentials, e o instalador dobraria de
+tamanho descrevendo componente diferente do que carrega. O
+`Gyan.FFmpeg.Essentials` do winget está atrasado (8.1.1), de modo que a
+9.0.1 essentials se baixa da própria release:
+`github.com/GyanD/codexffmpeg/releases/download/9.0.1/ffmpeg-9.0.1-essentials_build.zip`.
 
 Depois, a conferência que vale por todas:
 
