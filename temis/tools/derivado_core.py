@@ -107,6 +107,12 @@ class Derivacao:
     #: o trecho recortado, o preset de compactação. Cada ferramenta enche
     #: com o que só ela sabe.
     detalhes: list[tuple[str, str]] = field(default_factory=list)
+    #: Quando os resumos foram tomados, com fuso. É o instante de que a
+    #: peça responde: a data por extenso lá em cima é a da declaração,
+    #: que quem assina escolhe, e as duas não são a mesma coisa. Cadeia
+    #: de custódia se demonstra por instantes, e instante que alguém
+    #: digita não demonstra nada.
+    medido_em: str = ""
 
     @property
     def erros(self) -> list[str]:
@@ -118,8 +124,10 @@ def medir(origens, saida, detalhes=None) -> Derivacao:
     """Lê tamanho e resumo da origem (ou origens) e do resultado."""
     if isinstance(origens, (str, Path)):
         origens = [origens]
+    from ..relogio import agora, carimbo
     return Derivacao(origens=[ler(o) for o in origens], saida=ler(saida),
-                     detalhes=list(detalhes or []))
+                     detalhes=list(detalhes or []),
+                     medido_em=carimbo(agora()))
 
 
 @dataclass
@@ -208,6 +216,10 @@ def _quadro(d: Derivacao, numero: int) -> str:
     linhas.append(linha("SHA-256 do produzido",
                         d.saida.resumo or "não foi possível ler", mono=True))
     linhas += [linha(rotulo, valor) for rotulo, valor in d.detalhes]
+    # O instante fecha o quadro, e não o abre: quem lê procura primeiro o
+    # que foi feito e a que arquivos, e só então quando.
+    if d.medido_em:
+        linhas.append(linha("Resumos tomados em", d.medido_em))
     for falha in d.erros:
         linhas.append(linha("Falha na leitura", falha))
 
@@ -293,6 +305,8 @@ def build_texto(t: TermoDerivado) -> str:
         L.append(f"      SHA-256: {d.saida.resumo or '—'}")
         for rotulo, valor in d.detalhes:
             L.append(f"   {rotulo}: {valor}")
+        if d.medido_em:
+            L.append(f"   Resumos tomados em: {d.medido_em}")
         for falha in d.erros:
             L.append(f"   Falha na leitura: {falha}")
         L.append("")

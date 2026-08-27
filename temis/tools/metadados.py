@@ -228,10 +228,43 @@ class TermoDialog(QDialog):
             grade.addWidget(field_label(rotulo), 2, coluna)
             grade.addWidget(campo, 3, coluna)
 
+        # Terceira fileira: como o material chegou. Fica junto do vínculo
+        # aos autos porque é da mesma natureza — o que amarra a peça ao
+        # que veio de fora dela. Tudo opcional: campo vazio não sai
+        # impresso, e rótulo genérico preenchido para cumprir formulário
+        # é pior do que silêncio.
+        self._in_recebido_de = QLineEdit()
+        self._in_recebido_de.setPlaceholderText("Ex.: Setor de Inteligência")
+        self._in_recebido_de.textChanged.connect(self._remontar)
+        self._cb_meio = NoScrollComboBox()
+        self._cb_meio.setEditable(True)
+        self._cb_meio.addItems(
+            ["", "ofício nº ", "mídia lacrada nº ", "download do sistema ",
+             "mensagem eletrônica de ", "entrega pessoal"])
+        self._cb_meio.setToolTip(
+            "Como o material chegou. As opções são começos de frase — "
+            "complete com o número ou o nome que identifica a entrega.")
+        self._cb_meio.editTextChanged.connect(self._remontar)
+        self._in_recebido_em = QLineEdit()
+        self._in_recebido_em.setPlaceholderText("Ex.: 26/08/2026, às 15h")
+        self._in_recebido_em.setToolTip(
+            "Quando o material foi recebido — que é anterior à leitura "
+            "nesta estação, e por isso se digita em vez de ser medido")
+        self._in_recebido_em.textChanged.connect(self._remontar)
+
+        for coluna, (rotulo, campo) in enumerate((
+            ("Recebido de", self._in_recebido_de),
+            ("Por qual meio", self._cb_meio),
+            ("Recebido em", self._in_recebido_em),
+        )):
+            grade.addWidget(field_label(rotulo), 4, coluna)
+            grade.addWidget(campo, 5, coluna)
+
         grade.setColumnStretch(0, 3)
         grade.setColumnStretch(1, 1)
         grade.setColumnStretch(2, 2)
         grade.setRowMinimumHeight(2, 12)
+        grade.setRowMinimumHeight(4, 12)
         return caixa
 
     # ── documento ────────────────────────────────
@@ -248,6 +281,9 @@ class TermoDialog(QDialog):
             tipo_processo=self._cb_tipo.currentText(),
             numero_processo=self._in_processo.text().strip(),
             dia=d.day(), mes=d.month(), ano=d.year(),
+            recebido_de=self._in_recebido_de.text().strip(),
+            meio_entrega=self._cb_meio.currentText().strip(),
+            recebido_em=self._in_recebido_em.text().strip(),
         )
 
     def _remontar(self):
@@ -827,7 +863,8 @@ class MetadadosTool(ToolPage):
     def _mostrar_termo(self):
         if not self._arquivos:
             return
-        quando = datetime.datetime.now().strftime("%d/%m/%Y às %H:%M")
+        from ..relogio import carimbo
+        quando = carimbo()
         dlg = TermoDialog(self._arquivos, quando, self._modo, self)
         dlg.exec()
 

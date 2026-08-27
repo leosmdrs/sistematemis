@@ -187,17 +187,20 @@ def rodape_html(*motores: str) -> str:
     """
     from html import escape
 
-    from . import procedencia
-    texto = procedencia.frase(procedencia.motores(*motores))
-    return ('<p align="justify" style="font-size:9pt; line-height:145%; '
-            'margin-top:14px;"><font color="#5A6B85">'
-            + escape(texto) + "</font></p>")
+    from . import procedencia, relogio
+    linhas = (procedencia.frase(procedencia.motores(*motores)),
+              relogio.ressalva())
+    return "".join(
+        '<p align="justify" style="font-size:9pt; line-height:145%; '
+        'margin-top:10px;"><font color="#5A6B85">' + escape(x) + "</font></p>"
+        for x in linhas)
 
 
 def rodape_texto(*motores: str) -> str:
-    """A mesma linha, sem marcação, para colar onde não se aceita HTML."""
-    from . import procedencia
-    return procedencia.frase(procedencia.motores(*motores))
+    """As mesmas linhas, sem marcação, para colar onde não se aceita HTML."""
+    from . import procedencia, relogio
+    return (procedencia.frase(procedencia.motores(*motores))
+            + "\n\n" + relogio.ressalva())
 
 
 def preparar_escritor(caminho: str, titulo: str = "",

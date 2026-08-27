@@ -154,5 +154,91 @@ class APecaDeclaraAConferencia(unittest.TestCase):
         self.assertIn("não declarado", texto)
 
 
+class AHoraVaiQualificada(unittest.TestCase):
+    """Instante afirmado sem qualificação é afirmação sem lastro."""
+
+    def test_o_carimbo_traz_data_hora_e_fuso(self):
+        from temis import relogio
+        carimbo = relogio.carimbo()
+        self.assertRegex(carimbo, r"\d{2}/\d{2}/\d{4} às \d{2}:\d{2}:\d{2} "
+                                  r"\(UTC[+-]\d{2}:\d{2}\)")
+
+    def test_o_fuso_usa_hifen_comum_e_nao_o_sinal_tipografico(self):
+        # O texto da peça é copiado para o SEI, e o U+2212 não sobrevive
+        # a toda codificação pelo caminho.
+        from temis import relogio
+        self.assertNotIn("−", relogio.carimbo())
+
+    def test_o_instante_sabe_o_proprio_fuso(self):
+        from temis import relogio
+        self.assertIsNotNone(relogio.agora().tzinfo)
+
+    def test_a_ressalva_diz_de_onde_vem_a_hora_e_o_que_nao_promete(self):
+        from temis import relogio
+        texto = relogio.ressalva()
+        self.assertIn("relógio desta estação", texto)
+        self.assertIn(relogio.deslocamento(), texto)
+        self.assertIn("não constitui carimbo de tempo certificado", texto)
+
+    def test_nao_apurado_nao_e_nao_sincronizado(self):
+        # Dizer "não sincronizado" sem ter apurado seria a peça afirmando
+        # defeito que não constatou.
+        from temis import relogio
+        for valor, esperado in ((True, "sincronizado"),
+                                (False, "NÃO SINCRONIZADO"),
+                                (None, "Não foi possível apurar")):
+            with self.subTest(valor):
+                guardado = list(relogio._ESTADO)
+                relogio._ESTADO.clear()
+                relogio._ESTADO.append({"sincronizado": valor, "fonte": "",
+                                        "tipo": "", "servidor": ""})
+                try:
+                    self.assertIn(esperado, relogio.ressalva())
+                finally:
+                    relogio._ESTADO.clear()
+                    relogio._ESTADO.extend(guardado)
+
+    def test_toda_peca_leva_a_qualificacao_da_hora(self):
+        from temis.impressao import rodape_texto
+        self.assertIn("relógio desta estação", rodape_texto())
+
+    def test_a_derivacao_carimba_quando_os_resumos_foram_tomados(self):
+        import tempfile
+        from temis.tools import derivado_core as dc
+        with tempfile.TemporaryDirectory() as pasta:
+            a, b = Path(pasta) / "a", Path(pasta) / "b"
+            a.write_bytes(b"origem")
+            b.write_bytes(b"saida")
+            item = dc.medir(a, b)
+        self.assertRegex(item.medido_em, r"\(UTC[+-]\d{2}:\d{2}\)")
+
+
+class OMeioDeEntradaSeRegistra(unittest.TestCase):
+    """A falta de indicação do meio de entrega é falha arrolada nos julgados."""
+
+    def test_sem_nada_informado_a_frase_nao_existe(self):
+        # Rótulo genérico preenchido para cumprir formulário é pior do
+        # que silêncio: afirma percurso que ninguém apurou.
+        j = mc.Juntada()
+        self.assertFalse(j.houve_recebimento)
+        self.assertEqual(j.frase_recebimento(), "")
+
+    def test_monta_se_do_que_houver(self):
+        so_meio = mc.Juntada(meio_entrega="ofício nº 45/2026")
+        self.assertIn("por ofício nº 45/2026", so_meio.frase_recebimento())
+        self.assertNotIn(" de ,", so_meio.frase_recebimento())
+        completo = mc.Juntada(recebido_de="Setor X", meio_entrega="ofício",
+                              recebido_em="26/08/2026")
+        frase = completo.frase_recebimento()
+        for pedaco in ("de Setor X", "por ofício", "em 26/08/2026"):
+            with self.subTest(pedaco):
+                self.assertIn(pedaco, frase)
+
+    def test_a_frase_nao_promete_responder_pelo_que_antecede_a_entrega(self):
+        j = mc.Juntada(meio_entrega="ofício")
+        self.assertIn("a partir da leitura", j.frase_recebimento())
+        self.assertIn("declarado por quem a promoveu", j.frase_recebimento())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

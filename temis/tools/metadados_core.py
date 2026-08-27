@@ -131,6 +131,11 @@ class Arquivo:
     #: Número do documento no SEI, digitado pelo encarregado. Vai para a
     #: coluna do termo de juntada, que é o que amarra o arquivo aos autos.
     sei: str = ""
+    #: Quando o resumo deste arquivo foi tomado, com fuso. É o marco a
+    #: partir do qual a peça responde pelo material: antes dele não há
+    #: afirmação a fazer, e depois dele qualquer divergência de resumo é
+    #: alteração posterior à leitura.
+    lido_em: str = ""
     #: Resumo criptográfico que veio declarado com o arquivo — do ofício
     #: que o encaminhou, da mídia lacrada, do termo de quem o entregou.
     #: É o que permite conferir, e não apenas gerar: o Superior Tribunal
@@ -658,6 +663,8 @@ def extrair(caminho: str | Path, com_hash: bool = True,
         from .hash_core import sha256_file
         try:
             saida.sha256 = sha256_file(caminho)
+            from ..relogio import carimbo
+            saida.lido_em = carimbo()
         except OSError:
             pass
 
@@ -732,6 +739,44 @@ class Juntada:
     dia: int = 1
     mes: int = 1
     ano: int = 2026
+    #: Como o material chegou às mãos de quem assina — de quem, por que
+    #: meio, e quando. Os julgados que rejeitaram prova digital por
+    #: cadeia de custódia deficiente arrolam entre as falhas a "falta de
+    #: indicação do meio de entrega": a peça respondia pelo arquivo a
+    #: partir da leitura e nada dizia sobre o percurso até ali.
+    #:
+    #: Tudo opcional. Nem todo arquivo chega por ofício, e campo vazio
+    #: apenas não sai impresso — melhor silêncio do que rótulo genérico
+    #: preenchido para cumprir formulário.
+    recebido_de: str = ""
+    meio_entrega: str = ""
+    recebido_em: str = ""
+
+    @property
+    def houve_recebimento(self) -> bool:
+        return any(x.strip() for x in (self.recebido_de, self.meio_entrega,
+                                       self.recebido_em))
+
+    def frase_recebimento(self) -> str:
+        """Como o recebimento se lê na peça. Vazio se nada foi informado.
+
+        Monta-se do que houver: informar só o meio, ou só a data, é
+        melhor do que não informar nada, e a frase não pode exigir os
+        três para existir.
+        """
+        if not self.houve_recebimento:
+            return ""
+        partes = []
+        if self.recebido_de.strip():
+            partes.append("de " + self.recebido_de.strip())
+        if self.meio_entrega.strip():
+            partes.append("por " + self.meio_entrega.strip())
+        if self.recebido_em.strip():
+            partes.append("em " + self.recebido_em.strip())
+        return ("O material foi recebido " + ", ".join(partes)
+                + ". Esta peça responde pelo material a partir da leitura "
+                "nesta estação; quanto ao que antecede a entrega, registra "
+                "o que foi declarado por quem a promoveu.")
 
     def intro(self, decl: Declarante) -> str:
         """Parágrafo de abertura, na redação já consagrada no sistema."""
@@ -815,6 +860,34 @@ ALCANCE_CONFERENCIA = (
     "valer a fonte que o declarou. Conferir diz que o arquivo não mudou "
     "desde aquela declaração; não diz que a declaração estava certa.",
 )
+
+
+def _frase_dos_instantes(arquivos: list[Arquivo], quando: str) -> str:
+    """Quando os resumos foram tomados — e não quando a peça foi emitida.
+
+    São coisas diferentes, e a que importa é a primeira: o resumo é o
+    marco a partir do qual o sistema responde pelo material. Emitir a
+    peça meia hora depois não muda o instante da leitura, e datar a
+    leitura pela emissão seria antedatar por descuido.
+
+    Sai como intervalo quando os arquivos foram lidos em momentos
+    distintos, e como instante único quando todos coincidem.
+    """
+    import html as _h
+
+    e = _h.escape
+    instantes = sorted({a.lido_em for a in arquivos if a.lido_em})
+    if not instantes:
+        return ("" if not quando else
+                f"<br/>Diligência realizada em {e(quando)}, com "
+                "processamento local, sem envio dos arquivos a terceiros.")
+    if len(instantes) == 1:
+        momento = f"em {e(instantes[0])}"
+    else:
+        momento = f"entre {e(instantes[0])} e {e(instantes[-1])}"
+    return (f"<br/>Os resumos criptográficos foram tomados {momento}, nesta "
+            "estação, com processamento local e sem envio dos arquivos a "
+            "terceiros.")
 
 
 def _paragrafo_conferencia(arquivos: list[Arquivo]) -> str:
@@ -1122,9 +1195,9 @@ def build_html(arquivos: list[Arquivo], quando: str,
  "arquivo, sem qualquer alteração do original. O resumo criptográfico "
  "SHA-256 permite verificar, a qualquer tempo, que o arquivo examinado é o "
  "mesmo juntado aos autos."}
-{"" if not quando else
- f'<br/>Diligência realizada em {e(quando)}, com processamento local, sem '
- "envio dos arquivos a terceiros."}
+{_frase_dos_instantes(arquivos, quando)}
+{("<br/>" + e(juntada.frase_recebimento()))
+ if juntada is not None and juntada.houve_recebimento else ""}
 </p>
 {_paragrafo_conferencia(arquivos)}
 <p align="justify" style="font-size:11pt; margin-top:14px;">
