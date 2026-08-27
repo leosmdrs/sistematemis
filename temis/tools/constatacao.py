@@ -593,6 +593,22 @@ class ConstatacaoTool(ToolPage):
         n = len(self._sessao.capturas) + 1
         destino = self._pasta / f"{n:02d}"
         destino.mkdir(parents=True, exist_ok=True)
+
+        # O certificado diz quem o servidor afirma ser; o registro diz
+        # quem respondeu pelo nome. A resposta bruta é guardada como peça
+        # com resumo próprio: é ela que um terceiro confere, e não o que
+        # esta ferramenta extraiu dela para exibir.
+        c.registro, bruto_rdap = core.registro_do_dominio(c.host)
+        if bruto_rdap:
+            alvo = destino / "registro-dominio.json"
+            try:
+                alvo.write_bytes(bruto_rdap)
+                c.pecas.append(core.Peca(
+                    "registro-dominio.json",
+                    "resposta do registro do domínio (RDAP), como recebida",
+                    str(alvo)))
+            except OSError:
+                pass
         pendentes = {"pdf": False, "html": False}
 
         def concluir():

@@ -241,6 +241,11 @@ def frase(lista: list) -> str:
         texto += ", com " + ", ".join(partes[:-1]) + " e " + partes[-1]
     texto += (". As versões constam para que o método possa ser "
               "reexecutado e conferido por terceiro.")
+    texto += (" O método observa as diretrizes da ABNT NBR ISO/IEC 27037 "
+              "e da RFC 3227 quanto à documentação das ações, à "
+              "auditabilidade, à repetibilidade e à reprodutibilidade; o "
+              "alcance dessa observância, e o que fica fora dela, consta "
+              "do arquivo NORMAS.md publicado com o código-fonte.")
     resumo = resumo_do_programa()
     if resumo:
         texto += (" O executável que produziu esta peça tem resumo SHA-256 "

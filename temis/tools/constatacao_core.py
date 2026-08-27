@@ -26,6 +26,7 @@ viesse da mesma fonte.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import socket
 import ssl
@@ -134,6 +135,162 @@ def certificado_tls(host: str, porta: int = 443) -> Certificado:
     )
 
 
+@dataclass
+class Registro:
+    """Quem registrou o domínio, segundo o próprio registro.
+
+    O certificado diz quem o **servidor** afirma ser; o registro diz quem
+    respondeu pelo **nome**. São coisas diferentes, e numa apuração
+    costuma interessar a segunda: certificado se obtém em minutos, para
+    qualquer domínio, e não identifica pessoa alguma.
+
+    O que se guarda aqui é declaração do registro consultado, e não
+    apuração desta ferramenta. Registro de domínio pode trazer dado
+    falso, desatualizado ou suprimido — muitos registros de domínios
+    genéricos ocultam o titular por proteção de dados —, e a peça diz
+    isso em vez de apresentar o que veio como se fosse verificado.
+    """
+
+    dominio: str = ""
+    servidor: str = ""            # o servidor RDAP que respondeu
+    titular: str = ""
+    documento: str = ""           # identificador do titular, quando publicado
+    responsavel: str = ""         # o registrador, quando informado
+    criado_em: str = ""
+    alterado_em: str = ""
+    expira_em: str = ""
+    situacao: list = field(default_factory=list)
+    servidores_dns: list = field(default_factory=list)
+    erro: str = ""
+
+    @property
+    def obtido(self) -> bool:
+        return bool(self.dominio and not self.erro)
+
+    def to_dict(self) -> dict:
+        return dict(self.__dict__)
+
+
+#: Onde a IANA publica de quem é cada terminação. É a fonte
+#: autoritativa: consultá-la evita depender de serviço redirecionador de
+#: terceiro, que seria mais uma parte no caminho da prova.
+BOOTSTRAP_RDAP = "https://data.iana.org/rdap/dns.json"
+
+#: O mapa de terminações, buscado uma vez por sessão.
+_BOOTSTRAP: list = []
+
+
+def _abrir(url: str, tempo: int = TEMPO_LIMITE):
+    """Uma leitura HTTP simples, sem estado e sem identificação."""
+    from urllib.request import Request, urlopen
+
+    pedido = Request(url, headers={
+        "Accept": "application/rdap+json, application/json",
+        "User-Agent": "SistemaTemis/RDAP",
+    })
+    with urlopen(pedido, timeout=tempo) as resposta:       # noqa: S310
+        return resposta.read()
+
+
+def _servidor_rdap(dominio: str) -> str:
+    """O servidor RDAP da terminação do domínio, pela lista da IANA."""
+    if not _BOOTSTRAP:
+        try:
+            _BOOTSTRAP.append(json.loads(_abrir(BOOTSTRAP_RDAP)))
+        except Exception:                                   # noqa: BLE001
+            _BOOTSTRAP.append({})
+    servicos = (_BOOTSTRAP[0] or {}).get("services") or []
+    # Vence a terminação mais longa: "com.br" antes de "br", quando as
+    # duas constarem.
+    melhor, alvo = "", ""
+    for entrada in servicos:
+        terminacoes, enderecos = (entrada + [[], []])[:2]
+        for terminacao in terminacoes:
+            t = str(terminacao).lower()
+            if (dominio == t or dominio.endswith("." + t)) and len(t) > len(melhor):
+                melhor, alvo = t, (enderecos[0] if enderecos else "")
+    return alvo.rstrip("/")
+
+
+def _texto_vcard(entidade: dict, campo: str) -> str:
+    """Um campo do cartão de visita que o RDAP embute em cada entidade."""
+    for item in (entidade.get("vcardArray") or [None, []])[1]:
+        if isinstance(item, list) and item and item[0] == campo:
+            valor = item[3] if len(item) > 3 else ""
+            return valor if isinstance(valor, str) else " ".join(
+                str(x) for x in valor if x)
+    return ""
+
+
+def _por_papel(entidades: list, papel: str) -> dict:
+    for e in entidades or ():
+        if papel in (e.get("roles") or []):
+            return e
+    return {}
+
+
+def _evento(dados: dict, acao: str) -> str:
+    for e in dados.get("events") or ():
+        if e.get("eventAction") == acao:
+            return str(e.get("eventDate", ""))[:10]
+    return ""
+
+
+def registro_do_dominio(host: str) -> tuple:
+    """(Registro, resposta bruta) do domínio, pelo protocolo RDAP.
+
+    A resposta bruta volta junto para ser guardada como peça, com resumo
+    próprio: é ela que um terceiro confere, e não o resumo que esta
+    ferramenta extraiu dela para exibir.
+
+    O nome é encurtado um rótulo por vez até o registro responder —
+    "www.exemplo.com.br" não é domínio registrado, "exemplo.com.br" é.
+    Assim não é preciso carregar a lista pública de sufixos, que teria de
+    ser mantida atualizada dentro do instalador.
+    """
+    host = (host or "").strip().lower().rstrip(".")
+    if not host:
+        return Registro(erro="endereço sem domínio"), b""
+
+    rotulos = host.split(".")
+    ultimo_erro = "não foi possível consultar o registro"
+    for corte in range(len(rotulos) - 1):
+        dominio = ".".join(rotulos[corte:])
+        servidor = _servidor_rdap(dominio)
+        if not servidor:
+            ultimo_erro = ("a IANA não publica servidor de registro para a "
+                           "terminação de " + dominio)
+            continue
+        try:
+            bruto = _abrir(f"{servidor}/domain/{dominio}")
+            dados = json.loads(bruto)
+        except Exception as e:                              # noqa: BLE001
+            ultimo_erro = f"{type(e).__name__}: {e}"
+            continue
+
+        entidades = dados.get("entities") or []
+        titular = _por_papel(entidades, "registrant")
+        registrador = _por_papel(entidades, "registrar")
+        return Registro(
+            dominio=str(dados.get("ldhName", dominio)),
+            servidor=servidor,
+            titular=(_texto_vcard(titular, "fn")
+                     or _texto_vcard(titular, "org")),
+            documento=str(titular.get("handle", "")),
+            responsavel=(_texto_vcard(registrador, "fn")
+                         or str(registrador.get("handle", ""))),
+            criado_em=_evento(dados, "registration"),
+            alterado_em=_evento(dados, "last changed"),
+            expira_em=_evento(dados, "expiration"),
+            situacao=[str(x) for x in (dados.get("status") or [])],
+            servidores_dns=sorted(
+                str(n.get("ldhName", "")) for n in (dados.get("nameservers")
+                                                    or []) if n.get("ldhName")),
+        ), bruto
+
+    return Registro(erro=ultimo_erro), b""
+
+
 def resolver(host: str) -> list[str]:
     """Endereços IP para os quais o domínio aponta neste instante."""
     try:
@@ -192,6 +349,7 @@ class Captura:
     quando: datetime = field(default_factory=lambda: datetime.now().astimezone())
     ips: list[str] = field(default_factory=list)
     certificado: Certificado = field(default_factory=Certificado)
+    registro: Registro = field(default_factory=Registro)
     pecas: list[Peca] = field(default_factory=list)
     recursos: list[Recurso] = field(default_factory=list)
 
@@ -331,6 +489,36 @@ class Procedimento:
     numero: str = ""
 
 
+#: O que o registro do domínio é, e o que não é. Sai impresso só quando
+#: houver registro na peça: apresentar declaração de terceiro como
+#: apuração própria é o excesso que derruba a peça inteira.
+RESSALVA_REGISTRO = (
+    "Os dados de registro do domínio foram obtidos pelo protocolo RDAP, "
+    "junto ao registro competente indicado pela IANA, e a resposta "
+    "recebida acompanha esta peça em arquivo próprio, com resumo "
+    "criptográfico. São declarações de quem mantém o registro, e não "
+    "apuração desta ferramenta: podem estar desatualizadas, incompletas "
+    "ou suprimidas — registros de domínios genéricos costumam ocultar o "
+    "titular por proteção de dados. O que se atesta é o que o registro "
+    "respondeu naquele instante."
+)
+
+
+def _frase_registro(s) -> str:
+    """A ressalva do registro, quando alguma captura o tiver obtido.
+
+    Uma vez por termo, e não por captura: a sessão pode ter várias, e
+    repetir a mesma ressalva a cada uma faria o leitor pular todas.
+    """
+    import html as _h
+
+    if not any(getattr(c, "registro", None) and c.registro.obtido
+               for c in s.capturas):
+        return ""
+    return ('<p align="justify" style="font-size:10pt; line-height:150%; '
+            'margin-top:12px;">' + _h.escape(RESSALVA_REGISTRO) + "</p>")
+
+
 def _linha(rotulo: str, valor: str, mono: bool = False,
            alerta: bool = False) -> str:
     import html as _html
@@ -379,6 +567,36 @@ def _bloco_captura(c: Captura, numero: int, total: int) -> str:
     else:
         rede = _linha("Verificação de rede",
                       c.certificado.erro or "não realizada", alerta=True)
+
+    # O registro sai em bloco próprio, e não junto do certificado: são
+    # afirmações de origens diferentes, e misturá-las faria parecer que o
+    # sistema apurou as duas do mesmo jeito. O certificado esta ferramenta
+    # leu do servidor; o registro é o que um terceiro publicou.
+    if c.registro.obtido:
+        rede += "".join([
+            _linha("Registro — domínio", c.registro.dominio),
+            _linha("Registro — titular",
+                   c.registro.titular or "não publicado pelo registro"),
+            _linha("Registro — identificador do titular",
+                   c.registro.documento, mono=True)
+            if c.registro.documento else "",
+            _linha("Registro — registrador", c.registro.responsavel)
+            if c.registro.responsavel else "",
+            _linha("Registro — criado em", c.registro.criado_em)
+            if c.registro.criado_em else "",
+            _linha("Registro — alterado em", c.registro.alterado_em)
+            if c.registro.alterado_em else "",
+            _linha("Registro — expira em", c.registro.expira_em)
+            if c.registro.expira_em else "",
+            _linha("Registro — situação", ", ".join(c.registro.situacao))
+            if c.registro.situacao else "",
+            _linha("Registro — servidores DNS",
+                   ", ".join(c.registro.servidores_dns))
+            if c.registro.servidores_dns else "",
+            _linha("Registro — consultado em", c.registro.servidor, mono=True),
+        ])
+    elif c.registro.erro:
+        rede += _linha("Registro do domínio", c.registro.erro, alerta=True)
 
     pecas = "".join(
         "<tr>"
@@ -512,6 +730,7 @@ tabelião, <b>nem atesta a veracidade do conteúdo constatado</b> — atesta
 que o conteúdo estava acessível no endereço indicado, na data e hora
 registradas, nas condições aqui descritas.
 </p>
+{_frase_registro(sessao)}
 <p align="justify" style="font-size:11pt; margin-top:14px;">
 Sem mais a relatar, encerro o presente termo.
 </p>
