@@ -12,6 +12,9 @@ partir de `tools.REGISTRY` e apenas encaminha os sinais de status.
 """
 
 
+import html as _html
+from pathlib import Path
+
 from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (QColor, QKeySequence,
                          QShortcut)
@@ -911,6 +914,13 @@ class TemisWindow(QMainWindow):
         except Exception:                                   # noqa: BLE001
             pass
 
+        # O aviso de abertura só depois de a janela aparecer, e uma vez:
+        # em __init__ ele surgiria antes de haver o que ver atrás dele.
+        # Inicializado aqui, fora do try do registrador, para que o
+        # showEvent nunca o encontre indefinido — nem quando o registro
+        # de sessão não pôde subir.
+        self._avisou_abertura = False
+
         self._build_ui()
         self.go_portal()
 
@@ -925,6 +935,42 @@ class TemisWindow(QMainWindow):
             self._pulso_registro.timeout.connect(
                 lambda: self._registrador.gravar())
             self._pulso_registro.start()
+
+    def showEvent(self, ev):
+        super().showEvent(ev)
+        if not self._avisou_abertura:
+            self._avisou_abertura = True
+            QTimer.singleShot(250, self._avisar_registro_abertura)
+
+    def _avisar_registro_abertura(self):
+        """Diz, ao abrir, que a sessão será registrada localmente.
+
+        É consentimento informado, e não formalidade: a transparência
+        sobre o que se registra é o que separa este registro de uma
+        vigilância — o operador sabe, desde o início, o que fica anotado
+        e o que não fica.
+        """
+        if self._registrador is None:
+            return
+        caixa = QMessageBox(self)
+        caixa.setIcon(QMessageBox.Icon.Information)
+        caixa.setWindowTitle("Registro desta sessão")
+        caixa.setTextFormat(Qt.TextFormat.RichText)
+        caixa.setText(
+            "<b>Esta sessão de trabalho será registrada nesta máquina.</b>")
+        caixa.setInformativeText(
+            "Enquanto o Sistema Têmis estiver aberto, anota-se, apenas "
+            "nesta estação, quais ferramentas foram usadas e por quanto "
+            "tempo, e o que cada uma relatou ao concluir — em ordem "
+            "cronológica e encadeada por resumo criptográfico.<br><br>"
+            "<b>Nada é enviado a servidor algum.</b> Não se anota o "
+            "conteúdo dos arquivos examinados, o texto digitado, os "
+            "endereços visitados nem nomes de investigados. O registro "
+            "pode ser lido e apagado por quem opera, na ferramenta "
+            "Relatório de Atividades.")
+        caixa.setStandardButtons(QMessageBox.StandardButton.Ok)
+        caixa.button(QMessageBox.StandardButton.Ok).setText("Entendi")
+        caixa.exec()
 
     def _build_ui(self):
         self._stack = QStackedWidget()
@@ -1054,10 +1100,56 @@ class TemisWindow(QMainWindow):
         # Por último, e dentro de um `try`: o relatório é o registro do
         # que se fez, mas uma falha ao compô-lo não pode impedir o
         # sistema de fechar.
+        destino = None
         if self._registrador is not None:
             try:
-                self._registrador.encerrar()
+                destino = self._registrador.encerrar()
+            except Exception:                               # noqa: BLE001
+                pass
+            try:
+                self._recomendar_juntar_registro(destino)
             except Exception:                               # noqa: BLE001
                 pass
 
         ev.accept()
+
+    def _recomendar_juntar_registro(self, destino):
+        """Ao fechar, recomenda juntar o registro às peças da sessão.
+
+        O registro sozinho vale como prestação de contas; junto das peças,
+        vale como cadeia de custódia — amarra cada termo, documento e
+        arquivo produzido ao momento e à sessão em que se produziu. A
+        recomendação existe porque essa juntada depende de quem opera
+        lembrar de fazê-la, e é justamente o que costuma se perder.
+        """
+        caixa = QMessageBox(self)
+        caixa.setIcon(QMessageBox.Icon.Information)
+        caixa.setWindowTitle("Registro desta sessão")
+        caixa.setTextFormat(Qt.TextFormat.RichText)
+        caixa.setText("<b>A sessão foi registrada.</b>")
+        corpo = (
+            "Recomenda-se juntar o registro desta sessão aos autos "
+            "<b>junto com os termos, documentos e arquivos</b> que tenham "
+            "sido gerados durante ela. O registro documenta, em ordem "
+            "cronológica e encadeada, o que foi feito, e é o que reforça a "
+            "cadeia de custódia das peças produzidas.")
+        if destino:
+            corpo += ("<br><br>O relatório foi gravado em:<br>"
+                      f"<code>{_html.escape(str(destino))}</code>")
+        caixa.setInformativeText(corpo)
+
+        abrir = None
+        if destino:
+            abrir = caixa.addButton("Abrir a pasta",
+                                    QMessageBox.ButtonRole.ActionRole)
+        caixa.addButton("Fechar", QMessageBox.ButtonRole.AcceptRole)
+        caixa.exec()
+
+        if abrir is not None and caixa.clickedButton() is abrir:
+            try:
+                from PyQt6.QtGui import QDesktopServices
+                from PyQt6.QtCore import QUrl
+                QDesktopServices.openUrl(
+                    QUrl.fromLocalFile(str(Path(destino).parent)))
+            except Exception:                               # noqa: BLE001
+                pass
