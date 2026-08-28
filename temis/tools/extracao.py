@@ -408,6 +408,25 @@ class ExtracaoTool(ToolPage):
             "registro dos atos. O termo cruza os dois pelo tempo decorrido.")
         painel.body.addWidget(self._op_gravar)
 
+        # Qual tela gravar. Numa estação de dois monitores, gravar os
+        # dois põe no vídeo o que estava fora da diligência — e foi
+        # justamente isso que se apontou. A escolha fica recuada sob a
+        # gravação, como as fontes de som: só faz sentido com ela ligada.
+        self._op_monitor = NoScrollComboBox()
+        for m in grav.monitores():
+            self._op_monitor.addItem(m.rotulo, m.chave)
+        # Com mais de um monitor, começa no principal, e não em "todos":
+        # o padrão seguro para uma diligência é uma tela só.
+        principal = next((i for i in range(self._op_monitor.count())
+                          if "(principal)" in self._op_monitor.itemText(i)), 0)
+        if sum(1 for m in grav.monitores()
+               if m.chave.startswith("monitor:")) > 1:
+            self._op_monitor.setCurrentIndex(principal)
+        self._op_monitor.setToolTip(
+            "Qual tela entra no vídeo. “Todos os monitores” grava a área "
+            "de trabalho inteira; escolha um monitor para registrar só ele.")
+        painel.body.addWidget(self._op_monitor)
+
         # As duas fontes de som ficam recuadas sob a gravação, porque só
         # fazem sentido com ela ligada — e se apagam junto quando ela é
         # desmarcada, em vez de ficarem oferecendo o que não vai
@@ -431,6 +450,7 @@ class ExtracaoTool(ToolPage):
         painel.body.addWidget(self._op_som_ambiente)
 
         def _seguir_gravacao(ligado: bool):
+            self._op_monitor.setEnabled(ligado)
             self._op_som_sistema.setEnabled(ligado and pode_sistema)
             self._op_som_ambiente.setEnabled(ligado and bool(vozes))
 
@@ -629,6 +649,8 @@ class ExtracaoTool(ToolPage):
                                        if self._op_som_ambiente.isChecked()
                                        else ""),
                             audio_sistema=self._op_som_sistema.isChecked(),
+                            monitor=(self._op_monitor.currentData()
+                                     or "desktop"),
                             rodape="SISTEMA TÊMIS — EXTRAÇÃO REGISTRADA"))
             try:
                 self._gravador.iniciar()

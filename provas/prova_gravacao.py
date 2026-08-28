@@ -213,5 +213,34 @@ class ORegistroDeJanelas(unittest.TestCase):
         self.assertIn("não captura o que foi digitado", texto)
 
 
+class AEscolhaDeMonitor(unittest.TestCase):
+    """Gravar um monitor, e não os dois — o que se pediu na Extração."""
+
+    @classmethod
+    def setUpClass(cls):
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PyQt6.QtWidgets import QApplication
+        cls.app = QApplication.instance() or QApplication([])
+        if gc.ffmpeg_path() is None:
+            raise unittest.SkipTest("FFmpeg não está disponível")
+
+    def test_monitor_unico_recorta_a_regiao_dele(self):
+        cmd = gc.Gravador("x.mp4", gc.Opcoes(monitor="monitor:0")).comando()
+        self.assertIn("-offset_x", cmd)
+        self.assertIn("-video_size", cmd)
+
+    def test_todos_os_monitores_nao_recorta(self):
+        # "desktop" grava a área inteira; sem região, sem offset.
+        cmd = gc.Gravador("x.mp4", gc.Opcoes(monitor="desktop")).comando()
+        self.assertNotIn("-offset_x", cmd)
+        self.assertNotIn("-video_size", cmd)
+
+    def test_a_lista_de_monitores_traz_a_area_inteira_e_cada_tela(self):
+        chaves = [m.chave for m in gc.monitores()]
+        self.assertEqual(chaves[0], "desktop")
+        self.assertTrue(any(c.startswith("monitor:") for c in chaves))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
