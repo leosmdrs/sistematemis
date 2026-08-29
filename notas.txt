@@ -1,49 +1,9 @@
-RECONSTRUIR CONVERSA — a décima sexta ferramenta
+CORREÇÃO — o botão de abrir volta a ficar dourado
 
-Lê a exportação de uma conversa do WhatsApp — o .txt ou o .zip com as
-mídias — e a reconstrói numa peça pronta para os autos. Reconhece os
-dois formatos de exportação (o do iPhone, entre colchetes, e o do
-Android), remonta as mensagens de várias linhas, distingue as mídias
-anexadas das omitidas e resume em SHA-256 tanto o arquivo de origem
-quanto cada mídia do pacote.
+Na Reconstruir Conversa, o botão "Abrir exportação" saía escuro, quase
+sem contraste contra o azul do painel. A causa estava no painel lateral
+compartilhado: o fundo do corpo era definido de um jeito que vazava
+para os botões ali dentro e apagava o dourado.
 
-A peça atesta uma coisa só, e diz isso com todas as letras: que a
-reconstrução corresponde ao arquivo exportado, identificado pelo
-resumo. Não atesta a autenticidade nem a completude do que foi
-exportado — o arquivo pode ter sido editado antes de chegar, e o
-horário é o do fuso do aparelho que exportou. É o que a ferramenta
-pode honestamente afirmar, e é só isso que ela afirma.
-
-
-CAPTURA DE TELA — o print que se documenta sozinho
-
-Na Gravação de Tela e na Extração Registrada, um botão de captura fica
-à mão do operador. A cada clique, uma foto da tela é salva em PNG,
-resumida em SHA-256 sobre a imagem gravada em disco, e anotada na linha
-do tempo da diligência — com a hora do relógio qualificado e, quando há
-gravação em curso, o tempo decorrido, que amarra a imagem ao vídeo.
-
-O resumo é o que permite conferir, depois, que a captura juntada aos
-autos é exatamente a que foi feita. As capturas entram no termo, cada
-uma com o seu hash.
-
-
-NAVEGADOR EMBUTIDO — páginas que exigem Chrome
-
-O navegador embutido das diligências passa a apresentar-se como um
-Chrome comum. Algumas páginas — o WhatsApp Web, entre elas — barravam o
-navegador embutido e recusavam-se a carregar; agora abrem
-normalmente. O que se registra da diligência não muda.
-
-
-CORREÇÕES
-
-Iniciar a Gravação de Tela com "Registrar janelas em primeiro plano"
-ligado derrubava o programa. A leitura da janela ativa, feita a cada
-instante, escapava para o mecanismo de tempo e fechava tudo. Corrigido:
-falha de um monitor acessório vira anotação de erro no termo, e nunca
-mais fim de diligência.
-
-Na janelinha flutuante que fica sobre a tela durante a gravação, o
-botão de captura saía com o rótulo cortado. A largura do painel agora
-acompanha o conteúdo, e nenhum botão fica espremido.
+Agora o botão de abrir aparece dourado, como nas demais ferramentas.
+Nada mais muda em relação à 1.9.0.
