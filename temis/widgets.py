@@ -250,7 +250,11 @@ class SidebarPanel(QFrame):
         scroll.setStyleSheet(f"QScrollArea {{ background: {PALETTE['surface']}; }}")
 
         body = QWidget()
-        body.setStyleSheet(f"background: {PALETTE['surface']};")
+        # Escopado por ID de propósito: um "background" pelado (sem seletor)
+        # vaza para os filhos no Qt, e apagava o dourado dos botões postos
+        # no corpo — o "Abrir" ficava quase invisível contra o azul.
+        body.setObjectName("sidebar_body")
+        body.setStyleSheet(f"#sidebar_body {{ background: {PALETTE['surface']}; }}")
         self.body = QVBoxLayout(body)
         self.body.setContentsMargins(16, 16, 16, 16)
         self.body.setSpacing(14)
