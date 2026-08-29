@@ -13,7 +13,7 @@ QUALQUER GARANTIA. Veja a Licença Pública Geral Affero GNU para
 mais detalhes: <https://www.gnu.org/licenses/>.
 """
 
-__version__ = "1.8.2"
+__version__ = "1.9.0"
 __appname__ = "Sistema Têmis"
 #: Linha de apoio sob o nome do sistema. Não nomeia a
 #: instituição: o programa é obra pessoal do autor, e a
