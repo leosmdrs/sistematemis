@@ -313,5 +313,47 @@ class AEscolhaDeMonitor(unittest.TestCase):
         self.assertTrue(any(c.startswith("monitor:") for c in chaves))
 
 
+class OPainelFlutuanteCabeTodosOsBotoes(unittest.TestCase):
+    """A janelinha que fica sobre tudo não pode cortar botão.
+
+    O painel tinha largura fixa; quando ganhou o botão de captura, o
+    rótulo saiu cortado. Agora a largura acompanha o conteúdo — esta
+    prova trava isso, para o corte não voltar sem ninguém perceber.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PyQt6.QtWidgets import QApplication
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_a_largura_comporta_capturar_e_encerrar_inteiros(self):
+        from PyQt6.QtWidgets import QPushButton
+        from temis.tools.gravacao import PainelGravando
+        painel = PainelGravando()
+        try:
+            painel.mostrar()          # é aqui que a largura se ajusta
+            botoes = painel.findChildren(QPushButton)
+            self.assertEqual(len(botoes), 2)
+            # nenhum botão fica menor do que pede para caber inteiro
+            preciso = sum(b.sizeHint().width() for b in botoes)
+            self.assertGreaterEqual(painel.width(), preciso)
+            # e a largura cobre tudo o que o layout pede
+            self.assertGreaterEqual(
+                painel.width(), painel.layout().sizeHint().width())
+        finally:
+            painel.esconder()
+
+    def test_a_altura_continua_travada(self):
+        from temis.tools.gravacao import PainelGravando
+        painel = PainelGravando()
+        try:
+            painel.mostrar()
+            self.assertEqual(painel.height(), 56)
+        finally:
+            painel.esconder()
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

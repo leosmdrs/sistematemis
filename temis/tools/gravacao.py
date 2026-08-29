@@ -92,7 +92,9 @@ class PainelGravando(QWidget):
             | Qt.WindowType.WindowStaysOnTopHint
             | Qt.WindowType.Tool)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setFixedSize(268, 56)
+        # Altura travada; a largura acompanha o conteúdo (adjustSize em
+        # mostrar), para nenhum botão ficar cortado quando o painel muda.
+        self.setFixedHeight(56)
         self._arrastando: QPoint | None = None
 
         linha = QHBoxLayout(self)
@@ -109,9 +111,9 @@ class PainelGravando(QWidget):
             f"color: {PALETTE['text']}; font-size: 17px; font-weight: 700;"
             "font-family: Consolas, monospace;")
         linha.addWidget(self._tempo)
-        linha.addStretch()
+        linha.addSpacing(16)
 
-        capturar = QPushButton("Capturar tela")
+        capturar = QPushButton("Capturar")
         capturar.setCursor(Qt.CursorShape.PointingHandCursor)
         capturar.setStyleSheet(
             f"QPushButton {{ background: {PALETTE['surface3']}; "
@@ -152,6 +154,7 @@ class PainelGravando(QWidget):
             "font-size: 17px;")
 
     def mostrar(self):
+        self.adjustSize()  # largura conforme os botões, já com as fontes
         tela = QGuiApplication.primaryScreen().availableGeometry()
         self.move(tela.right() - self.width() - 28, tela.top() + 28)
         self.show()
