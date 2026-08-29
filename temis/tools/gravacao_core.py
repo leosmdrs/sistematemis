@@ -69,6 +69,7 @@ import platform
 import re
 import socket
 import subprocess
+import sys
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -626,9 +627,9 @@ def janela_em_foco() -> tuple:
     filmada pelo vídeo; registrá-lo apenas torna pesquisável o que a
     imagem já mostra.
     """
-    if sys.platform != "win32":
-        return "", ""
     try:
+        if sys.platform != "win32":
+            return "", ""
         import ctypes
         from ctypes import wintypes
 
@@ -978,16 +979,27 @@ class Gravador:
             raise RuntimeError(_explicar_falha(erro))
 
     def varrer_downloads(self):
-        """Uma passada do monitor. Quem grava a chama pelo próprio pulso.
+        """Uma passada dos monitores. Quem grava a chama pelo próprio pulso.
 
         Fica aqui, e não num relógio interno, porque o núcleo não conta
         tempo por conta própria — recebe o instante de fora, e assim
         continua conferível numa prova, sem depender de quando rodou.
+
+        Nada aqui pode escapar: esta função roda no pulso do temporizador,
+        e uma exceção não tratada num slot do Qt aborta o processo — o que
+        derrubaria a gravação por causa de um monitor acessório. Falha de
+        monitor vira anotação de erro, não fim de diligência.
         """
-        if getattr(self, "_monitor", None) is not None:
-            self._monitor.varrer(self.decorrido, time.time())
-        if getattr(self, "_janelas", None) is not None:
-            self._janelas.varrer(self.decorrido)
+        try:
+            if getattr(self, "_monitor", None) is not None:
+                self._monitor.varrer(self.decorrido, time.time())
+        except Exception as e:                              # noqa: BLE001
+            self._erros.append(f"monitor de downloads: {e}")
+        try:
+            if getattr(self, "_janelas", None) is not None:
+                self._janelas.varrer(self.decorrido)
+        except Exception as e:                              # noqa: BLE001
+            self._erros.append(f"registro de janelas: {e}")
 
     def encerrar(self, espera: float = 25.0) -> Resultado:
         """Fecha a gravação e devolve o que ela produziu."""

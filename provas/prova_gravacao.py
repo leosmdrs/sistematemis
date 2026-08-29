@@ -179,6 +179,18 @@ class ORegistroDeJanelas(unittest.TestCase):
             m.varrer(d)
         self.assertEqual(len(m.registros), 1)
 
+    def test_a_leitura_real_do_foco_nao_estoura(self):
+        # A prova que faltava: as demais injetam um leitor de mentira, e
+        # por isso não pegaram que a função real referenciava um "sys" não
+        # importado — o que abortava o processo pela mão do PyQt no timer.
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PyQt6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+        r = gc.janela_em_foco()
+        self.assertIsInstance(r, tuple)
+        self.assertEqual(len(r), 2)
+
     def test_foco_vazio_e_ignorado(self):
         m = self.monitor([("", "")])
         m.varrer(1.0)
