@@ -336,6 +336,14 @@ class ConstatacaoTool(ToolPage):
         if WEBVIEW_DISPONIVEL:
             # Perfil anônimo: nada em disco, sessão nova a cada abertura.
             self._perfil = QWebEngineProfile(self)
+            # Apresenta-se como Chrome comum, retirando o rótulo "QtWebEngine"
+            # da identificação do navegador. Sítios que barram navegador
+            # desconhecido — o WhatsApp Web, entre eles — passam a carregar, e
+            # o conteúdo servido é o mesmo que um Chrome veria. A versão do
+            # Chromium é a real, embutida; nada de fingir versão que não há.
+            import re as _re
+            self._perfil.setHttpUserAgent(
+                _re.sub(r"QtWebEngine/\S+\s*", "", self._perfil.httpUserAgent()))
             self._perfil.setPersistentCookiesPolicy(
                 QWebEngineProfile.PersistentCookiesPolicy.NoPersistentCookies)
             self._perfil.setHttpCacheType(
