@@ -83,6 +83,7 @@ class PainelGravando(QWidget):
     """Controle mínimo que fica sobre tudo enquanto se grava."""
 
     encerrar_pedido = pyqtSignal()
+    capturar_pedido = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(None)
@@ -109,6 +110,16 @@ class PainelGravando(QWidget):
             "font-family: Consolas, monospace;")
         linha.addWidget(self._tempo)
         linha.addStretch()
+
+        capturar = QPushButton("Capturar tela")
+        capturar.setCursor(Qt.CursorShape.PointingHandCursor)
+        capturar.setStyleSheet(
+            f"QPushButton {{ background: {PALETTE['surface3']}; "
+            f"color: {PALETTE['text']}; border: none; border-radius: 6px; "
+            f"padding: 7px 14px; font-weight: 600; }}"
+            f"QPushButton:hover {{ background: {PALETTE['surface2']}; }}")
+        capturar.clicked.connect(self.capturar_pedido)
+        linha.addWidget(capturar)
 
         parar = QPushButton("Encerrar")
         parar.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -388,9 +399,11 @@ class GravacaoTool(ToolPage):
         super().__init__(parent)
         self._gravador: core.Gravador | None = None
         self._resultados: list[core.Resultado] = []
+        self._capturas: list = []
         self._contexto = core.ler_contexto()
         self._painel = PainelGravando()
         self._painel.encerrar_pedido.connect(self._encerrar)
+        self._painel.capturar_pedido.connect(self._capturar)
 
         self._pulso = QTimer(self)
         self._pulso.setInterval(500)
@@ -541,6 +554,13 @@ class GravacaoTool(ToolPage):
         self._b_gravar = primary_button("Iniciar gravação", "camera")
         self._b_gravar.clicked.connect(self._iniciar)
         painel.footer.addWidget(self._b_gravar)
+
+        self._b_capturar = output_button("Capturar tela", "camera")
+        self._b_capturar.setToolTip(
+            "Fotografa a tela agora, resume em SHA-256 e documenta a "
+            "captura. Durante a gravação, use o botão da janela flutuante.")
+        self._b_capturar.clicked.connect(self._capturar)
+        painel.footer.addWidget(self._b_capturar)
 
         self._b_termo = output_button("Gerar termo")
         self._b_termo.clicked.connect(self._gerar_termo)
@@ -724,6 +744,36 @@ class GravacaoTool(ToolPage):
         if janela is not None:
             janela.showMinimized()
 
+    def _pasta_capturas(self) -> Path:
+        """Onde as capturas ficam.
+
+        Junto do vídeo, quando há gravação em curso — assim a imagem e o
+        vídeo da mesma diligência moram no mesmo lugar. Fora de uma
+        gravação, numa pasta de capturas por dia.
+        """
+        if self._gravador is not None:
+            return Path(self._gravador.destino).parent / "capturas"
+        agora = datetime.datetime.now()
+        return PASTA_PADRAO / "Capturas" / f"{agora:%Y-%m-%d}"
+
+    def _capturar(self):
+        monitor = (self._gravador.opcoes.monitor
+                   if self._gravador is not None
+                   else self._cb_area.currentData() or "desktop")
+        decorrido = (self._gravador.decorrido
+                     if self._gravador is not None else None)
+        captura = core.capturar_tela(
+            self._pasta_capturas(), len(self._capturas) + 1, monitor,
+            decorrido)
+        self._capturas.append(captura)
+        if captura.erro:
+            self.status_msg.emit(f"Falha na captura: {captura.erro}")
+        else:
+            self.status_msg.emit(
+                f"Captura {len(self._capturas)} salva "
+                f"({captura.nome}) — SHA-256 {captura.sha256[:12]}…")
+        self._atualizar_estado()
+
     def _tique(self):
         if self._gravador is None:
             return
@@ -858,20 +908,25 @@ class GravacaoTool(ToolPage):
 
     # ── termo ────────────────────────────────────
     def _gerar_termo(self):
-        if not self._resultados:
+        if not self._resultados and not self._capturas:
             return
         termo = core.TermoGravacao(
             nome=self._e_operador.text().strip(),
             numero_processo=self._e_processo.text().strip(),
             objeto=self._e_objeto.toPlainText().strip(),
-            registros=list(self._resultados))
+            registros=list(self._resultados),
+            capturas=list(self._capturas))
         TermoDialog(termo, self).exec()
 
     # ── estado ───────────────────────────────────
     def _atualizar_estado(self):
         gravando = self._gravador is not None
         self._b_gravar.setEnabled(not gravando)
-        self._b_termo.setEnabled(bool(self._resultados) and not gravando)
+        # Capturar vale sempre: durante a gravação (pelo painel flutuante
+        # e por este botão) e fora dela.
+        self._b_capturar.setEnabled(True)
+        tem_peca = bool(self._resultados or self._capturas)
+        self._b_termo.setEnabled(tem_peca and not gravando)
         self._b_nova.setEnabled(bool(self._resultados) and not gravando)
         self._b_remover.setEnabled(
             self._arvore.currentItem() is not None and not gravando)

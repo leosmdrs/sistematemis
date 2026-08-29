@@ -59,6 +59,7 @@ CARREGADA = "carregada"
 CLIQUE = "clique"
 FORMULARIO = "formulario"
 DOWNLOAD = "download"
+CAPTURA = "captura"
 ANOTACAO = "anotacao"
 FALHA = "falha"
 ENCERRAMENTO = "encerramento"
@@ -70,6 +71,7 @@ ROTULO_EVENTO = {
     CLIQUE: "Clique",
     FORMULARIO: "Consulta submetida",
     DOWNLOAD: "Arquivo recebido",
+    CAPTURA: "Captura de tela",
     ANOTACAO: "Anotação do operador",
     FALHA: "Falha",
     ENCERRAMENTO: "Encerramento da diligência",

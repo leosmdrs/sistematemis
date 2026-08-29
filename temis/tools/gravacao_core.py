@@ -711,6 +711,71 @@ class MonitorJanelas:
             decorrido=decorrido, aplicativo=aplicativo, titulo=titulo))
 
 
+@dataclass
+class Captura:
+    """Uma captura de tela feita a pedido do operador, documentada.
+
+    O resumo é o elo forte, calculado sobre os bytes da imagem no instante
+    em que ela é salva. A hora vem do relógio qualificado, com fuso; o
+    tempo decorrido, quando a captura acontece durante uma gravação,
+    amarra a imagem ao vídeo pela cronologia.
+    """
+
+    nome: str = ""
+    caminho: str = ""
+    sha256: str = ""
+    quando: str = ""
+    tamanho: int = 0
+    monitor: str = ""
+    #: Segundos de gravação decorridos, ou None quando a captura é avulsa.
+    decorrido: object = None
+    erro: str = ""
+
+
+def _tela_do_monitor(monitor: str):
+    """A QScreen correspondente ao monitor escolhido, ou a principal."""
+    try:
+        from PyQt6.QtGui import QGuiApplication
+        if monitor and monitor.startswith("monitor:"):
+            i = int(monitor.split(":")[1])
+            telas = QGuiApplication.screens()
+            if 0 <= i < len(telas):
+                return telas[i]
+        return QGuiApplication.primaryScreen()
+    except Exception:                                       # noqa: BLE001
+        return None
+
+
+def capturar_tela(pasta, indice: int, monitor: str = "",
+                  decorrido=None) -> Captura:
+    """Fotografa a tela, salva em PNG e resume — tudo num gesto.
+
+    O resumo é tomado sobre a imagem já gravada em disco: é o que permite
+    afirmar, depois, que a captura juntada aos autos é exatamente a que
+    foi feita, e não outra.
+    """
+    from ..relogio import carimbo
+
+    pasta = Path(pasta)
+    nome = f"captura-{indice:03d}.png"
+    alvo = pasta / nome
+    c = Captura(nome=nome, caminho=str(alvo), quando=carimbo(),
+                monitor=monitor, decorrido=decorrido)
+    try:
+        pasta.mkdir(parents=True, exist_ok=True)
+        tela = _tela_do_monitor(monitor)
+        if tela is None:
+            raise RuntimeError("nenhuma tela disponível para capturar")
+        imagem = tela.grabWindow(0)
+        if imagem.isNull() or not imagem.save(str(alvo), "PNG"):
+            raise RuntimeError("não foi possível salvar a imagem")
+        c.tamanho = alvo.stat().st_size
+        c.sha256 = sha256(alvo)
+    except Exception as e:                                  # noqa: BLE001
+        c.erro = f"{type(e).__name__}: {e}"
+    return c
+
+
 class Gravador:
     """Conduz o FFmpeg durante a captura.
 
@@ -1091,6 +1156,14 @@ RESSALVA_DOWNLOADS = (
 
 #: O que a relação de janelas é, e o que não é. Vai impresso quando
 #: houver janelas na peça.
+RESSALVA_CAPTURAS = (
+    "As capturas de tela foram feitas a pedido do operador, no instante "
+    "indicado, e cada uma foi resumida em SHA-256 sobre a imagem gravada em "
+    "disco. O resumo permite conferir, a qualquer tempo, que a captura "
+    "juntada aos autos é a mesma que foi feita. As imagens acompanham "
+    "esta peça."
+)
+
 RESSALVA_JANELAS = (
     "A relação de janelas indica quais aplicativos e janelas estiveram em "
     "primeiro plano durante a gravação, e em que momento. Os títulos são "
@@ -1140,6 +1213,8 @@ class TermoGravacao:
     objeto: str = ""
     sistema_consultado: str = ""
     registros: list[Resultado] = field(default_factory=list)
+    #: Capturas de tela feitas a pedido do operador, com hash e hora.
+    capturas: list = field(default_factory=list)
 
     @property
     def bons(self) -> list[Resultado]:
@@ -1304,6 +1379,41 @@ def _quadro_janelas(janelas: list) -> str:
         f"{''.join(linhas)}</table>")
 
 
+def _quadro_capturas(capturas: list) -> str:
+    """A relação das capturas de tela feitas na diligência."""
+    import html as _h
+    e = _h.escape
+    linhas = []
+    for i, c in enumerate(capturas, 1):
+        if c.decorrido is None:
+            momento = ""
+        else:
+            s = int(c.decorrido)
+            momento = (f" (decorrido {s // 3600:02d}:{(s % 3600) // 60:02d}:"
+                       f"{s % 60:02d})")
+        detalhe = (formatar_tamanho(c.tamanho) if c.sha256
+                   else (c.erro or "não foi possível capturar"))
+        linhas.append(
+            "<tr>"
+            + _cel(i, "center")
+            + _cel(c.nome)
+            + _cel(e(c.quando) + momento)
+            + _cel(detalhe)
+            + "</tr><tr>"
+            + _cel("", "center")
+            + (f'<td colspan="3"><font color="{INK}" face="Courier New" '
+               f'size="1">SHA-256: {c.sha256}</font></td>' if c.sha256
+               else '<td colspan="3"></td>')
+            + "</tr>")
+    return (
+        '<table width="100%" cellspacing="0" cellpadding="4" border="1" '
+        'style="border-collapse:collapse; font-size:8.5pt;">'
+        '<tr style="background-color:#0a2442; color:#ffd633;">'
+        '<th width="4%">Nº</th><th width="30%">Arquivo</th>'
+        '<th width="34%">Feita em</th><th width="32%">Tamanho</th></tr>'
+        + "".join(linhas) + "</table>")
+
+
 def build_html(t: TermoGravacao) -> str:
     """Termo em HTML, para exibir e exportar."""
     from ..impressao import cabecalho_html, rodape_html
@@ -1381,6 +1491,14 @@ def build_html(t: TermoGravacao) -> str:
         partes.append(
             '<p align="justify" style="font-size:10.5pt; line-height:150%; '
             'margin-top:8px;">' + e(RESSALVA_JANELAS) + "</p>")
+
+    # ── capturas de tela ──────────────────
+    if t.capturas:
+        partes.append(secao("Capturas de tela"))
+        partes.append(_quadro_capturas(t.capturas))
+        partes.append(
+            '<p align="justify" style="font-size:10.5pt; line-height:150%; '
+            'margin-top:8px;">' + e(RESSALVA_CAPTURAS) + "</p>")
 
     # ── método ────────────────────────────
     partes.append(secao("Método"))

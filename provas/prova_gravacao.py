@@ -213,6 +213,65 @@ class ORegistroDeJanelas(unittest.TestCase):
         self.assertIn("não captura o que foi digitado", texto)
 
 
+class ACapturaDeTela(unittest.TestCase):
+    """Captura documentada — o botão de printscreen com hash e hora."""
+
+    @classmethod
+    def setUpClass(cls):
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PyQt6.QtWidgets import QApplication
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_a_captura_carrega_hora_e_um_lugar_para_o_resumo(self):
+        # O modelo tem os campos que documentam a prova.
+        campos = set(gc.Captura().__dataclass_fields__)
+        for c in ("nome", "caminho", "sha256", "quando", "tamanho",
+                  "monitor", "decorrido"):
+            self.assertIn(c, campos)
+
+    def test_falha_ao_capturar_vira_erro_e_nao_queda(self):
+        # No motor offscreen não há tela a fotografar: a captura devolve
+        # erro em vez de derrubar a diligência.
+        import tempfile
+        c = gc.capturar_tela(tempfile.mkdtemp(), 1, "monitor:0", 12.0)
+        self.assertTrue(c.erro or c.sha256)   # ou capturou, ou registrou o erro
+        self.assertEqual(c.nome, "captura-001.png")
+
+    def test_o_termo_relaciona_as_capturas_com_hash(self):
+        import re
+        cap = gc.Captura(nome="captura-002.png", sha256="d" * 64,
+                         tamanho=1024, quando="27/08/2026 às 15:00:00",
+                         decorrido=90.0)
+        r = gc.Resultado(arquivo="v.mp4", inicio="2026-08-27T15:00:00-03:00",
+                         fim="2026-08-27T15:10:00-03:00", segundos=600,
+                         tamanho=1, sha256="e" * 64, largura=1920, altura=1080,
+                         quadros=10, contexto=gc.ler_contexto(),
+                         opcoes=gc.Opcoes())
+        termo = gc.TermoGravacao(nome="F", matricula="1", lotacao="X",
+                                 numero_processo="1", objeto="t",
+                                 registros=[r], capturas=[cap])
+        texto = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ",
+                                            gc.build_html(termo)))
+        self.assertIn("Capturas de tela", texto)
+        self.assertIn("captura-002.png", texto)
+        self.assertIn("d" * 64, texto)
+        self.assertIn("decorrido 00:01:30", texto)
+
+    def test_sem_captura_a_secao_nao_aparece(self):
+        import re
+        r = gc.Resultado(arquivo="v.mp4", inicio="2026-08-27T15:00:00-03:00",
+                         fim="2026-08-27T15:10:00-03:00", segundos=600,
+                         tamanho=1, sha256="e" * 64, largura=1920, altura=1080,
+                         quadros=10, contexto=gc.ler_contexto(),
+                         opcoes=gc.Opcoes())
+        termo = gc.TermoGravacao(nome="F", matricula="1", lotacao="X",
+                                 numero_processo="1", objeto="t",
+                                 registros=[r])
+        texto = re.sub(r"<[^>]+>", " ", gc.build_html(termo))
+        self.assertNotIn("Capturas de tela", texto)
+
+
 class AEscolhaDeMonitor(unittest.TestCase):
     """Gravar um monitor, e não os dois — o que se pediu na Extração."""
 

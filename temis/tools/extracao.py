@@ -504,6 +504,15 @@ class ExtracaoTool(ToolPage):
         b_ir.clicked.connect(self._ir)
         linha.addWidget(b_ir)
 
+        self._b_captura = QPushButton("  Capturar")
+        self._b_captura.setIcon(draw_icon("camera", 15, PALETTE["text"]))
+        self._b_captura.setToolTip(
+            "Fotografa a tela agora, resume em SHA-256 e registra a captura "
+            "na linha do tempo da diligência")
+        self._b_captura.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._b_captura.clicked.connect(self._capturar)
+        linha.addWidget(self._b_captura)
+
         self._b_anotar = QPushButton("  Anotar")
         self._b_anotar.setIcon(draw_icon("note", 15, PALETTE["text"]))
         self._b_anotar.setToolTip(
@@ -791,6 +800,28 @@ class ExtracaoTool(ToolPage):
     def _recarregar(self):
         if WEBVIEW_DISPONIVEL:
             self._pagina.triggerAction(QWebEnginePage.WebAction.Reload)
+
+    def _capturar(self):
+        if self._sessao is None or not self._sessao.ativa:
+            QMessageBox.information(
+                self, "Diligência não iniciada",
+                "Inicie a diligência para que a captura entre na linha do "
+                "tempo, com hora e resumo.")
+            return
+        from . import gravacao_core as _grav
+        pasta = Path(self._sessao.pasta) / "capturas"
+        monitor = (self._op_monitor.currentData() or "desktop"
+                   if hasattr(self, "_op_monitor") else "desktop")
+        indice = self._sessao.quantos(core.CAPTURA) + 1
+        captura = _grav.capturar_tela(pasta, indice, monitor,
+                                      self._sessao.decorrido)
+        if captura.erro:
+            self._registrar(core.FALHA, "Falha ao capturar a tela",
+                            detalhe=captura.erro)
+        else:
+            self._registrar(
+                core.CAPTURA, f"Captura de tela: {captura.nome}",
+                detalhe=f"SHA-256 {captura.sha256}")
 
     def _anotar(self):
         if self._sessao is None or not self._sessao.ativa:
