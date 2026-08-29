@@ -673,6 +673,51 @@ GUIAS: dict[str, Guia] = {
         ),
     ),
 
+    "conversa": Guia(
+        finalidade=(
+            "Reconstrói uma conversa a partir do arquivo que o próprio "
+            "aplicativo exporta — o texto, ou o pacote com as mídias — e a "
+            "identifica pelo resumo criptográfico desse arquivo. A "
+            "corregedoria costuma receber a conversa já exportada; abri-la "
+            "no Bloco de Notas resolve o prático e destrói o jurídico, "
+            "porque ao fim existe um texto e não existe como demonstrar que "
+            "ele corresponde ao arquivo recebido.\n\n"
+            "A peça que sai daqui atesta uma coisa só, e por isso se "
+            "sustenta: que a reconstrução corresponde àquele arquivo, com "
+            "aquele resumo. Não atesta a autenticidade nem a completude da "
+            "conversa original — e diz isso com todas as letras."),
+        quando=(
+            "Chegou uma exportação de conversa (WhatsApp, em texto ou no "
+            "pacote .zip) e é preciso juntá-la aos autos de forma "
+            "conferível.",
+            "Interessa registrar quem falou, quando, e com qual resumo "
+            "criptográfico de cada mídia recebida.",
+        ),
+        passos=(
+            "Clique em <b>Abrir exportação</b> e escolha o arquivo <b>.txt</b> "
+            "ou <b>.zip</b> que o aplicativo gerou em “Exportar conversa”.",
+            "Confira a reconstrução na tela: participantes, período e "
+            "mensagens, com as mídias resumidas quando o pacote as inclui.",
+            "Preencha o procedimento e o número do processo, para o termo "
+            "amarrar a peça aos autos.",
+            "Clique em <b>Gerar termo</b> e exporte em PDF, em HTML para o "
+            "SEI, ou copie o texto.",
+        ),
+        limites=(
+            "A peça responde pelo arquivo a partir do momento em que ele é "
+            "aberto por esta ferramenta. Nada afirma sobre a autenticidade "
+            "da conversa nem sobre o que houve antes: a exportação é gerada "
+            "no aparelho e é, na origem, um texto, que pode ter sido editado.",
+            "As datas e horas são as do arquivo, no fuso do aparelho que "
+            "exportou, que o arquivo em geral não declara.",
+            "As mensagens de sistema são reconhecidas por padrão; em formato "
+            "incomum, alguma pode ser classificada como mensagem comum, ou o "
+            "contrário.",
+            "Quando a exportação é apenas texto, as mídias não a acompanham, "
+            "e a mensagem correspondente consta como referência.",
+        ),
+    ),
+
     "planilha": Guia(
         finalidade=(
             "Examina planilha de auditoria sem quebrar a cadeia de "

@@ -12,6 +12,7 @@ from .base import ToolMeta, ToolPage, PlaceholderPage
 from .antiinj import AntiInjectionTool
 from .atividades import AtividadesTool
 from .constatacao import ConstatacaoTool
+from .conversa import ConversaTool
 from .ips import IPSTool
 from .metadados import MetadadosTool
 from .espelhamento import EspelhamentoTool
@@ -53,6 +54,7 @@ REGISTRY: list[tuple[ToolMeta, type | None]] = [
     (QuadroTool.meta,        QuadroTool),
     (VideoTool.meta,         VideoTool),
     (TranscricaoTool.meta,   TranscricaoTool),
+    (ConversaTool.meta,      ConversaTool),
     (PlanilhaTool.meta,      PlanilhaTool),
     (AtividadesTool.meta,    AtividadesTool),
 ]

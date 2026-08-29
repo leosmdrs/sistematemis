@@ -71,8 +71,8 @@ instalar.
 
 ## Ferramentas
 
-**Quinze ferramentas**, todas disponíveis. A ordem abaixo é a do portal,
-que as dispõe em três fileiras de cinco e não em ordem alfabética: na
+**Dezesseis ferramentas**, todas disponíveis. A ordem abaixo é a do
+portal, disposta por etapa do trabalho e não em ordem alfabética: na
 primeira, a peça e o preparo do documento que a instrui; na segunda, o
 registro da prova onde ela está; na terceira, o exame do material e o
 registro do próprio trabalho.
@@ -92,10 +92,11 @@ registro do próprio trabalho.
 | **Quadro de Evidências** | Mural de vínculos da investigação: anotações, imagens e marcações conectadas, organizadas por caso. Serve para enxergar as relações entre pessoas, fatos e provas antes de redigir a peça. |
 | **Edição de Vídeo** | Compactar, fatiar e mesclar gravações para a juntada aos autos. Trabalha com videomonitoramento, câmeras corporais e vídeos anexados pelas partes. |
 | **Degravação** | Transcreve áudio e vídeo com reconhecimento de fala executado na própria máquina; nenhum trecho é enviado a serviço externo. Separa automaticamente quem fala, na cronologia da gravação, e basta nomear cada voz uma vez. |
+| **Reconstruir Conversa** | Reconstrói a conversa exportada de um aplicativo (texto ou pacote com mídias) num documento conferível, identificado pelo resumo criptográfico do arquivo de origem; as mídias do pacote são resumidas em SHA-256. Atesta que a reconstrução corresponde ao arquivo — não a autenticidade da conversa. |
 | **Análise de Planilha** | Filtrar, ordenar, escolher colunas, remover duplicidades, acrescentar coluna calculada, agrupar e resumir, marcar linhas com justificativa e cruzar com outra planilha — registrando cada passo. Produz o resultado e um termo com o roteiro completo, que terceiro re-executa sobre o original para conferir. |
 | **Relatório de Atividades** | Documenta cada execução do sistema, do abrir ao fechar, sem que ninguém precise ligá-la: ferramentas usadas e por quanto tempo, o que cada uma relatou ao concluir, e a identificação da estação e da rede. Grava enquanto a sessão corre. Fica só nesta máquina. |
 
-Duas acessam a rede, e estão marcadas acima. As outras treze leem e
+Duas acessam a rede, e estão marcadas acima. As outras catorze leem e
 processam tudo na própria estação. Fora delas, o sistema só sai à rede
 para conferir se há versão nova, sem enviar identificação — e isso se
 desliga em **Sobre**.

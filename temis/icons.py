@@ -359,6 +359,16 @@ def draw_icon(kind: str, size: int = 16, color: str = None, width: float = 1.8) 
         path.lineTo(QPointF(c - s * 0.07, c + s * 0.11))
         path.closeSubpath()
         p.drawPath(path)
+    elif kind == "tool_conversa":
+        # dois balões de conversa sobrepostos — a reconstrução do diálogo
+        b1 = QRectF(m - s * 0.02, m, s * 0.62, s * 0.44)
+        p.drawRoundedRect(b1, s * 0.10, s * 0.10)
+        p.drawLine(QPointF(b1.left() + s * 0.10, b1.bottom()),
+                   QPointF(b1.left() + s * 0.10, b1.bottom() + s * 0.10))
+        b2 = QRectF(s - m - s * 0.60, c - s * 0.02, s * 0.62, s * 0.44)
+        p.drawRoundedRect(b2, s * 0.10, s * 0.10)
+        p.drawLine(QPointF(b2.right() - s * 0.10, b2.bottom()),
+                   QPointF(b2.right() - s * 0.10, b2.bottom() + s * 0.10))
     elif kind == "redact":
         p.fillRect(QRectF(m, c - s * 0.16, s - 2 * m, s * 0.32), QColor(color))
 
