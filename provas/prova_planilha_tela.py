@@ -159,5 +159,56 @@ class RecusaOQueEstaIncompleto(unittest.TestCase):
         self.assertIsNone(self.montar("cruzamento").operacao())
 
 
+class OsBotoesDeReordenar(unittest.TestCase):
+    """Botão sem indicação nenhuma do que faz é botão inútil.
+
+    Estes dois usavam o caractere de seta como rótulo, e saíram vazios na
+    tela: a fonte que o Windows entrega para a interface pode não ter o
+    glifo, e nada avisa — o botão simplesmente não pinta nada.
+
+    Aqui ficam só os ícones, sem nome ao lado, porque a fileira divide a
+    largura do painel com o botão de acrescentar. Por isso a prova exige
+    que o ícone exista e desenhe: sem rótulo, ele é a única indicação.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        import PyQt6.QtWebEngineCore                   # noqa: F401
+        cls.app = QApplication.instance() or QApplication([])
+
+    def setUp(self):
+        from temis.tools.planilha import PlanilhaTool
+        self.tela = PlanilhaTool()
+        self.addCleanup(self.tela.shutdown)
+
+    def pintados(self, botao) -> int:
+        img = botao.icon().pixmap(14, 14).toImage()
+        return sum(1 for x in range(img.width()) for y in range(img.height())
+                   if img.pixelColor(x, y).alpha() > 40)
+
+    def test_cada_seta_desenha_alguma_coisa(self):
+        for botao, nome in ((self.tela._bt_sobe, "subir"),
+                            (self.tela._bt_desce, "descer")):
+            with self.subTest(nome):
+                self.assertFalse(botao.icon().isNull())
+                self.assertGreater(self.pintados(botao), 10,
+                                   "a seta não desenhou nada")
+
+    def test_as_duas_setas_sao_diferentes_uma_da_outra(self):
+        # Duas iguais seriam pior do que nenhuma: indicariam o que não é.
+        def marca(botao):
+            img = botao.icon().pixmap(14, 14).toImage()
+            # a metade de cima pinta mais numa, a de baixo na outra
+            return sum(1 for x in range(img.width()) for y in range(7)
+                       if img.pixelColor(x, y).alpha() > 40)
+
+        self.assertNotEqual(marca(self.tela._bt_sobe),
+                            marca(self.tela._bt_desce))
+
+    def test_cada_uma_diz_o_que_faz_ao_parar_o_ponteiro(self):
+        self.assertIn("Adiantar", self.tela._bt_sobe.toolTip())
+        self.assertIn("Atrasar", self.tela._bt_desce.toolTip())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

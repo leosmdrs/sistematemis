@@ -988,12 +988,19 @@ class PlanilhaTool(ToolPage):
         self._bt_menos.setFixedWidth(38)
         self._bt_menos.clicked.connect(self._remover)
         linha.addWidget(self._bt_menos)
-        self._bt_sobe = QPushButton("↑")
+        # Seta desenhada, e não o caractere de seta como rótulo: a fonte
+        # que o Windows entrega para a interface pode não ter o glifo, e
+        # aí o botão sai vazio. Aqui ficam só os ícones, sem nome ao
+        # lado, porque a fileira divide a largura do painel com o botão
+        # de acrescentar — e o que passa da largura do painel é decepado.
+        self._bt_sobe = QPushButton()
+        self._bt_sobe.setIcon(draw_icon("seta_cima", 14, PALETTE["text"]))
         self._bt_sobe.setToolTip("Adiantar a operação — a ordem muda o resultado")
         self._bt_sobe.setFixedWidth(32)
         self._bt_sobe.clicked.connect(lambda: self._mover(-1))
         linha.addWidget(self._bt_sobe)
-        self._bt_desce = QPushButton("↓")
+        self._bt_desce = QPushButton()
+        self._bt_desce.setIcon(draw_icon("seta_baixo", 14, PALETTE["text"]))
         self._bt_desce.setToolTip("Atrasar a operação")
         self._bt_desce.setFixedWidth(32)
         self._bt_desce.clicked.connect(lambda: self._mover(1))

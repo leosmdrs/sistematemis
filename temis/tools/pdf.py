@@ -235,13 +235,17 @@ class PDFTool(ToolPage):
         self._lbl_lista.setStyleSheet("font-size: 13px; font-weight: 700;")
         topo.addWidget(self._lbl_lista)
         topo.addStretch()
-        self._b_sobe = QPushButton("↑")
-        self._b_sobe.setFixedWidth(32)
+        # Seta desenhada, e não o caractere de seta como rótulo: a fonte
+        # que o Windows entrega para a interface pode não ter o glifo, e
+        # aí o botão sai vazio — foi o que aconteceu aqui. Com o nome ao
+        # lado, some também a dúvida sobre qual sobe e qual desce.
+        self._b_sobe = QPushButton("  Subir")
+        self._b_sobe.setIcon(draw_icon("seta_cima", 14, PALETTE["text"]))
         self._b_sobe.setToolTip("Adiantar — a ordem decide o resultado")
         self._b_sobe.clicked.connect(lambda: self._mover(-1))
         topo.addWidget(self._b_sobe)
-        self._b_desce = QPushButton("↓")
-        self._b_desce.setFixedWidth(32)
+        self._b_desce = QPushButton("  Descer")
+        self._b_desce.setIcon(draw_icon("seta_baixo", 14, PALETTE["text"]))
         self._b_desce.setToolTip("Atrasar")
         self._b_desce.clicked.connect(lambda: self._mover(1))
         topo.addWidget(self._b_desce)

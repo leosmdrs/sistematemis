@@ -800,7 +800,8 @@ GUIAS: dict[str, Guia] = {
             "tamanho de cada um, e assinala em vermelho o que não pôde "
             "ser lido.",
             "Escolha <b>Mesclar</b>, <b>Separar</b> ou <b>Comprimir</b>.",
-            "Em <b>Mesclar</b>, ordene com <b>↑</b> e <b>↓</b> — a ordem "
+            "Em <b>Mesclar</b>, ordene com <b>Subir</b> e "
+            "<b>Descer</b> — a ordem "
             "da lista é a ordem do resultado. Em <b>Separar</b>, escreva "
             "as páginas, como <i>1-3, 7, 10-12</i>. Em <b>Comprimir</b>, "
             "escolha o grau.",
@@ -864,7 +865,8 @@ GUIAS: dict[str, Guia] = {
             "Em <b>Acrescentar</b>, monte cada operação: filtrar linhas, "
             "ordenar, escolher colunas ou remover duplicidades. Cada "
             "passo mostra quantas linhas entraram e quantas saíram.",
-            "Use <b>↑</b> e <b>↓</b> para mudar a ordem. A ordem importa: "
+            "Use os botões de seta ao lado de <b>Acrescentar</b> para "
+            "mudar a ordem. A ordem importa: "
             "filtrar antes ou depois de remover duplicidades dá "
             "resultados diferentes.",
             "Clique em <b>Salvar resultado</b> e escolha onde gravar.",

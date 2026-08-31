@@ -392,6 +392,27 @@ class ATela(Base):
         self.assertTrue(self.tela._b_processar.isEnabled())
         self.assertEqual(len(self.tela._origens()), 2)
 
+    def test_os_botoes_de_reordenar_mostram_alguma_coisa(self):
+        """Botão sem indicação nenhuma do que faz é botão inútil.
+
+        Estes dois usavam o caractere de seta como rótulo, e saíram
+        vazios na tela: a fonte que o Windows entrega para a interface
+        pode não ter o glifo, e nada avisa — o botão simplesmente não
+        pinta nada. Agora a seta é desenhada, como a de todo botão do
+        sistema, e o nome vai ao lado.
+        """
+        for botao, nome in ((self.tela._b_sobe, "Subir"),
+                            (self.tela._b_desce, "Descer")):
+            with self.subTest(nome):
+                self.assertIn(nome, botao.text())
+                self.assertFalse(botao.icon().isNull())
+                px = botao.icon().pixmap(14, 14)
+                img = px.toImage()
+                pintados = sum(1 for x in range(img.width())
+                               for y in range(img.height())
+                               if img.pixelColor(x, y).alpha() > 40)
+                self.assertGreater(pintados, 10, "a seta não desenhou nada")
+
     def test_nada_do_painel_passa_da_borda_direita(self):
         """O painel tem largura fixa, e o que passa dela é decepado.
 
