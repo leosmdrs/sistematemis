@@ -322,6 +322,20 @@ def draw_icon(kind: str, size: int = 16, color: str = None, width: float = 1.8) 
                    QPointF(s - m * 0.9, s - m * 0.9 - s * 0.1))
         p.drawLine(QPointF(s - m * 0.9, s - m * 0.9),
                    QPointF(s - m * 0.9 + s * 0.08, s - m * 0.9))
+    elif kind == "tool_pdf":
+        # duas folhas: a de tras aparece so pelas bordas de cima e da
+        # direita, porque o pincel nao tem cor de fundo com que tapa-la —
+        # o icone e desenhado sobre transparencia
+        recuo = s * 0.15
+        f = QRectF(m, m + recuo, s - 2 * m - recuo, s - 2 * m - recuo)
+        poly((f.left() + recuo, f.top() - recuo),
+             (f.right() + recuo, f.top() - recuo),
+             (f.right() + recuo, f.bottom() - recuo))
+        p.drawRoundedRect(f, s * 0.07, s * 0.07)
+        for k in (0.34, 0.56, 0.78):
+            y = f.top() + f.height() * k
+            p.drawLine(QPointF(f.left() + s * 0.10, y),
+                       QPointF(f.right() - s * 0.10, y))
     elif kind == "tool_planilha":
         # grade com a faixa de cabecalho cheia: e planilha, e a divisao
         # interna sugere as colunas que a analise separa

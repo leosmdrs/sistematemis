@@ -439,5 +439,62 @@ class OFilhoNaoSobreviveAoPai(unittest.TestCase):
                                 "/T"], capture_output=True)
 
 
+class GravarSemMicrofone(unittest.TestCase):
+    """Microfone é opcional, e a mensagem de erro tem de saber disso.
+
+    Há estação sem microfone algum, e há diligência em que não se quer o
+    som da sala. Nos dois casos o comando sai sem entrada de áudio e a
+    gravação corre normalmente — isto trava esse caminho.
+
+    O que atrapalhava era a explicação da falha. "I/O error" é das
+    mensagens mais genéricas do FFmpeg — sai por destino inacessível, por
+    disco cheio, por captura recusada — e estava mapeada para "o
+    microfone não pôde ser aberto". Quem gravasse sem microfone e
+    esbarrasse em qualquer uma dessas causas lia que o problema era o
+    microfone, e concluía que a ferramenta exige um.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        if gc.ffmpeg_path() is None:
+            raise unittest.SkipTest("FFmpeg não está disponível")
+
+    def test_sem_microfone_o_comando_nao_tem_entrada_de_audio(self):
+        cmd = gc.Gravador("x.mp4", gc.Opcoes(microfone="")).comando()
+        self.assertNotIn("dshow", cmd)
+        self.assertNotIn("-c:a", cmd)
+
+    def test_com_microfone_a_entrada_de_audio_aparece(self):
+        cmd = gc.Gravador(
+            "x.mp4", gc.Opcoes(microfone="Microfone (Realtek)")).comando()
+        self.assertIn("dshow", cmd)
+        self.assertIn("audio=Microfone (Realtek)", cmd)
+
+    def test_sem_microfone_a_falha_generica_nao_culpa_o_microfone(self):
+        texto = gc._explicar_falha("Error: I/O error occurred", microfone="")
+        self.assertNotIn("microfone", texto.lower())
+        # E o que o codificador disse continua à vista, para quem for
+        # resolver poder pesquisar.
+        self.assertIn("I/O error", texto)
+
+    def test_com_microfone_a_explicacao_continua_valendo(self):
+        texto = gc._explicar_falha("Error: I/O error occurred",
+                                   microfone="Microfone (Realtek)")
+        self.assertIn("microfone", texto.lower())
+
+    def test_dispositivo_ausente_so_se_explica_com_microfone(self):
+        erro = "Could not find audio only device with name"
+        self.assertIn("microfone",
+                      gc._explicar_falha(erro, microfone="X").lower())
+        self.assertNotIn("microfone",
+                         gc._explicar_falha(erro, microfone="").lower())
+
+    def test_as_falhas_alheias_ao_audio_valem_sempre(self):
+        for erro, marca in (("height not divisible by 2", "ímpar"),
+                            ("Permission denied", "não deixou gravar"),
+                            ("No such file or directory", "pasta de destino")):
+            self.assertIn(marca, gc._explicar_falha(erro, microfone=""))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

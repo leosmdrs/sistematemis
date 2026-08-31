@@ -718,6 +718,62 @@ GUIAS: dict[str, Guia] = {
         ),
     ),
 
+    "pdf": Guia(
+        finalidade=(
+            "Junta vários PDFs num só, extrai páginas para um documento "
+            "novo e reduz o tamanho de digitalizações que não cabem no "
+            "sistema de processo.\n\n"
+            "Resolve, antes de tudo, um problema de sigilo: essas três "
+            "tarefas costumam ser feitas em sítio da internet, o que "
+            "significa enviar peça de procedimento para servidor de "
+            "terceiro, fora do controle do órgão. Aqui nada sai da "
+            "estação. E, como nas demais ferramentas do sistema, a "
+            "operação fica declarada e o resultado, conferível."),
+        quando=(
+            "O documento digitalizado excede o tamanho que o sistema de "
+            "processo aceita.",
+            "Chegaram vários PDFs avulsos que precisam virar peça única.",
+            "Só algumas páginas de um documento longo interessam à "
+            "juntada.",
+        ),
+        passos=(
+            "Clique em <b>Acrescentar PDFs</b>. A lista mostra páginas e "
+            "tamanho de cada um, e assinala em vermelho o que não pôde "
+            "ser lido.",
+            "Escolha <b>Mesclar</b>, <b>Separar</b> ou <b>Comprimir</b>.",
+            "Em <b>Mesclar</b>, ordene com <b>↑</b> e <b>↓</b> — a ordem "
+            "da lista é a ordem do resultado. Em <b>Separar</b>, escreva "
+            "as páginas, como <i>1-3, 7, 10-12</i>. Em <b>Comprimir</b>, "
+            "escolha o grau.",
+            "Clique em <b>Processar</b> e escolha onde gravar.",
+            "Clique em <b>Gerar termo</b>. Antes de montar a peça, a "
+            "ferramenta refaz a operação a partir das origens e confere "
+            "se chega ao mesmo documento.",
+        ),
+        limites=(
+            "A conferência é feita sobre o resumo do conteúdo das "
+            "páginas, e não sobre os bytes do arquivo produzido: o "
+            "formato PDF guarda dentro de si dados que variam a cada "
+            "gravação, e refazer a mesma operação gera arquivos de "
+            "resumos diferentes ainda que o conteúdo seja o mesmo.",
+            "Mesclar e separar não alteram página alguma, e o termo "
+            "afirma isso por conferência: cada página do resultado tem "
+            "resumo idêntico ao da página de origem.",
+            "Comprimir sem perda costuma ganhar pouco, ou nada, num "
+            "arquivo já limpo — o ganho vem de reamostrar imagem. Nos "
+            "graus com perda a redução é grande, e o custo é real: as "
+            "páginas mudam, e o detalhe fino de carimbo, assinatura e "
+            "letra miúda se degrada.",
+            "A camada de texto sobrevive à compressão em todos os graus. "
+            "Nisto a ferramenta difere da Tarja Preta, que rasteriza a "
+            "página e perde o texto pesquisável.",
+            "Documento protegido por senha não é aberto. A ferramenta "
+            "assinala e segue com os demais, em vez de interromper tudo.",
+            "O documento produzido não herda metadado algum dos "
+            "originais: é composto do zero e recebe apenas as páginas.",
+        ),
+    ),
+
     "planilha": Guia(
         finalidade=(
             "Examina planilha de auditoria sem quebrar a cadeia de "

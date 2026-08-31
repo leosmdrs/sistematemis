@@ -381,30 +381,45 @@ def montar_faixa(pasta: str | Path, identificacao: str,
 
 
 #: Falhas conhecidas do codificador, ditas em português. A chave é o
-#: trecho que o FFmpeg imprime; o valor, o que a pessoa precisa saber
-#: para resolver. O que não estiver aqui vai cru, que é melhor do que
-#: uma mensagem genérica: o texto do FFmpeg ao menos pode ser pesquisado.
+#: trecho que o FFmpeg imprime; depois, o que a pessoa precisa saber para
+#: resolver; por fim, se aquela explicação só vale quando havia microfone
+#: na jogada. O que não estiver aqui vai cru, que é melhor do que uma
+#: mensagem genérica: o texto do FFmpeg ao menos pode ser pesquisado.
+#:
+#: O terceiro campo existe porque "I/O error" é das mensagens mais
+#: genéricas do FFmpeg — sai por destino inacessível, por disco cheio, por
+#: captura recusada. Atribuí-la ao microfone sem que microfone algum
+#: tivesse sido pedido fazia a ferramenta acusar causa que não tinha como
+#: conhecer, e levava quem lia a concluir que gravar exige microfone. Não
+#: exige: sem microfone, o comando sai sem entrada de áudio nenhuma.
 _FALHAS = (
     ("not divisible by 2",
      "A área a gravar tem largura ou altura ímpar, e o formato de vídeo "
      "exige medidas pares. Costuma acontecer com dois monitores de "
-     "alturas diferentes."),
+     "alturas diferentes.", False),
     ("Could not find audio only device",
      "O microfone escolhido não foi encontrado. Ele pode ter sido "
-     "desconectado, ou estar em uso por outro programa."),
+     "desconectado, ou estar em uso por outro programa.", True),
     ("I/O error",
      "O microfone escolhido não pôde ser aberto. Ele pode estar em uso "
-     "por outro programa."),
+     "por outro programa.", True),
     ("Permission denied",
-     "O sistema não deixou gravar no arquivo de destino."),
+     "O sistema não deixou gravar no arquivo de destino.", False),
     ("No such file or directory",
-     "A pasta de destino não existe ou não pôde ser criada."),
+     "A pasta de destino não existe ou não pôde ser criada.", False),
 )
 
 
-def _explicar_falha(erro: str) -> str:
-    """Traduz o que o codificador disse, sem esconder o que ele disse."""
-    for marca, explicacao in _FALHAS:
+def _explicar_falha(erro: str, microfone: str = "") -> str:
+    """Traduz o que o codificador disse, sem esconder o que ele disse.
+
+    `microfone` é o dispositivo que a gravação pediu, ou vazio se ela não
+    pediu nenhum. Sem microfone, as explicações de microfone não se
+    aplicam — e afirmá-las seria acusar uma causa inexistente.
+    """
+    for marca, explicacao, so_com_microfone in _FALHAS:
+        if so_com_microfone and not microfone:
+            continue
         if marca.lower() in erro.lower():
             return f"{explicacao}\n\nO codificador informou: {marca}"
     linhas = [x.strip() for x in erro.splitlines() if x.strip()]
@@ -979,7 +994,8 @@ class Gravador:
             self._processo = None
 
             self._inicio = 0.0
-            raise RuntimeError(_explicar_falha(erro))
+            raise RuntimeError(
+                _explicar_falha(erro, self.opcoes.microfone))
 
     def varrer_downloads(self):
         """Uma passada dos monitores. Quem grava a chama pelo próprio pulso.

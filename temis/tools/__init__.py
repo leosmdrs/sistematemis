@@ -19,6 +19,7 @@ from .espelhamento import EspelhamentoTool
 from .extracao import ExtracaoTool
 from .gravacao import GravacaoTool
 from .ocrpdf import OCRPDFTool
+from .pdf import PDFTool
 from .planilha import PlanilhaTool
 from .quadro import QuadroTool
 from .tarja_preta import TarjaPretaTool
@@ -55,6 +56,7 @@ REGISTRY: list[tuple[ToolMeta, type | None]] = [
     (VideoTool.meta,         VideoTool),
     (TranscricaoTool.meta,   TranscricaoTool),
     (ConversaTool.meta,      ConversaTool),
+    (PDFTool.meta,           PDFTool),
     (PlanilhaTool.meta,      PlanilhaTool),
     (AtividadesTool.meta,    AtividadesTool),
 ]
