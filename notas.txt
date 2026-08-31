@@ -1,9 +1,41 @@
-CORREÇÃO — o botão de abrir volta a ficar dourado
+PASTA DE SESSÃO — a diligência inteira reunida num lugar só
 
-Na Reconstruir Conversa, o botão "Abrir exportação" saía escuro, quase
-sem contraste contra o azul do painel. A causa estava no painel lateral
-compartilhado: o fundo do corpo era definido de um jeito que vazava
-para os botões ali dentro e apagava o dourado.
+Cada vez que o Sistema Têmis é aberto, a execução passa a ter uma pasta
+própria, em "Documentos\Sistema Têmis\Sessões". Tudo o que as
+ferramentas geram durante aquele uso — vídeos, capturas de tela, termos,
+os arquivos recebidos nas diligências de navegador, planilhas
+analisadas, PDFs tarjados, índices de varredura, roteiros — cai ali por
+padrão, arrumado em subpastas por tipo, ao lado do registro encadeado do
+que foi feito e do relatório da sessão em PDF.
 
-Agora o botão de abrir aparece dourado, como nas demais ferramentas.
-Nada mais muda em relação à 1.9.0.
+Reunir assim não é só organização: amarra cada peça ao momento e à
+sessão em que se produziu, e reforça a cadeia de custódia do conjunto.
+Para quem opera, some o trabalho de caçar, no fim do dia, onde cada
+arquivo foi parar.
+
+Como se comporta:
+
+• A pasta nasce tarde. Só passa a existir quando a primeira peça é
+  gravada. Abrir o programa para uma consulta rápida, ou por engano, não
+  deixa pasta nem PDF vazios para trás.
+
+• O destino é sugerido, não imposto. Cada janela de salvar já abre na
+  pasta da sessão, mas quem opera continua livre para gravar noutro
+  lugar quando precisar.
+
+• Ao fechar o programa, se a sessão produziu alguma coisa, o relatório
+  do que foi feito é gravado em PDF dentro da pasta, e a pasta se abre
+  sozinha — pronta para juntar aos autos. Se nada foi produzido, o
+  programa fecha em silêncio.
+
+
+GRAVAÇÃO NÃO SOBREVIVE MAIS À QUEDA DO PROGRAMA
+
+Se o programa fechasse de repente durante uma gravação — uma queda, um
+encerramento forçado —, o gravador de tela podia continuar rodando
+sozinho em segundo plano, capturando a tela indefinidamente: o ponteiro
+do mouse piscava como se ainda houvesse gravação, e o disco enchia.
+
+Agora o próprio Windows encerra a gravação (e o espelhamento de celular)
+junto com o programa, aconteça o que acontecer. No fechamento normal,
+nada muda: a gravação já era encerrada com o arquivo íntegro.
