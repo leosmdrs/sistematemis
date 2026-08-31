@@ -210,8 +210,10 @@ class _TermoConversaDialog(QDialog):
         lay.addLayout(linha)
 
     def _salvar_pdf(self):
+        from ..sessao import destino_para_dialogo
         caminho, _ = QFileDialog.getSaveFileName(
-            self, "Salvar termo em PDF", "termo-conversa.pdf",
+            self, "Salvar termo em PDF",
+            destino_para_dialogo(self, "Termos", "termo-conversa.pdf"),
             "PDF (*.pdf)")
         if not caminho:
             return
@@ -226,8 +228,10 @@ class _TermoConversaDialog(QDialog):
         self._aviso_salvo(caminho)
 
     def _salvar_html(self):
+        from ..sessao import destino_para_dialogo
         caminho, _ = QFileDialog.getSaveFileName(
-            self, "Salvar termo em HTML", "termo-conversa.html",
+            self, "Salvar termo em HTML",
+            destino_para_dialogo(self, "Termos", "termo-conversa.html"),
             "HTML (*.html)")
         if not caminho:
             return

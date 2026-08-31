@@ -348,9 +348,11 @@ class ReportDialog(QDialog):
     def _save_html(self):
         """Exporta o que está na tela, limpo para a importação do SEI."""
         base = Path(self._file_name).stem or "documento"
+        from ..sessao import destino_para_dialogo
         path, _ = QFileDialog.getSaveFileName(
             self, "Salvar relatório em HTML",
-            f"constatacao-{base}.html", "Página HTML (*.html)")
+            destino_para_dialogo(self, "Termos", f"constatacao-{base}.html"),
+            "Página HTML (*.html)")
         if not path:
             return
         if not path.lower().endswith((".html", ".htm")):
@@ -369,9 +371,11 @@ class ReportDialog(QDialog):
 
     def _save_pdf(self):
         base = Path(self._file_name).stem or "documento"
+        from ..sessao import destino_para_dialogo
         path, _ = QFileDialog.getSaveFileName(
             self, "Salvar relatório de constatação",
-            f"constatacao-{base}.pdf", "Arquivos PDF (*.pdf)")
+            destino_para_dialogo(self, "Termos", f"constatacao-{base}.pdf"),
+            "Arquivos PDF (*.pdf)")
         if not path:
             return
         if not path.lower().endswith(".pdf"):

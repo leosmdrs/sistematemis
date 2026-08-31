@@ -253,8 +253,10 @@ class TermoDialog(QDialog):
         return f"constatacao-{self._sessao.id}"
 
     def _salvar_pdf(self):
+        from ..sessao import destino_para_dialogo
         caminho, _ = QFileDialog.getSaveFileName(
-            self, "Salvar termo", f"{self._base()}.pdf",
+            self, "Salvar termo",
+            destino_para_dialogo(self, "Termos", f"{self._base()}.pdf"),
             "Arquivos PDF (*.pdf)")
         if not caminho:
             return
@@ -271,8 +273,10 @@ class TermoDialog(QDialog):
                                  f"Não foi possível gerar o PDF:\n{e}")
 
     def _salvar_html(self):
+        from ..sessao import destino_para_dialogo
         caminho, _ = QFileDialog.getSaveFileName(
-            self, "Salvar termo em HTML", f"{self._base()}.html",
+            self, "Salvar termo em HTML",
+            destino_para_dialogo(self, "Termos", f"{self._base()}.html"),
             "Página HTML (*.html)")
         if not caminho:
             return
@@ -289,8 +293,11 @@ class TermoDialog(QDialog):
                                  f"Não foi possível gravar:\n{e}")
 
     def _salvar_zip(self):
+        from ..sessao import destino_para_dialogo
         caminho, _ = QFileDialog.getSaveFileName(
-            self, "Salvar peças", f"{self._base()}.zip", "Arquivo ZIP (*.zip)")
+            self, "Salvar peças",
+            destino_para_dialogo(self, "Termos", f"{self._base()}.zip"),
+            "Arquivo ZIP (*.zip)")
         if not caminho:
             return
         if not caminho.lower().endswith(".zip"):

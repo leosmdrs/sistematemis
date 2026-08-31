@@ -1248,8 +1248,10 @@ class PlanilhaTool(ToolPage):
     def _salvar_resultado(self):
         if self._analise is None:
             return
-        sugestao = Path(self._analise.origem)
-        alvo = str(sugestao.with_name(sugestao.stem + "-analisado.xlsx"))
+        origem = Path(self._analise.origem)
+        alvo = self.destino_na_sessao(
+            "Planilhas", origem.stem + "-analisado.xlsx",
+            fallback=origem.parent)
         caminho, _ = QFileDialog.getSaveFileName(
             self, "Salvar o resultado", alvo,
             "Planilha (*.xlsx);;Texto separado (*.csv)")
@@ -1274,8 +1276,10 @@ class PlanilhaTool(ToolPage):
     def _salvar_roteiro(self):
         if self._analise is None:
             return
-        sugestao = Path(self._analise.origem)
-        alvo = str(sugestao.with_name(sugestao.stem + "-roteiro.json"))
+        origem = Path(self._analise.origem)
+        alvo = self.destino_na_sessao(
+            "Roteiros", origem.stem + "-roteiro.json",
+            fallback=origem.parent)
         caminho, _ = QFileDialog.getSaveFileName(
             self, "Salvar o roteiro", alvo, "Roteiro (*.json)")
         if not caminho:

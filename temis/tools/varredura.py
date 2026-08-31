@@ -324,8 +324,10 @@ class TermoDialog(QDialog):
         self._aviso.setText("✓ Texto copiado")
 
     def _salvar_html(self):
+        from ..sessao import destino_para_dialogo
         caminho, _ = QFileDialog.getSaveFileName(
-            self, "Salvar termo em HTML", "termo-varredura.html",
+            self, "Salvar termo em HTML",
+            destino_para_dialogo(self, "Termos", "termo-varredura.html"),
             "Página HTML (*.html)")
         if not caminho:
             return
@@ -344,8 +346,10 @@ class TermoDialog(QDialog):
                                  f"Não foi possível gravar o arquivo:\n{e}")
 
     def _salvar_pdf(self):
+        from ..sessao import destino_para_dialogo
         caminho, _ = QFileDialog.getSaveFileName(
-            self, "Salvar termo", "termo-varredura.pdf",
+            self, "Salvar termo",
+            destino_para_dialogo(self, "Termos", "termo-varredura.pdf"),
             "Arquivos PDF (*.pdf)")
         if not caminho:
             return
@@ -726,12 +730,13 @@ class VarreduraTool(ToolPage):
         if aviso.exec() != QMessageBox.StandardButton.Yes:
             return
 
-        PASTA_PADRAO.mkdir(parents=True, exist_ok=True)
-        sugestao = PASTA_PADRAO / (
-            f"varredura-{Path(origem).name or rotulo or 'acervo'}"
-            f"-{datetime.date.today():%Y-%m-%d}{core.SUFIXO}")
+        from ..sessao import destino_para_dialogo
+        nome = (f"varredura-{Path(origem).name or rotulo or 'acervo'}"
+                f"-{datetime.date.today():%Y-%m-%d}{core.SUFIXO}")
+        sugestao = destino_para_dialogo(self, "Varreduras", nome,
+                                        fallback=PASTA_PADRAO)
         destino, _ = QFileDialog.getSaveFileName(
-            self, "Onde gravar o índice", str(sugestao),
+            self, "Onde gravar o índice", sugestao,
             f"Índice de varredura (*{core.SUFIXO})")
         if not destino:
             return

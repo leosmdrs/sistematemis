@@ -622,7 +622,8 @@ class VideoTool(ToolPage):
 
     def _tarefas_compactar(self) -> list:
         pasta = QFileDialog.getExistingDirectory(
-            self, "Pasta de destino dos vídeos compactados")
+            self, "Pasta de destino dos vídeos compactados",
+            self.destino_na_sessao("Vídeos", ""))
         if not pasta:
             return []
         preset = core.preset_por_chave(self._cb_preset.currentData())
@@ -665,7 +666,9 @@ class VideoTool(ToolPage):
             return []
         fim = min(fim, v.duracao)
 
-        sugestao = f"{Path(v.nome).stem}-trecho.mp4"
+        from ..sessao import destino_para_dialogo
+        sugestao = destino_para_dialogo(
+            self, "Vídeos", f"{Path(v.nome).stem}-trecho.mp4")
         saida, _ = QFileDialog.getSaveFileName(
             self, "Salvar trecho", sugestao, "Vídeo MP4 (*.mp4)")
         if not saida:
@@ -695,7 +698,9 @@ class VideoTool(ToolPage):
     def _tarefas_mesclar(self) -> list:
         if len(self._videos) < 2:
             return []
-        sugestao = f"{Path(self._videos[0].nome).stem}-mesclado.mp4"
+        from ..sessao import destino_para_dialogo
+        sugestao = destino_para_dialogo(
+            self, "Vídeos", f"{Path(self._videos[0].nome).stem}-mesclado.mp4")
         saida, _ = QFileDialog.getSaveFileName(
             self, "Salvar vídeo mesclado", sugestao, "Vídeo MP4 (*.mp4)")
         if not saida:
@@ -787,8 +792,12 @@ class VideoTool(ToolPage):
         # Uma operação produz um roteiro; a compactação de vários vídeos
         # produz vários. Num arquivo só, porque foram um gesto só e é
         # assim que a peça os relaciona.
-        sugerido = str(Path(roteiros[0].origens[0][0]).with_suffix(
-            ".roteiro.json")) if roteiros[0].origens else ""
+        if roteiros[0].origens:
+            base = Path(roteiros[0].origens[0][0])
+            nome, fb = base.stem + ".roteiro.json", base.parent
+        else:
+            nome, fb = "edicao.roteiro.json", None
+        sugerido = self.destino_na_sessao("Roteiros", nome, fallback=fb)
         destino, _ = QFileDialog.getSaveFileName(
             self, "Salvar roteiro da edição", sugerido, "Roteiro (*.json)")
         if not destino:

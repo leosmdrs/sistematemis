@@ -1039,8 +1039,14 @@ class TarjaPretaTool(ToolPage):
                 "• Ou use a busca automática")
             return
 
+        from ..sessao import destino_para_dialogo
+        fonte = (Path(self._doc.name).stem
+                 if getattr(self._doc, "name", "") else "documento")
         out_path, _ = QFileDialog.getSaveFileName(
-            self, "Salvar PDF tarjado", "", "Arquivos PDF (*.pdf)")
+            self, "Salvar PDF tarjado",
+            destino_para_dialogo(self, "Documentos tarjados",
+                                 f"{fonte}-tarjado.pdf"),
+            "Arquivos PDF (*.pdf)")
         if not out_path:
             return
         if not out_path.lower().endswith(".pdf"):
@@ -1090,8 +1096,16 @@ class TarjaPretaTool(ToolPage):
     def _salvar_roteiro(self):
         if not (self._caminho_origem and self._ultimo_conteudo):
             return
-        sugerido = str(Path(self._ultimo_salvo).with_suffix(".roteiro.json")
-                       if self._ultimo_salvo else "")
+        if self._ultimo_salvo:
+            # ao lado do PDF tarjado que já foi salvo — na pasta da sessão,
+            # se foi ali que ele caiu
+            sugerido = str(Path(self._ultimo_salvo).with_suffix(".roteiro.json"))
+        else:
+            from ..sessao import destino_para_dialogo
+            base = (Path(self._caminho_origem).stem
+                    if self._caminho_origem else "censura")
+            sugerido = destino_para_dialogo(self, "Roteiros",
+                                            f"{base}.roteiro.json")
         destino, _ = QFileDialog.getSaveFileName(
             self, "Salvar roteiro da censura", sugerido,
             "Roteiro (*.json)")

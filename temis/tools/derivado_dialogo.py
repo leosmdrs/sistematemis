@@ -192,7 +192,8 @@ class TermoDerivadoDialog(QDialog):
         base = "termo"
         if self._termo.itens and self._termo.itens[0].saida.nome:
             base = Path(self._termo.itens[0].saida.nome).stem
-        return str(Path.home() / "Documents" / f"termo-{base}{extensao}")
+        from ..sessao import destino_para_dialogo
+        return destino_para_dialogo(self, "Termos", f"termo-{base}{extensao}")
 
     # ── saídas ───────────────────────────────
     def _salvar_pdf(self):

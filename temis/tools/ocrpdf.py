@@ -311,8 +311,10 @@ class TermoDialog(QDialog):
         self._aviso.setText("✓ Texto copiado")
 
     def _salvar_html(self):
+        from ..sessao import destino_para_dialogo
         caminho, _ = QFileDialog.getSaveFileName(
-            self, "Salvar termo em HTML", "termo-ocr.html",
+            self, "Salvar termo em HTML",
+            destino_para_dialogo(self, "Termos", "termo-ocr.html"),
             "Página HTML (*.html)")
         if not caminho:
             return
@@ -330,8 +332,11 @@ class TermoDialog(QDialog):
                                  f"Não foi possível gravar o arquivo:\n{e}")
 
     def _salvar_pdf(self):
+        from ..sessao import destino_para_dialogo
         caminho, _ = QFileDialog.getSaveFileName(
-            self, "Salvar termo", "termo-ocr.pdf", "Arquivos PDF (*.pdf)")
+            self, "Salvar termo",
+            destino_para_dialogo(self, "Termos", "termo-ocr.pdf"),
+            "Arquivos PDF (*.pdf)")
         if not caminho:
             return
         if not caminho.lower().endswith(".pdf"):
@@ -584,9 +589,10 @@ class OCRPDFTool(ToolPage):
         self._atualizar_estado()
 
     def _escolher_pasta(self):
+        from ..sessao import destino_para_dialogo
         pasta = QFileDialog.getExistingDirectory(
             self, "Onde gravar os documentos gerados",
-            self._pasta_saida or str(Path.home()))
+            self._pasta_saida or destino_para_dialogo(self, "OCR", ""))
         if not pasta:
             return
         self._pasta_saida = pasta

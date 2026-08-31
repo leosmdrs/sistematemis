@@ -268,8 +268,10 @@ class TermoDialog(QDialog):
         self._aviso.setText("✓ Texto copiado")
 
     def _salvar_html(self):
+        from ..sessao import destino_para_dialogo
         caminho, _ = QFileDialog.getSaveFileName(
-            self, "Salvar termo em HTML", "termo-espelhamento.html",
+            self, "Salvar termo em HTML",
+            destino_para_dialogo(self, "Termos", "termo-espelhamento.html"),
             "Página HTML (*.html)")
         if not caminho:
             return
@@ -287,8 +289,10 @@ class TermoDialog(QDialog):
                                  f"Não foi possível gravar o arquivo:\n{e}")
 
     def _salvar_pdf(self):
+        from ..sessao import destino_para_dialogo
         caminho, _ = QFileDialog.getSaveFileName(
-            self, "Salvar termo", "termo-espelhamento.pdf",
+            self, "Salvar termo",
+            destino_para_dialogo(self, "Termos", "termo-espelhamento.pdf"),
             "Arquivos PDF (*.pdf)")
         if not caminho:
             return
@@ -584,11 +588,13 @@ class EspelhamentoTool(ToolPage):
             if resposta != QMessageBox.StandardButton.Yes:
                 return
 
-        PASTA_PADRAO.mkdir(parents=True, exist_ok=True)
+        from ..sessao import destino_para_dialogo
         agora = datetime.datetime.now()
-        sugestao = PASTA_PADRAO / f"espelhamento-{agora:%Y-%m-%d-%H%M%S}.mp4"
+        nome = f"espelhamento-{agora:%Y-%m-%d-%H%M%S}.mp4"
+        sugestao = destino_para_dialogo(self, "Vídeos", nome,
+                                        fallback=PASTA_PADRAO)
         destino, _ = QFileDialog.getSaveFileName(
-            self, "Onde gravar a sessão", str(sugestao), "Vídeo MP4 (*.mp4)")
+            self, "Onde gravar a sessão", sugestao, "Vídeo MP4 (*.mp4)")
         if not destino:
             return
         if not destino.lower().endswith(".mp4"):

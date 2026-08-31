@@ -344,8 +344,10 @@ class TermoDialog(QDialog):
         return f"degravacao-{Path(self._deg.origem).stem or 'midia'}"
 
     def _salvar_pdf(self):
+        from ..sessao import destino_para_dialogo
         caminho, _ = QFileDialog.getSaveFileName(
-            self, "Salvar termo", f"{self._base()}.pdf",
+            self, "Salvar termo",
+            destino_para_dialogo(self, "Termos", f"{self._base()}.pdf"),
             "Arquivos PDF (*.pdf)")
         if not caminho:
             return
@@ -362,8 +364,10 @@ class TermoDialog(QDialog):
                                  f"Não foi possível gerar o PDF:\n{e}")
 
     def _salvar_html(self):
+        from ..sessao import destino_para_dialogo
         caminho, _ = QFileDialog.getSaveFileName(
-            self, "Salvar termo em HTML", f"{self._base()}.html",
+            self, "Salvar termo em HTML",
+            destino_para_dialogo(self, "Termos", f"{self._base()}.html"),
             "Página HTML (*.html)")
         if not caminho:
             return

@@ -914,6 +914,19 @@ class TemisWindow(QMainWindow):
         except Exception:                                   # noqa: BLE001
             pass
 
+        # A pasta desta sessão. Nasce só quando a primeira peça é gravada
+        # (ver sessao.py). Herda o identificador do registro, para que a
+        # pasta e o log encadeado concordem na hora; se o registro não
+        # subiu, gera o seu. Nunca impede o sistema de abrir.
+        self._sessao_trabalho = None
+        try:
+            from .sessao import SessaoTrabalho
+            ident = (self._registrador.sessao.identificador
+                     if self._registrador is not None else "")
+            self._sessao_trabalho = SessaoTrabalho(ident)
+        except Exception:                                   # noqa: BLE001
+            pass
+
         # O aviso de abertura só depois de a janela aparecer, e uma vez:
         # em __init__ ele surgiria antes de haver o que ver atrás dele.
         # Inicializado aqui, fora do try do registrador, para que o
@@ -1042,6 +1055,11 @@ class TemisWindow(QMainWindow):
             if hasattr(tool, "registrador"):
                 tool.registrador = self._registrador
 
+            # A pasta da sessão é oferecida a quem a quiser como destino
+            # padrão. Ferramenta que não a conhece salva onde sempre salvou.
+            if hasattr(tool, "sessao"):
+                tool.sessao = self._sessao_trabalho
+
             frame = ToolFrame(tool)
             frame.back_requested.connect(self.go_portal)
             frame.about_requested.connect(self._show_about)
@@ -1106,14 +1124,68 @@ class TemisWindow(QMainWindow):
                 destino = self._registrador.encerrar()
             except Exception:                               # noqa: BLE001
                 pass
+
+        # Se a sessão produziu algo, o registro e o PDF vão para a pasta
+        # dela, e o modal aponta e abre essa pasta. Se não produziu nada,
+        # pasta_sessao é None, e o fechamento segue discreto como sempre.
+        pasta_sessao = None
+        try:
+            pasta_sessao = self._depositar_na_sessao()
+        except Exception:                                   # noqa: BLE001
+            pass
+
+        if self._registrador is not None:
             try:
-                self._recomendar_juntar_registro(destino)
+                self._recomendar_juntar_registro(destino, pasta_sessao)
             except Exception:                               # noqa: BLE001
                 pass
 
         ev.accept()
 
-    def _recomendar_juntar_registro(self, destino):
+    def _abrir_no_explorador(self, caminho):
+        """Abre uma pasta no explorador de arquivos do sistema."""
+        try:
+            from PyQt6.QtCore import QUrl
+            from PyQt6.QtGui import QDesktopServices
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(caminho)))
+        except Exception:                                   # noqa: BLE001
+            pass
+
+    def _depositar_na_sessao(self):
+        """Deixa na pasta da sessão o registro encadeado e o PDF, se houve.
+
+        A pasta já reúne as peças da diligência; para valer como registro
+        completo, recebe também o relatório da sessão — o mesmo que a
+        ferramenta de Atividades produz, só que aqui sozinho, no
+        encerramento. Nada disto acontece numa sessão sem peças: a pasta
+        nem chega a existir. Devolve a pasta, para o modal apontar e abrir.
+        """
+        if self._sessao_trabalho is None or not self._sessao_trabalho.usada():
+            return None
+        if self._registrador is None:
+            return self._sessao_trabalho.pasta
+        from .tools import atividades_core
+        sessao = self._registrador.sessao
+        pasta = self._sessao_trabalho.garantir()
+        base = f"registro-da-sessao-{sessao.identificador}"
+        html = atividades_core.relatorio_html(sessao)
+        try:
+            from PyQt6.QtGui import QTextDocument
+            from .impressao import imprimir_documento, preparar_escritor
+            doc = QTextDocument()
+            doc.setHtml(html)
+            escritor = preparar_escritor(str(pasta / f"{base}.pdf"),
+                                         "Registro da sessão")
+            imprimir_documento(doc, escritor)
+        except Exception:                                   # noqa: BLE001
+            pass
+        try:
+            (pasta / f"{base}.html").write_text(html, encoding="utf-8")
+        except Exception:                                   # noqa: BLE001
+            pass
+        return pasta
+
+    def _recomendar_juntar_registro(self, destino, pasta_sessao=None):
         """Ao fechar, recomenda juntar o registro às peças da sessão.
 
         O registro sozinho vale como prestação de contas; junto das peças,
@@ -1121,12 +1193,31 @@ class TemisWindow(QMainWindow):
         arquivo produzido ao momento e à sessão em que se produziu. A
         recomendação existe porque essa juntada depende de quem opera
         lembrar de fazê-la, e é justamente o que costuma se perder.
+
+        Quando a sessão produziu peças, elas já estão reunidas numa pasta;
+        o modal aponta essa pasta e a abre ao ser fechado, para que o que
+        se juntar aos autos seja a diligência inteira, num lugar só.
         """
         caixa = QMessageBox(self)
         caixa.setIcon(QMessageBox.Icon.Information)
         caixa.setWindowTitle("Registro desta sessão")
         caixa.setTextFormat(Qt.TextFormat.RichText)
         caixa.setText("<b>A sessão foi registrada.</b>")
+
+        if pasta_sessao is not None:
+            caixa.setInformativeText(
+                "Tudo o que esta sessão produziu está reunido numa pasta só "
+                "— os termos, os documentos e os arquivos recebidos —, agora "
+                "com o registro encadeado do que foi feito e o relatório da "
+                "sessão em <b>PDF</b>. Reunida assim, a diligência inteira "
+                "fica pronta para juntar aos autos, e cada peça carrega a "
+                "sessão em que nasceu.<br><br>A pasta será aberta a seguir:"
+                f"<br><code>{_html.escape(str(pasta_sessao))}</code>")
+            caixa.addButton("Fechar", QMessageBox.ButtonRole.AcceptRole)
+            caixa.exec()
+            self._abrir_no_explorador(pasta_sessao)
+            return
+
         corpo = (
             "Recomenda-se juntar o registro desta sessão aos autos "
             "<b>junto com os termos, documentos e arquivos</b> que tenham "
@@ -1146,10 +1237,4 @@ class TemisWindow(QMainWindow):
         caixa.exec()
 
         if abrir is not None and caixa.clickedButton() is abrir:
-            try:
-                from PyQt6.QtGui import QDesktopServices
-                from PyQt6.QtCore import QUrl
-                QDesktopServices.openUrl(
-                    QUrl.fromLocalFile(str(Path(destino).parent)))
-            except Exception:                               # noqa: BLE001
-                pass
+            self._abrir_no_explorador(Path(destino).parent)

@@ -40,6 +40,23 @@ class ToolPage(QWidget):
 
     meta: ToolMeta
 
+    #: A pasta desta sessão de trabalho, entregue pelo casco quando há uma.
+    #: Ferramenta que a ignora salva onde sempre salvou; quem a usa — por
+    #: `destino_na_sessao` — faz suas peças caírem, por padrão, na pasta da
+    #: diligência, reunindo a sessão inteira num lugar só.
+    sessao = None
+
+    def destino_na_sessao(self, subpasta: str, nome: str,
+                          fallback=None) -> str:
+        """Caminho a propor num diálogo de salvar, na pasta da sessão.
+
+        Delega à função homônima do módulo `sessao`, que acha a sessão
+        subindo pela árvore de widgets — de modo que serve tanto aqui,
+        na ferramenta, quanto nos diálogos de termo que ela abre.
+        """
+        from ..sessao import destino_para_dialogo
+        return destino_para_dialogo(self, subpasta, nome, fallback)
+
     def on_activated(self):
         """Chamado sempre que a ferramenta passa a ser a visível."""
 

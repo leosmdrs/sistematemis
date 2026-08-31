@@ -292,8 +292,10 @@ class TermoDialog(QDialog):
         self._aviso.setText("✓ Texto copiado")
 
     def _salvar_html(self):
+        from ..sessao import destino_para_dialogo
         caminho, _ = QFileDialog.getSaveFileName(
-            self, "Salvar termo em HTML", "termo-extracao.html",
+            self, "Salvar termo em HTML",
+            destino_para_dialogo(self, "Termos", "termo-extracao.html"),
             "Página HTML (*.html)")
         if not caminho:
             return
@@ -311,8 +313,10 @@ class TermoDialog(QDialog):
                                  f"Não foi possível gravar o arquivo:\n{e}")
 
     def _salvar_pdf(self):
+        from ..sessao import destino_para_dialogo
         caminho, _ = QFileDialog.getSaveFileName(
-            self, "Salvar termo", "termo-extracao.pdf",
+            self, "Salvar termo",
+            destino_para_dialogo(self, "Termos", "termo-extracao.pdf"),
             "Arquivos PDF (*.pdf)")
         if not caminho:
             return
@@ -644,8 +648,11 @@ class ExtracaoTool(ToolPage):
         if resposta != QMessageBox.StandardButton.Yes:
             return
 
-        base = core.pasta_padrao() / core.nome_de_sessao(
-            self._e_processo.text().strip())
+        nome = core.nome_de_sessao(self._e_processo.text().strip())
+        if self.sessao is not None:
+            base = self.sessao.garantir("Extração Registrada") / nome
+        else:
+            base = core.pasta_padrao() / nome
         self._sessao = core.Sessao()
         self._sessao.comecar(base)
         self._lista_atos.clear()

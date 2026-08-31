@@ -297,9 +297,11 @@ class TermoDialog(QDialog):
 
     def _salvar_html(self):
         """Exporta o que está na tela, limpo para a importação do SEI."""
+        from ..sessao import destino_para_dialogo
         caminho, _ = QFileDialog.getSaveFileName(
             self, "Salvar termo em HTML",
-            f"termo-{self._base()}.html", "Página HTML (*.html)")
+            destino_para_dialogo(self, "Termos", f"termo-{self._base()}.html"),
+            "Página HTML (*.html)")
         if not caminho:
             return
         if not caminho.lower().endswith((".html", ".htm")):
@@ -322,9 +324,11 @@ class TermoDialog(QDialog):
                 if self._arquivos else "arquivos")
 
     def _salvar_pdf(self):
+        from ..sessao import destino_para_dialogo
         caminho, _ = QFileDialog.getSaveFileName(
             self, "Salvar termo",
-            f"termo-{self._base()}.pdf", "Arquivos PDF (*.pdf)")
+            destino_para_dialogo(self, "Termos", f"termo-{self._base()}.pdf"),
+            "Arquivos PDF (*.pdf)")
         if not caminho:
             return
         if not caminho.lower().endswith(".pdf"):

@@ -1105,8 +1105,11 @@ class IPSTool(ToolPage):
         self._guardar_secao()
         base = "".join(ch for ch in self._caso.nome
                        if ch.isalnum() or ch in " -_").strip() or "informacao"
+        from ..sessao import destino_para_dialogo
         caminho, _ = QFileDialog.getSaveFileName(
-            self, "Exportar PDF", f"{base}.pdf", "Documento PDF (*.pdf)")
+            self, "Exportar PDF",
+            destino_para_dialogo(self, "Termos", f"{base}.pdf"),
+            "Documento PDF (*.pdf)")
         if not caminho:
             return
         if not caminho.lower().endswith(".pdf"):
@@ -1168,8 +1171,10 @@ class IPSTool(ToolPage):
 
         base = "".join(ch for ch in self._caso.nome
                        if ch.isalnum() or ch in " -_").strip() or "informacao"
+        from ..sessao import destino_para_dialogo
         caminho, _ = QFileDialog.getSaveFileName(
-            self, "Exportar HTML para o SEI", f"{base}.html",
+            self, "Exportar HTML para o SEI",
+            destino_para_dialogo(self, "Termos", f"{base}.html"),
             "Documento HTML (*.html)")
         if not caminho:
             return

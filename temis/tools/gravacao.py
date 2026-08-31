@@ -352,8 +352,10 @@ class TermoDialog(QDialog):
         self._aviso.setText("✓ Texto copiado")
 
     def _salvar_html(self):
+        from ..sessao import destino_para_dialogo
         caminho, _ = QFileDialog.getSaveFileName(
-            self, "Salvar termo em HTML", "termo-gravacao.html",
+            self, "Salvar termo em HTML",
+            destino_para_dialogo(self, "Termos", "termo-gravacao.html"),
             "Página HTML (*.html)")
         if not caminho:
             return
@@ -371,8 +373,10 @@ class TermoDialog(QDialog):
                                  f"Não foi possível gravar o arquivo:\n{e}")
 
     def _salvar_pdf(self):
+        from ..sessao import destino_para_dialogo
         caminho, _ = QFileDialog.getSaveFileName(
-            self, "Salvar termo", "termo-gravacao.pdf",
+            self, "Salvar termo",
+            destino_para_dialogo(self, "Termos", "termo-gravacao.pdf"),
             "Arquivos PDF (*.pdf)")
         if not caminho:
             return
@@ -705,11 +709,18 @@ class GravacaoTool(ToolPage):
             if resposta != QMessageBox.StandardButton.Yes:
                 return
 
-        PASTA_PADRAO.mkdir(parents=True, exist_ok=True)
         agora = datetime.datetime.now()
-        sugestao = PASTA_PADRAO / f"diligencia-{agora:%Y-%m-%d-%H%M%S}.mp4"
+        nome = f"diligencia-{agora:%Y-%m-%d-%H%M%S}.mp4"
+        if self.sessao is not None:
+            # A pasta da sessão vira o destino proposto; o operador ainda
+            # pode mudar. A subpasta vazia não conta como sessão usada —
+            # só o vídeo, quando gravar, faz a sessão existir de fato.
+            pasta = self.sessao.garantir("Vídeos")
+        else:
+            pasta = PASTA_PADRAO
+            pasta.mkdir(parents=True, exist_ok=True)
         destino, _ = QFileDialog.getSaveFileName(
-            self, "Onde gravar o vídeo", str(sugestao),
+            self, "Onde gravar o vídeo", str(pasta / nome),
             "Vídeo MP4 (*.mp4)")
         if not destino:
             return
@@ -752,10 +763,13 @@ class GravacaoTool(ToolPage):
 
         Junto do vídeo, quando há gravação em curso — assim a imagem e o
         vídeo da mesma diligência moram no mesmo lugar. Fora de uma
-        gravação, numa pasta de capturas por dia.
+        gravação, na pasta da sessão, ou numa pasta de capturas por dia
+        quando não há sessão.
         """
         if self._gravador is not None:
             return Path(self._gravador.destino).parent / "capturas"
+        if self.sessao is not None:
+            return self.sessao.garantir("Capturas")
         agora = datetime.datetime.now()
         return PASTA_PADRAO / "Capturas" / f"{agora:%Y-%m-%d}"
 

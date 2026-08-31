@@ -1705,8 +1705,10 @@ class QuadroTool(ToolPage):
             return
         base = "".join(c for c in self._caso.nome
                        if c.isalnum() or c in " -_").strip() or "quadro"
+        from ..sessao import destino_para_dialogo
         caminho, filtro = QFileDialog.getSaveFileName(
-            self, "Exportar quadro", f"{base}.png",
+            self, "Exportar quadro",
+            destino_para_dialogo(self, "Quadros", f"{base}.png"),
             "Imagem PNG (*.png);;Documento PDF (*.pdf)")
         if not caminho:
             return
