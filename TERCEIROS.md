@@ -59,6 +59,20 @@ correspondente. Ele está nos endereços acima; na impossibilidade de
 obtê-lo ali, abra uma questão no repositório do Sistema Têmis e ele será
 fornecido.
 
+## yt-dlp
+
+A captura de vídeo publicado na internet, na ferramenta Vídeo da
+Internet, usa a biblioteca **yt-dlp**. Ela é quem acompanha as mudanças
+das plataformas; a junção das faixas de imagem e som é feita pelo FFmpeg
+que o sistema já embarca.
+
+| Componente | Licença | Origem |
+|---|---|---|
+| **yt-dlp** | Unlicense (domínio público) | [github.com/yt-dlp/yt-dlp](https://github.com/yt-dlp/yt-dlp) |
+
+A Unlicense coloca a obra em domínio público, e é compatível com a
+AGPL-3.0 deste projeto.
+
 ## soundcard
 
 A captura do som que o computador reproduz, na Gravação de Tela e na

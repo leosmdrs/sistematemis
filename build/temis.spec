@@ -38,6 +38,9 @@ WINRT = [
 SOM = collect_submodules("soundcard") + collect_submodules("cffi")
 # A Análise de Planilha só toca nestas duas dentro das funções
 # que leem e gravam arquivo; o empacotador não as enxerga.
+# O yt-dlp carrega um extrator por plataforma, todos por nome:
+# sem isto o pacote sai sem nenhum deles.
+VIDEOWEB = collect_submodules("yt_dlp")
 PLANILHA = (collect_submodules("python_calamine")
             + collect_submodules("openpyxl"))
 
@@ -106,7 +109,7 @@ a = Analysis(
     pathex=[ROOT],
     binaries=WINRT_BINARIOS,
     datas=FFMPEG + SCRCPY + DADOS_DE_PACOTE,
-    hiddenimports=WINRT + SOM + PLANILHA,
+    hiddenimports=WINRT + SOM + PLANILHA + VIDEOWEB,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

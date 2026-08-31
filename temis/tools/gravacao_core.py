@@ -179,7 +179,7 @@ def _equipamento() -> tuple[str, str, str]:
     try:
         r = subprocess.run(
             ["powershell", "-NoProfile", "-NonInteractive", "-Command", consulta],
-            capture_output=True, text=True, timeout=15,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15,
             creationflags=_SEM_JANELA)
         partes = (r.stdout or "").strip().split("|")
         if len(partes) == 3:
@@ -289,7 +289,7 @@ def microfones() -> list[str]:
         r = subprocess.run(
             [str(ffmpeg), "-hide_banner", "-list_devices", "true",
              "-f", "dshow", "-i", "dummy"],
-            capture_output=True, text=True, timeout=25,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=25,
             creationflags=_SEM_JANELA)
     except Exception:                                        # noqa: BLE001
         return []
@@ -1130,7 +1130,7 @@ def medir(caminho: Path) -> tuple[int, int, float]:
             [str(ffprobe), "-v", "error", "-select_streams", "v:0",
              "-show_entries", "stream=width,height:format=duration",
              "-of", "default=nw=1:nk=1", str(caminho)],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30,
             creationflags=_SEM_JANELA)
         valores = [x for x in (r.stdout or "").split() if x]
         largura = int(float(valores[0])) if len(valores) > 0 else 0

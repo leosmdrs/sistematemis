@@ -30,3 +30,9 @@ soundcard>=0.4.4
 # esta ferramenta existe para evitar.
 python-calamine>=0.8
 openpyxl>=3.1
+
+# Vídeo da Internet. Domínio público (Unlicense), 21 MB. É a biblioteca
+# que acompanha as mudanças das plataformas — e por isso envelhece: cópia
+# antiga falha por motivo obscuro. A ferramenta diz a idade dela antes de
+# a pessoa descobrir no meio de uma diligência.
+yt-dlp>=2026.8

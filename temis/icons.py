@@ -322,6 +322,21 @@ def draw_icon(kind: str, size: int = 16, color: str = None, width: float = 1.8) 
                    QPointF(s - m * 0.9, s - m * 0.9 - s * 0.1))
         p.drawLine(QPointF(s - m * 0.9, s - m * 0.9),
                    QPointF(s - m * 0.9 + s * 0.08, s - m * 0.9))
+    elif kind == "tool_videoweb":
+        # o triangulo de reproduzir sobre a seta que desce: e video, e
+        # vem de fora para ca
+        p.setBrush(QBrush(QColor(color)))
+        p.setPen(Qt.PenStyle.NoPen)
+        topo = m - s * 0.02
+        poly((c - s * 0.15, topo), (c + s * 0.19, topo + s * 0.15),
+             (c - s * 0.15, topo + s * 0.30))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(pen)
+        haste = topo + s * 0.42
+        p.drawLine(QPointF(c, haste), QPointF(c, s - m - s * 0.04))
+        poly((c - s * 0.14, s - m - s * 0.19),
+             (c, s - m - s * 0.04),
+             (c + s * 0.14, s - m - s * 0.19))
     elif kind == "tool_pdf":
         # duas folhas: a de tras aparece so pelas bordas de cima e da
         # direita, porque o pincel nao tem cor de fundo com que tapa-la —

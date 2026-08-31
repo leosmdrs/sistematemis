@@ -555,7 +555,7 @@ def _de_midia(caminho: Path) -> list[Campo]:
     saida = subprocess.run(
         [str(exe), "-v", "quiet", "-print_format", "json",
          "-show_format", "-show_streams", str(caminho)],
-        capture_output=True, text=True, timeout=60,
+        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
         creationflags=_SEM_JANELA).stdout
     try:
         dados = json.loads(saida)

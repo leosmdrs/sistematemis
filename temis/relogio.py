@@ -103,7 +103,7 @@ def _status() -> tuple:
     try:
         import subprocess
         r = subprocess.run(["w32tm", "/query", "/status"],
-                           capture_output=True, text=True, timeout=15,
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15,
                            creationflags=getattr(subprocess,
                                                  "CREATE_NO_WINDOW", 0))
         saida = (r.stdout or "") + (r.stderr or "")

@@ -246,7 +246,7 @@ def extrair_audio(midia: str | Path, destino: str | Path) -> Path:
     resultado = subprocess.run(
         [str(exe), "-y", "-i", str(midia), "-vn", "-ac", "1",
          "-ar", str(TAXA), "-c:a", "pcm_s16le", "-f", "wav", str(destino)],
-        capture_output=True, text=True, creationflags=_SEM_JANELA)
+        capture_output=True, text=True, encoding="utf-8", errors="replace", creationflags=_SEM_JANELA)
     if resultado.returncode != 0 or not destino.is_file():
         cauda = (resultado.stderr or "").strip().splitlines()[-1:] or [""]
         raise ErroTranscricao(f"Não foi possível extrair o áudio: {cauda[0]}")

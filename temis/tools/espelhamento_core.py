@@ -478,7 +478,7 @@ def aplicar_faixa(origem: Path, destino: Path, identificacao: str,
                "-c:v", "libx264", "-preset", "veryfast", "-crf", "26",
                "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k",
                "-movflags", "+faststart", str(destino)]
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=tempo,
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=tempo,
                            creationflags=_SEM_JANELA)
         if r.returncode != 0 or not destino.is_file():
             raise RuntimeError((r.stderr or "").strip()[-400:] or

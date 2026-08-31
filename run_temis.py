@@ -144,6 +144,23 @@ def autoteste() -> int:
                 f"esta estação não grava o som do computador: {detalhe}")
         return f"captura de retorno em “{detalhe}”"
 
+    def video_publico():
+        # A biblioteca da captura carrega um extrator por plataforma, e
+        # todos entram por nome — o empacotador não os enxerga sozinho.
+        # Faltando, o programa abre normalmente e a falha só apareceria
+        # ao colar o primeiro endereço.
+        from temis.tools import videoweb_core as vw
+
+        pode, recado = vw.estado()
+        if not pode:
+            raise RuntimeError(recado)
+        import yt_dlp.extractor                                # noqa: F401
+        if "dias atrás" in recado:
+            # Envelhecer não impede de abrir, mas impede de funcionar —
+            # e o sintoma seria erro obscuro no meio de uma diligência.
+            raise RuntimeError(recado)
+        return recado
+
     def planilhas():
         # A Análise de Planilha depende de duas bibliotecas que o
         # empacotador não descobre sozinho, porque só entram em cena
@@ -346,6 +363,7 @@ def autoteste() -> int:
         ("registro de ferramentas", ferramentas),
         ("som do computador", som_do_sistema),
         ("leitura de planilhas", planilhas),
+        ("captura de vídeo público", video_publico),
         ("identificação do operador", identificacao),
         ("cabeçalho das peças", timbre),
         ("procedência das peças", procedencia),

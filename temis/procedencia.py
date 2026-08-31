@@ -127,7 +127,7 @@ def _versao_espelhamento() -> str:
         return ""
     try:
         r = subprocess.run([str(caminho), "--version"], capture_output=True,
-                           text=True, timeout=10,
+                           text=True, encoding="utf-8", errors="replace", timeout=10,
                            creationflags=getattr(subprocess,
                                                  "CREATE_NO_WINDOW", 0))
         achado = re.search(r"scrcpy (\S+)", (r.stdout or "") + (r.stderr or ""))

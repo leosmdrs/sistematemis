@@ -26,6 +26,7 @@ from .tarja_preta import TarjaPretaTool
 from .transcricao import TranscricaoTool
 from .varredura import VarreduraTool
 from .video import VideoTool
+from .videoweb import VideoWebTool
 
 
 # ─────────────────────────────────────────
@@ -54,6 +55,7 @@ REGISTRY: list[tuple[ToolMeta, type | None]] = [
     # terceira fileira — o exame do material e o registro do trabalho
     (QuadroTool.meta,        QuadroTool),
     (VideoTool.meta,         VideoTool),
+    (VideoWebTool.meta,      VideoWebTool),
     (TranscricaoTool.meta,   TranscricaoTool),
     (ConversaTool.meta,      ConversaTool),
     (PDFTool.meta,           PDFTool),

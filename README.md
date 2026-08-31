@@ -71,7 +71,7 @@ instalar.
 
 ## Ferramentas
 
-**Dezesseis ferramentas**, todas disponíveis. A ordem abaixo é a do
+**Dezoito ferramentas**, todas disponíveis. A ordem abaixo é a do
 portal, disposta por etapa do trabalho e não em ordem alfabética: na
 primeira, a peça e o preparo do documento que a instrui; na segunda, o
 registro da prova onde ela está; na terceira, o exame do material e o
@@ -91,12 +91,14 @@ registro do próprio trabalho.
 | **Varredura** | Indexa um pendrive, um cartão ou uma pasta inteira: SHA-256 de cada arquivo e o texto que houver, inclusive o de páginas digitalizadas, por reconhecimento óptico. A busca passa a ser instantânea e não toca mais no dispositivo, que pode ser lacrado. Aponta os duplicados. |
 | **Quadro de Evidências** | Mural de vínculos da investigação: anotações, imagens e marcações conectadas, organizadas por caso. Serve para enxergar as relações entre pessoas, fatos e provas antes de redigir a peça. |
 | **Edição de Vídeo** | Compactar, fatiar e mesclar gravações para a juntada aos autos. Trabalha com videomonitoramento, câmeras corporais e vídeos anexados pelas partes. |
+| **Vídeo da Internet** | **Acessa a rede.** Obtém vídeo publicado em plataforma da internet e emite o termo que o identifica: o endereço, os dados que a plataforma publicava naquele instante, a hora qualificada da captura e o resumo criptográfico do arquivo. Alcança somente o que está publicamente acessível, e a peça não promete reprodutibilidade — a plataforma pode servir outro arquivo amanhã, ou nenhum. |
 | **Degravação** | Transcreve áudio e vídeo com reconhecimento de fala executado na própria máquina; nenhum trecho é enviado a serviço externo. Separa automaticamente quem fala, na cronologia da gravação, e basta nomear cada voz uma vez. |
 | **Reconstruir Conversa** | Reconstrói a conversa exportada de um aplicativo (texto ou pacote com mídias) num documento conferível, identificado pelo resumo criptográfico do arquivo de origem; as mídias do pacote são resumidas em SHA-256. Atesta que a reconstrução corresponde ao arquivo — não a autenticidade da conversa. |
+| **Documentos PDF** | Mesclar, extrair páginas e comprimir sem enviar peça de procedimento a sítio de terceiro. Ao mesclar e ao separar, o termo afirma por conferência que nenhuma página foi alterada: cada página do resultado tem resumo idêntico ao da origem. Na compressão, declara o que a redução custou — e a camada de texto sobrevive. |
 | **Análise de Planilha** | Filtrar, ordenar, escolher colunas, remover duplicidades, acrescentar coluna calculada, agrupar e resumir, marcar linhas com justificativa e cruzar com outra planilha — registrando cada passo. Produz o resultado e um termo com o roteiro completo, que terceiro re-executa sobre o original para conferir. |
 | **Relatório de Atividades** | Documenta cada execução do sistema, do abrir ao fechar, sem que ninguém precise ligá-la: ferramentas usadas e por quanto tempo, o que cada uma relatou ao concluir, e a identificação da estação e da rede. Grava enquanto a sessão corre. Fica só nesta máquina. |
 
-Duas acessam a rede, e estão marcadas acima. As outras catorze leem e
+Três acessam a rede, e estão marcadas acima. As outras quinze leem e
 processam tudo na própria estação. Fora delas, o sistema só sai à rede
 para conferir se há versão nova, sem enviar identificação — e isso se
 desliga em **Sobre**.

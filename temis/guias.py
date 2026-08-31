@@ -718,6 +718,65 @@ GUIAS: dict[str, Guia] = {
         ),
     ),
 
+    "videoweb": Guia(
+        finalidade=(
+            "Obtém vídeo publicado em plataforma da internet e emite o "
+            "termo que o identifica: o endereço, os dados que a "
+            "plataforma publicava naquele instante, a hora qualificada da "
+            "captura e o resumo criptográfico do arquivo.\n\n"
+            "Serve ao material que some. Vídeo em rede social desaparece "
+            "porque o autor apaga, porque a plataforma remove, porque a "
+            "conta é encerrada. Quem precisa dele num procedimento tem de "
+            "obtê-lo enquanto existe — e tem de poder demonstrar, depois, "
+            "o que obteve, de onde e quando."),
+        quando=(
+            "Vídeo publicado interessa à apuração e pode ser retirado do "
+            "ar a qualquer momento.",
+            "É preciso juntar aos autos material audiovisual divulgado "
+            "publicamente, com a origem documentada.",
+            "A publicação será objeto de exame posterior e convém "
+            "preservá-la como estava.",
+        ),
+        passos=(
+            "Cole o endereço e clique em <b>Consultar</b>. A tela mostra "
+            "título, canal, data, duração e disponibilidade antes de "
+            "qualquer captura.",
+            "Confira, na consulta, que a disponibilidade é <b>pública</b>. "
+            "A ferramenta não alcança material restrito.",
+            "Escolha a <b>Qualidade</b> e clique em <b>Capturar</b>.",
+            "Clique em <b>Gerar termo</b>. A peça traz o endereço, os "
+            "dados publicados, o momento da captura e o resumo "
+            "criptográfico do arquivo obtido.",
+            "Para compactar, recortar ou juntar o material, use depois a "
+            "<b>Edição de Vídeo</b>, que emite termo próprio ligando o "
+            "resultado a este arquivo pelo resumo.",
+        ),
+        limites=(
+            "Esta é a única ferramenta do sistema que sai para a "
+            "internet, e a única cuja peça não promete "
+            "reprodutibilidade — nem poderia. Baixar o mesmo endereço "
+            "noutro momento pode devolver arquivo diferente, ou nenhum: a "
+            "plataforma recodifica o material e remove conteúdo. O que a "
+            "peça afirma é que este arquivo, com este resumo, foi obtido "
+            "deste endereço neste instante.",
+            "Os dados de título, canal, data e visualizações são "
+            "informados pela própria plataforma. A ferramenta os "
+            "transcreve como estavam; não os certifica.",
+            "As plataformas servem imagem e som em fluxos separados, e o "
+            "arquivo entregue costuma ser a junção local dos dois — não a "
+            "cópia byte a byte de um arquivo publicado. O termo declara "
+            "isso e consigna a versão do FFmpeg que fez a junção.",
+            "Só se alcança o que está publicamente acessível. Nenhuma "
+            "credencial é apresentada e nenhuma restrição de acesso é "
+            "contornada: vídeo privado, restrito a membros ou com "
+            "verificação de idade é recusado, com a razão dita.",
+            "A biblioteca de captura acompanha as mudanças das "
+            "plataformas e envelhece: cópia antiga falha por motivo "
+            "obscuro. A idade dela aparece no rodapé do painel, e a "
+            "ferramenta a menciona quando uma captura fracassa.",
+        ),
+    ),
+
     "pdf": Guia(
         finalidade=(
             "Junta vários PDFs num só, extrai páginas para um documento "

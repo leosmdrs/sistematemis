@@ -195,7 +195,7 @@ def versao() -> str:
         return ""
     try:
         saida = subprocess.run([str(exe), "-version"], capture_output=True,
-                               text=True, timeout=15,
+                               text=True, encoding="utf-8", errors="replace", timeout=15,
                                creationflags=_SEM_JANELA).stdout
         return saida.splitlines()[0] if saida else ""
     except Exception:
@@ -256,7 +256,7 @@ def sondar(caminho: str | Path) -> VideoInfo:
 
     cmd = [str(exe), "-v", "error", "-print_format", "json",
            "-show_format", "-show_streams", str(caminho)]
-    proc = subprocess.run(cmd, capture_output=True, text=True,
+    proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace",
                           creationflags=_SEM_JANELA)
     if proc.returncode != 0:
         raise RuntimeError(proc.stderr.strip() or "não foi possível ler o arquivo")
@@ -455,7 +455,7 @@ def executar(cmd: list[str], duracao: float = 0.0,
 
     proc = subprocess.Popen(
         completo, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        text=True, bufsize=1, creationflags=_SEM_JANELA)
+        text=True, encoding="utf-8", errors="replace", bufsize=1, creationflags=_SEM_JANELA)
 
     try:
         for linha in proc.stdout:
