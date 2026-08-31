@@ -36,30 +36,30 @@ from .videoweb import VideoWebTool
 #: (meta, classe da ferramenta ou None se ainda não implementada)
 #:
 #: **Esta lista é a ordem do portal**, lida da esquerda para a direita e
-#: de cima para baixo, em fileiras de cinco. Mudar a ordem aqui muda a
+#: de cima para baixo, em fileiras de seis. Mudar a ordem aqui muda a
 #: tela — não há segunda lista a acertar junto, e `provas/prova_readme.py`
 #: obriga a tabela do README a acompanhar.
 REGISTRY: list[tuple[ToolMeta, type | None]] = [
     # primeira fileira — a peça, e o preparo do documento que a instrui
     (IPSTool.meta,           IPSTool),
     (TarjaPretaTool.meta,    TarjaPretaTool),
-    (AntiInjectionTool.meta, AntiInjectionTool),
-    (MetadadosTool.meta,     MetadadosTool),
+    (PDFTool.meta,           PDFTool),
     (OCRPDFTool.meta,        OCRPDFTool),
+    (PlanilhaTool.meta,      PlanilhaTool),
+    (AntiInjectionTool.meta, AntiInjectionTool),
     # segunda fileira — o registro da prova onde ela está
+    (MetadadosTool.meta,     MetadadosTool),
     (ConstatacaoTool.meta,   ConstatacaoTool),
     (ExtracaoTool.meta,      ExtracaoTool),
     (GravacaoTool.meta,      GravacaoTool),
     (EspelhamentoTool.meta,  EspelhamentoTool),
-    (VarreduraTool.meta,     VarreduraTool),
+    (VideoWebTool.meta,      VideoWebTool),
     # terceira fileira — o exame do material e o registro do trabalho
     (QuadroTool.meta,        QuadroTool),
-    (VideoTool.meta,         VideoTool),
-    (VideoWebTool.meta,      VideoWebTool),
+    (VarreduraTool.meta,     VarreduraTool),
     (TranscricaoTool.meta,   TranscricaoTool),
     (ConversaTool.meta,      ConversaTool),
-    (PDFTool.meta,           PDFTool),
-    (PlanilhaTool.meta,      PlanilhaTool),
+    (VideoTool.meta,         VideoTool),
     (AtividadesTool.meta,    AtividadesTool),
 ]
 

@@ -212,7 +212,7 @@ class GradePortal(QWidget):
     tool_requested = pyqtSignal(str)
 
     #: Ladrilhos por fileira.
-    COLUNAS = 5
+    COLUNAS = 6
 
     #: Distância entre dois ladrilhos vizinhos, em cada eixo. Não é folga
     #: estética: abaixo disto as molduras se tocam.
