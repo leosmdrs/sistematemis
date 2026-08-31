@@ -103,6 +103,25 @@ Agora as explicações de microfone só aparecem quando um microfone foi de
 fato pedido. Fora disso, aparece o que o codificador realmente disse.
 
 
+BOTÕES QUE NÃO SE VIAM
+
+Duas correções de interface nas ferramentas novas.
+
+• Nos Documentos PDF, os botões Mesclar, Separar e Comprimir estavam
+  lado a lado numa fileira que pedia mais largura do que o painel tem.
+  O que excede a largura do painel não vira barra de rolagem: é
+  decepado. "Comprimir" saía cortado pela metade, e o texto explicativo
+  abaixo era cortado junto. Agora ficam empilhados, cada um com a
+  largura toda.
+
+• Os botões de subir e descer, que reordenam a lista nos Documentos PDF
+  e na Análise de Planilha, usavam o caractere de seta como rótulo e
+  saíam vazios — sem indicação nenhuma do que faziam. A fonte que o
+  Windows entrega para a interface pode não ter esse desenho, e nada
+  avisa. Agora a seta é desenhada, como a de todo botão do sistema, e
+  nos Documentos PDF o nome vai ao lado: Subir e Descer.
+
+
 LEITURA DA SAÍDA DOS PROGRAMAS AUXILIARES
 
 Correção discreta e de fundo. Doze pontos do sistema liam a saída de
