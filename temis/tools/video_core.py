@@ -27,6 +27,125 @@ from pathlib import Path
 _SEM_JANELA = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 
+# ─────────────────────────────────────────
+#  FILHOS QUE NÃO SOBREVIVEM AO PAI (Windows)
+# ─────────────────────────────────────────
+#
+# Um subprocesso longo — o FFmpeg de uma gravação, o scrcpy de um
+# espelhamento — precisa morrer quando o Têmis morre. No fechamento normal
+# quem o encerra é o `shutdown` da ferramenta, com o cuidado de fechar o
+# arquivo direito. Mas se o programa cai de repente, ou é morto à força, o
+# `shutdown` não roda — e no Windows o filho não morre junto do pai. O
+# FFmpeg fica então capturando a tela sozinho, indefinidamente: o cursor
+# pisca como se ainda houvesse gravação, e o disco enche.
+#
+# A rede de segurança é um Job Object com "matar ao fechar": os filhos
+# atados a ele são terminados pelo próprio sistema operacional quando o
+# último identificador do job se fecha — o que acontece, sem falta, quando
+# o processo-pai deixa de existir, por qualquer motivo.
+
+#: Identificador do job, vivo enquanto o processo existir. Criado sob
+#: demanda, uma vez só.
+_JOB = None
+_JOB_TENTADO = False
+
+
+def _kernel32():
+    import ctypes
+    from ctypes import wintypes
+    k = ctypes.WinDLL("kernel32", use_last_error=True)
+    k.CreateJobObjectW.restype = wintypes.HANDLE
+    k.CreateJobObjectW.argtypes = [wintypes.LPVOID, wintypes.LPCWSTR]
+    k.SetInformationJobObject.restype = wintypes.BOOL
+    k.SetInformationJobObject.argtypes = [
+        wintypes.HANDLE, ctypes.c_int, wintypes.LPVOID, wintypes.DWORD]
+    k.AssignProcessToJobObject.restype = wintypes.BOOL
+    k.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+    k.CloseHandle.restype = wintypes.BOOL
+    k.CloseHandle.argtypes = [wintypes.HANDLE]
+    return k
+
+
+def _garantir_job():
+    """Cria (uma vez) o Job Object com matar-ao-fechar. None se não der."""
+    global _JOB, _JOB_TENTADO
+    if _JOB_TENTADO or sys.platform != "win32":
+        return _JOB
+    _JOB_TENTADO = True
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        k = _kernel32()
+        job = k.CreateJobObjectW(None, None)
+        if not job:
+            return None
+
+        class _IO(ctypes.Structure):
+            _fields_ = [(n, ctypes.c_ulonglong) for n in (
+                "ReadOperationCount", "WriteOperationCount",
+                "OtherOperationCount", "ReadTransferCount",
+                "WriteTransferCount", "OtherTransferCount")]
+
+        class _BASIC(ctypes.Structure):
+            _fields_ = [
+                ("PerProcessUserTimeLimit", ctypes.c_int64),
+                ("PerJobUserTimeLimit", ctypes.c_int64),
+                ("LimitFlags", wintypes.DWORD),
+                ("MinimumWorkingSetSize", ctypes.c_size_t),
+                ("MaximumWorkingSetSize", ctypes.c_size_t),
+                ("ActiveProcessLimit", wintypes.DWORD),
+                ("Affinity", ctypes.c_size_t),
+                ("PriorityClass", wintypes.DWORD),
+                ("SchedulingClass", wintypes.DWORD)]
+
+        class _EXT(ctypes.Structure):
+            _fields_ = [
+                ("BasicLimitInformation", _BASIC),
+                ("IoInfo", _IO),
+                ("ProcessMemoryLimit", ctypes.c_size_t),
+                ("JobMemoryLimit", ctypes.c_size_t),
+                ("PeakProcessMemoryUsed", ctypes.c_size_t),
+                ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+        _KILL_ON_JOB_CLOSE = 0x00002000
+        _EXTENDED_LIMIT_INFO = 9
+        info = _EXT()
+        info.BasicLimitInformation.LimitFlags = _KILL_ON_JOB_CLOSE
+        ok = k.SetInformationJobObject(
+            job, _EXTENDED_LIMIT_INFO, ctypes.byref(info), ctypes.sizeof(info))
+        if not ok:
+            k.CloseHandle(job)
+            return None
+        _JOB = job
+    except Exception:                                        # noqa: BLE001
+        _JOB = None
+    return _JOB
+
+
+def atar_ao_encerramento(proc) -> bool:
+    """Ata um subprocesso ao Job Object global, para não sobreviver ao pai.
+
+    Devolve True se atou; False (sem erro) em qualquer outra plataforma, ou
+    se o sistema não deixou — caso em que o encerramento limpo pelo
+    `shutdown` segue valendo, apenas sem a rede de segurança.
+    """
+    if sys.platform != "win32" or proc is None:
+        return False
+    job = _garantir_job()
+    if not job:
+        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+        k = _kernel32()
+        k.AssignProcessToJobObject.argtypes = [
+            wintypes.HANDLE, wintypes.HANDLE]
+        return bool(k.AssignProcessToJobObject(job, int(proc._handle)))
+    except Exception:                                        # noqa: BLE001
+        return False
+
+
 def _candidatos(nome: str) -> list[Path]:
     exe = f"{nome}.exe" if sys.platform == "win32" else nome
     locais: list[Path] = []

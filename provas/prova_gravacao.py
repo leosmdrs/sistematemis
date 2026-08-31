@@ -355,5 +355,89 @@ class OPainelFlutuanteCabeTodosOsBotoes(unittest.TestCase):
             painel.esconder()
 
 
+class OFilhoNaoSobreviveAoPai(unittest.TestCase):
+    """O FFmpeg (e o scrcpy) não podem seguir vivos se o Têmis cai.
+
+    O `shutdown` encerra tudo num fechamento limpo. A rede de segurança,
+    para quando o programa cai de repente, é o Job Object: o sistema
+    operacional mata os filhos atados quando o processo-pai deixa de
+    existir. Sem isto, o FFmpeg seguia capturando a tela sozinho — o
+    cursor piscava como se ainda houvesse gravação, e o disco enchia.
+    """
+
+    @unittest.skipUnless(sys.platform == "win32", "Job Object é do Windows")
+    def test_o_job_object_se_cria(self):
+        # Se a estrutura ou as flags estivessem erradas (o handle de 64
+        # bits truncado, um campo fora de tamanho), isto devolveria None.
+        from temis.tools import video_core as vc
+        self.assertTrue(vc._garantir_job())
+
+    @unittest.skipUnless(sys.platform == "win32", "Job Object é do Windows")
+    def test_filho_atado_morre_quando_o_pai_e_morto(self):
+        import os
+        import subprocess
+        raiz = str(Path(__file__).resolve().parents[1])
+        # Carrega o video_core isolado, por caminho: importar o pacote
+        # temis.tools puxaria as 16 ferramentas (Qt, whisper…) e o processo
+        # levaria muito para subir. O que se quer aqui é só o Job Object.
+        codigo = (
+            "import importlib.util, os, subprocess, sys, time\n"
+            "alvo = os.path.join(os.environ['TEMIS_RAIZ'],\n"
+            "                    'temis', 'tools', 'video_core.py')\n"
+            "spec = importlib.util.spec_from_file_location('vc', alvo)\n"
+            "vc = importlib.util.module_from_spec(spec)\n"
+            "sys.modules['vc'] = vc\n"
+            "spec.loader.exec_module(vc)\n"
+            "filho = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(120)'],\n"
+            "                         creationflags=vc._SEM_JANELA)\n"
+            "ok = vc.atar_ao_encerramento(filho)\n"
+            "print(f'{os.getpid()} {filho.pid} {int(ok)}', flush=True)\n"
+            "time.sleep(30)\n")
+        env = dict(os.environ, TEMIS_RAIZ=raiz)
+
+        def vivo(pid):
+            r = subprocess.run(["tasklist", "/FI", f"PID eq {pid}"],
+                               capture_output=True, text=True)
+            return str(pid) in r.stdout
+
+        pai = subprocess.Popen([sys.executable, "-c", codigo], env=env,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                               text=True)
+        pid_filho = None
+        try:
+            # readline não bloqueia: o pai imprime e dá descarga na hora.
+            # A leitura de stderr fica só no ramo de falha, e depois de
+            # matar o pai — nunca com ele vivo, senão o read trava até os
+            # 30 s acabarem.
+            linha = pai.stdout.readline().split()
+            if len(linha) != 3:
+                pai.kill()
+                self.fail("o pai não subiu: " + pai.stderr.read()[:500])
+            pid_pai, pid_filho, ok = int(linha[0]), int(linha[1]), linha[2]
+            self.assertEqual(ok, "1", "não atou o filho ao job")
+            self.assertTrue(vivo(pid_filho), "o filho nem chegou a subir")
+
+            # mata só o pai, à força — é o que uma queda faz
+            subprocess.run(["taskkill", "/PID", str(pid_pai), "/F"],
+                           capture_output=True)
+            morreu = False
+            for _ in range(40):
+                time.sleep(0.25)
+                if not vivo(pid_filho):
+                    morreu = True
+                    break
+            self.assertTrue(
+                morreu, "o filho sobreviveu ao pai — Job Object falhou")
+        finally:
+            try:
+                pai.kill()
+                pai.communicate(timeout=5)
+            except Exception:                                # noqa: BLE001
+                pass
+            if pid_filho is not None:
+                subprocess.run(["taskkill", "/PID", str(pid_filho), "/F",
+                                "/T"], capture_output=True)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

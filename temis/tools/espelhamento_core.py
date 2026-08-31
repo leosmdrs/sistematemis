@@ -55,7 +55,7 @@ from pathlib import Path
 
 from .gravacao_core import (Contexto, data_br, formatar_tamanho, ler_contexto,
                             medir, montar_faixa, sha256)
-from .video_core import _SEM_JANELA
+from .video_core import _SEM_JANELA, atar_ao_encerramento
 
 #: Onde o scrcpy e o adb ficam dentro do pacote.
 PASTA_VENDOR = "scrcpy"
@@ -377,6 +377,9 @@ class Espelhador:
         self._processo = subprocess.Popen(
             self.comando(), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, creationflags=_SEM_JANELA)
+        # Se o Têmis cair, o Windows mata este scrcpy junto — sem isto, o
+        # espelhamento seguiria de pé, gravando, depois de o programa fechar.
+        atar_ao_encerramento(self._processo)
 
     def encerrar(self, espera: float = 25.0, progresso=None) -> Resultado:
         """Fecha o espelhamento, aplica a faixa e resume o arquivo."""

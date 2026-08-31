@@ -75,7 +75,7 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .video_core import _SEM_JANELA, ffmpeg_path
+from .video_core import _SEM_JANELA, atar_ao_encerramento, ffmpeg_path
 
 #: Altura da faixa de contexto, em pixels de vídeo.
 FAIXA = 64
@@ -933,6 +933,9 @@ class Gravador:
         self._processo = subprocess.Popen(
             self.comando(), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, creationflags=_SEM_JANELA)
+        # Se o Têmis cair de repente, o Windows mata este FFmpeg junto —
+        # sem isto, ele seguiria capturando a tela e o cursor piscaria.
+        atar_ao_encerramento(self._processo)
         self._video_comecou = time.time()
         self._conferir_partida()
 
