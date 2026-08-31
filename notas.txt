@@ -1,41 +1,116 @@
-PASTA DE SESSÃO — a diligência inteira reunida num lugar só
+DOCUMENTOS PDF — mesclar, separar e comprimir sem sair da máquina
 
-Cada vez que o Sistema Têmis é aberto, a execução passa a ter uma pasta
-própria, em "Documentos\Sistema Têmis\Sessões". Tudo o que as
-ferramentas geram durante aquele uso — vídeos, capturas de tela, termos,
-os arquivos recebidos nas diligências de navegador, planilhas
-analisadas, PDFs tarjados, índices de varredura, roteiros — cai ali por
-padrão, arrumado em subpastas por tipo, ao lado do registro encadeado do
-que foi feito e do relatório da sessão em PDF.
+Ferramenta nova. Junta vários PDFs num só, extrai páginas para um
+documento novo e reduz o tamanho de digitalizações que não cabem no
+sistema de processo.
 
-Reunir assim não é só organização: amarra cada peça ao momento e à
-sessão em que se produziu, e reforça a cadeia de custódia do conjunto.
-Para quem opera, some o trabalho de caçar, no fim do dia, onde cada
-arquivo foi parar.
+Resolve, antes de tudo, um problema de sigilo: essas três tarefas
+costumam ser feitas em sítio da internet, o que significa enviar peça de
+procedimento para servidor de terceiro, fora do controle do órgão. Aqui
+nada sai da estação.
 
-Como se comporta:
+E, como nas demais ferramentas do sistema, a operação fica declarada e o
+resultado, conferível:
 
-• A pasta nasce tarde. Só passa a existir quando a primeira peça é
-  gravada. Abrir o programa para uma consulta rápida, ou por engano, não
-  deixa pasta nem PDF vazios para trás.
+• Ao mesclar e ao separar, o termo afirma por conferência que nenhuma
+  página foi alterada — cada página do resultado tem resumo criptográfico
+  idêntico ao da página de origem. É afirmação mais forte, e mais útil na
+  peça, do que igualdade de arquivo.
 
-• O destino é sugerido, não imposto. Cada janela de salvar já abre na
-  pasta da sessão, mas quem opera continua livre para gravar noutro
-  lugar quando precisar.
+• Na compressão, a peça declara o que a redução custou. Medido num
+  documento de oito páginas que se comporta como digitalização: sem perda
+  não se ganha quase nada num arquivo já limpo; nos graus com perda a
+  redução vai de dois terços a quase tudo, e as páginas mudam.
 
-• Ao fechar o programa, se a sessão produziu alguma coisa, o relatório
-  do que foi feito é gravado em PDF dentro da pasta, e a pasta se abre
-  sozinha — pronta para juntar aos autos. Se nada foi produzido, o
-  programa fecha em silêncio.
+• A camada de texto sobrevive à compressão em todos os graus — o
+  documento continua pesquisável. Nisto a ferramenta difere da Tarja
+  Preta, que rasteriza a página e perde o texto.
+
+• O documento produzido não herda metadado algum dos originais: é
+  composto do zero e recebe apenas as páginas.
+
+Dividir um documento em vários arquivos ainda não entrou.
 
 
-GRAVAÇÃO NÃO SOBREVIVE MAIS À QUEDA DO PROGRAMA
+VÍDEO DA INTERNET — capturar o que some, e documentar o que se capturou
 
-Se o programa fechasse de repente durante uma gravação — uma queda, um
-encerramento forçado —, o gravador de tela podia continuar rodando
-sozinho em segundo plano, capturando a tela indefinidamente: o ponteiro
-do mouse piscava como se ainda houvesse gravação, e o disco enchia.
+Ferramenta nova. Obtém vídeo publicado em plataforma da internet e emite
+o termo que o identifica: o endereço, os dados que a plataforma publicava
+naquele instante, a hora qualificada da captura e o resumo criptográfico
+do arquivo.
 
-Agora o próprio Windows encerra a gravação (e o espelhamento de celular)
-junto com o programa, aconteça o que acontecer. No fechamento normal,
-nada muda: a gravação já era encerrada com o arquivo íntegro.
+Serve ao material que desaparece — apagado pelo autor, removido pela
+plataforma, perdido com a conta encerrada. Quem precisa dele num
+procedimento tem de obtê-lo enquanto existe, e tem de poder demonstrar
+depois o que obteve, de onde e quando.
+
+O que a peça afirma, e o que ela não afirma:
+
+• Esta é a única peça do sistema que NÃO promete reprodutibilidade — e
+  não poderia. Baixar o mesmo endereço amanhã pode devolver arquivo
+  diferente, ou nenhum. O que ela afirma é mais estreito e verificável:
+  este arquivo, com este resumo, foi obtido deste endereço neste
+  instante.
+
+• As plataformas servem imagem e som em fluxos separados. O arquivo
+  entregue é a junção local dos dois, feita na estação, e não a cópia
+  byte a byte de um arquivo publicado. O termo declara isso e consigna a
+  versão do FFmpeg que fez a junção.
+
+• Título, canal, data e visualizações são informados pela própria
+  plataforma. A ferramenta os transcreve como estavam; não os certifica.
+
+• Só se alcança o que está publicamente acessível. Nenhuma credencial é
+  apresentada e nenhuma restrição de acesso é contornada: vídeo privado,
+  restrito a membros ou com verificação de idade é recusado, com a razão
+  dita em português. A consulta mostra a disponibilidade antes de
+  qualquer captura.
+
+• A biblioteca que acompanha as mudanças das plataformas envelhece, e
+  cópia antiga falha por motivo obscuro. A idade dela aparece no rodapé
+  do painel, o autoteste a verifica, e uma captura que fracassa menciona
+  a desatualização quando é o caso.
+
+Vem marcada como ferramenta que acessa a rede, ao lado da Constatação Web
+e da Extração Registrada.
+
+
+PORTAL — três fileiras de seis, na ordem do trabalho
+
+Com dezoito ferramentas, seis por fileira fecha em três; antes eram
+quatro fileiras de cinco, com a última pela metade. Cada fileira passou a
+ter sentido próprio: na primeira, a peça e o preparo do documento que a
+instrui; na segunda, o registro da prova onde ela está; na terceira, o
+exame do material e o registro do próprio trabalho.
+
+A janela pede um pouco mais de largura e menos altura do que pedia antes.
+Continua cabendo com folga na tela de catorze polegadas.
+
+
+GRAVAR SEM MICROFONE
+
+Gravar a tela nunca exigiu microfone: há estação que não tem nenhum, e há
+diligência em que não se quer o som da sala. O que atrapalhava era a
+mensagem de erro.
+
+"I/O error" é das mensagens mais genéricas do codificador de vídeo — sai
+por destino inacessível, por disco cheio, por captura recusada — e estava
+traduzida como "o microfone não pôde ser aberto". Quem gravasse sem
+microfone e esbarrasse em qualquer uma dessas causas lia que o problema
+era o microfone, e concluía que a ferramenta exigia um.
+
+Agora as explicações de microfone só aparecem quando um microfone foi de
+fato pedido. Fora disso, aparece o que o codificador realmente disse.
+
+
+LEITURA DA SAÍDA DOS PROGRAMAS AUXILIARES
+
+Correção discreta e de fundo. Doze pontos do sistema liam a saída de
+programas auxiliares sem declarar a codificação do texto. Quando o FFmpeg
+devolve um byte que a codificação local não sabe decodificar, a leitura
+morre por dentro — e o que dependia dela some sem explicação.
+
+Atingia a Edição de Vídeo, o Espelhamento de Celular, a Degravação, a
+lista de microfones e o rodapé de todas as peças, que consigna as versões
+dos programas usados. Os doze passaram a declarar a codificação, e o byte
+ilegível vira um caractere de substituição em vez de derrubar a leitura.

@@ -119,8 +119,11 @@ class PDFTool(ToolPage):
             "arquivo novo.", wrap=True))
 
         p.body.addWidget(group_title("O que fazer"))
-        linha = QHBoxLayout()
-        linha.setSpacing(6)
+        # Empilhados, e não lado a lado. Três botões com ícone e rótulo
+        # numa fileira pedem mais largura do que o painel tem — e o que
+        # excede não vira barra de rolagem: é decepado. Cortava
+        # "Comprimir" pela metade e levava junto o texto explicativo
+        # abaixo, que passava a ser cortado também.
         self._botoes_modo = {}
         for chave, rotulo, icone, dica in MODOS:
             b = QPushButton("  " + rotulo)
@@ -129,11 +132,8 @@ class PDFTool(ToolPage):
             b.setToolTip(dica)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.clicked.connect(lambda _=False, c=chave: self._trocar_modo(c))
-            linha.addWidget(b, 1)
+            p.body.addWidget(b)
             self._botoes_modo[chave] = b
-        caixa = QWidget()
-        caixa.setLayout(linha)
-        p.body.addWidget(caixa)
 
         self._paginas_modo = QStackedWidget()
         self._paginas_modo.addWidget(self._pagina_mesclar())

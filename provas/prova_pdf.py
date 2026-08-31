@@ -392,6 +392,49 @@ class ATela(Base):
         self.assertTrue(self.tela._b_processar.isEnabled())
         self.assertEqual(len(self.tela._origens()), 2)
 
+    def test_nada_do_painel_passa_da_borda_direita(self):
+        """O painel tem largura fixa, e o que passa dela é decepado.
+
+        Não vira barra de rolagem: some. Os três botões de modo estavam
+        lado a lado numa fileira, pediam mais largura do que o painel tem
+        e cortavam "Comprimir" pela metade — levando junto o texto
+        explicativo abaixo, que passava a ser cortado também.
+
+        A medida aqui é a geometria que o Qt de fato deu a cada widget,
+        depois de mostrar a tela. Foi preciso chegar a ela: `sizeHint`
+        mente para rótulo que quebra linha, e `minimumSize` acusa aperto
+        em painel que funciona — as duas apontavam estrago onde não há.
+        """
+        from PyQt6.QtWidgets import QLabel
+
+        self.tela.resize(1200, 700)
+        self.tela.show()
+        self.addCleanup(self.tela.hide)
+        painel = self.tela._painel
+
+        def direita(w):
+            return w.mapTo(painel, w.rect().topLeft()).x() + w.width()
+
+        for chave, botao in self.tela._botoes_modo.items():
+            with self.subTest(chave):
+                self.assertLessEqual(direita(botao), painel.width())
+
+        for chave in ("mesclar", "separar", "comprimir"):
+            self.tela._trocar_modo(chave)
+            pagina = self.tela._paginas_modo.currentWidget()
+            for lb in pagina.findChildren(QLabel):
+                if not (lb.wordWrap() and lb.text()):
+                    continue
+                with self.subTest(chave + ": texto"):
+                    self.assertLessEqual(direita(lb), painel.width())
+                    # rótulo que quebra também precisa caber em altura
+                    self.assertLessEqual(lb.heightForWidth(lb.width()),
+                                         lb.height())
+
+        for botao in (self.tela._b_processar, self.tela._b_termo):
+            with self.subTest(botao.text().strip()):
+                self.assertLessEqual(direita(botao), painel.width())
+
     def test_os_detalhes_do_termo_dizem_a_operacao_e_os_parametros(self):
         self.carregar(self.a)
         self.tela._trocar_modo("comprimir")
