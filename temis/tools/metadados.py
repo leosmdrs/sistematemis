@@ -1,5 +1,5 @@
 """
-Metadados e Hash — o que o arquivo informa sobre si, e o que o identifica.
+Gerador de Hash e Metadados — o resumo do arquivo, e o que ele diz de si.
 
 Reúne duas coisas que sempre andaram juntas na prática: o resumo
 criptográfico que amarra o arquivo aos autos e os metadados que ele
@@ -42,7 +42,7 @@ from . import metadados_core as core
 
 META = ToolMeta(
     key="metadados",
-    name="Metadados e Hash",
+    name="Gerador de Hash e Metadados",
     icon="tool_metadados",
     tagline="Identifica o arquivo e o que ele carrega",
     description=(

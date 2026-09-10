@@ -565,7 +565,7 @@ GUIAS: dict[str, Guia] = {
             "Confira o resultado antes de entregar. O que não foi marcado "
             "continua legível.",
             "Metadados do PDF não são tarjados. Se houver dado sensível "
-            "neles, verifique em Metadados e Hash.",
+            "neles, verifique em Gerador de Hash e Metadados.",
         ),
     ),
 
