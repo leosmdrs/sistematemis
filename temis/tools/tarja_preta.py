@@ -478,9 +478,14 @@ class TarjaPretaTool(ToolPage):
         self._lbl_file = subtext("Nenhum arquivo aberto", wrap=True)
         panel.header.addWidget(self._lbl_file)
 
-        # Corpo — controles
-        panel.body.addWidget(self._group_brackets())
+        # Corpo — controles. A busca automática vem primeiro porque é
+        # o caminho da maioria dos casos: CPF, CNPJ, RG, telefone e e-mail
+        # estão em quase todo documento que chega à corregedoria, e tarjá-los
+        # não exige preparo nenhum. A marcação por sinais pressupõe alguém
+        # ter passado antes pelo texto-fonte pondo os sinais — é o segundo
+        # movimento, e não o primeiro.
         panel.body.addWidget(self._group_search())
+        panel.body.addWidget(self._group_brackets())
         panel.body.addWidget(self._group_actions())
         panel.body.addStretch()
 
@@ -683,6 +688,13 @@ class TarjaPretaTool(ToolPage):
         lbl.setFixedWidth(50)
         combo = NoScrollComboBox()
         combo.addItems(["Esta página", "Todas as páginas"])
+        # Todas as páginas por padrão. Quem tarja um CPF quer tarjá-lo no
+        # documento inteiro, e o padrão anterior — só a página exibida —
+        # falhava em silêncio: as demais ocorrências ficavam legíveis sem
+        # que nada avisasse, e o erro só apareceria com o PDF já juntado
+        # aos autos. Restringir a uma página é a exceção, e exceção se
+        # escolhe.
+        combo.setCurrentIndex(1)
         setattr(self, attr, combo)
         row.addWidget(lbl)
         row.addWidget(combo, 1)
@@ -1035,8 +1047,9 @@ class TarjaPretaTool(ToolPage):
                 self, "Sem tarjas",
                 "Nenhuma tarja foi adicionada ainda.\n\n"
                 "• Arraste o mouse sobre o texto para tarja manual\n"
-                "• Use [ ] no texto-fonte e clique em 'Tarjar conteúdo entre [ ]'\n"
-                "• Ou use a busca automática")
+                "• Use a busca automática por CPF, CNPJ, RG, telefone ou e-mail\n"
+                "• Ou marque [ ] no texto-fonte e clique em "
+                "'Tarjar conteúdo entre [ ]'")
             return
 
         from ..sessao import destino_para_dialogo
