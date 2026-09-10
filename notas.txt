@@ -1,36 +1,48 @@
-TARJA PRETA — O ESCOPO NASCE EM "TODAS AS PÁGINAS"
+O PROGRAMA NÃO CONGELA MAIS AO GERAR O TERMO
 
-Tanto a busca automática quanto a marcação por sinais vinham
-configuradas para agir só na página exibida. Quem tarjava um CPF via a
-tarja aparecer, dava o trabalho por feito e salvava — e as demais
-ocorrências do mesmo CPF, nas outras páginas, continuavam legíveis.
+Relato de uso: na Edição de Vídeo, depois de compactar, clicar em "Gerar
+termo de edição" deixava o programa cerca de cinquenta segundos sem
+responder — com o aviso do Windows na barra de título — e só então o
+termo aparecia.
 
-O escopo sempre esteve à vista no painel; o que muda é o valor com que
-ele nasce. Agora é o documento inteiro, nos dois casos. Restringir a uma
-página continua a um clique de distância — é a exceção, e exceção se
-escolhe.
+Não havia travamento. Havia trabalho pesado sendo feito no lugar errado.
 
-Vale conferir os PDFs tarjados em qualquer versão anterior a esta: onde
-o escopo não foi trocado à mão, só a página que estava na tela foi
-tarjada.
+Gerar o termo não é só escrever o documento: o sistema **re-executa a
+operação inteira** e compara o resultado com o que foi declarado. É isso
+que autoriza a peça a afirmar que a operação foi conferida, e não apenas
+alegada. No caso do vídeo, quer dizer que a compactação que acabou de
+rodar é refeita — e refazer custa o mesmo que fazer.
+
+O trabalho continua sendo feito, porque é ele que dá valor à peça. O que
+muda é que agora acontece fora da parte do programa que desenha a tela.
+Aparece uma janela de avanço dizendo o que está acontecendo — "Conferindo
+a reprodução — reexecutando a compactação" —, a barra corre, e o programa
+responde normalmente enquanto isso.
+
+Quem espera passa a saber por que espera.
+
+Atingia quatro ferramentas, e as quatro foram corrigidas:
+
+• Edição de Vídeo — refazia a codificação do FFmpeg
+• Tarja Preta — refazia a censura, página a página
+• Documentos PDF — refazia a mesclagem, a separação ou a compressão
+• Análise de Planilha — relia a planilha e refazia a análise
+
+Na Tarja Preta há botão de cancelar, porque ela compõe uma página de cada
+vez e a desistência pode ser atendida no meio. Em Documentos PDF e na
+Análise de Planilha não há, porque a operação é uma chamada única que vai
+até o fim de qualquer modo — e botão que não cumpre o que promete faria
+quem clicasse concluir que travou de novo.
+
+Desistir nunca vira acusação na peça. Uma conferência interrompida não
+constatou divergência nenhuma, e o termo não é gerado.
 
 
-TARJA PRETA — A BUSCA AUTOMÁTICA VEM PRIMEIRO
+DUAS JANELAS DE ESPERA QUE NUNCA APARECIAM
 
-No painel lateral, a busca automática subiu para o topo e a marcação por
-sinais desceu para o segundo lugar. É a ordem do uso: CPF, CNPJ, RG,
-telefone e e-mail estão em quase todo documento que chega, e tarjá-los
-não exige preparo nenhum. Pôr sinais no texto-fonte pressupõe alguém ter
-passado por ele antes — é o segundo movimento, e não o primeiro.
+Documentos PDF e Análise de Planilha já tentavam avisar que estavam
+conferindo. Não funcionava: a janela era aberta e o trabalho começava no
+mesmo instante, sem deixar o programa chegar a desenhá-la. Quem olhava
+via a janela parada de sempre.
 
-A dica que aparece ao tentar salvar sem nenhuma tarja seguiu a mesma
-ordem, e passou a dizer o que a busca automática encontra, em vez de
-apenas mandar usá-la.
-
-
-METADADOS E HASH AGORA SE CHAMA GERADOR DE HASH E METADADOS
-
-O nome antigo punha os metadados na frente, e o que se procura ali, na
-maior parte das vezes, é o resumo criptográfico para o termo de juntada.
-Nada muda no funcionamento, no que a ferramenta lê ou no documento que
-ela produz: é o mesmo lugar, com o nome do que se vai fazer nele.
+Agora que o trabalho saiu dali, elas aparecem.
