@@ -1,135 +1,36 @@
-DOCUMENTOS PDF — mesclar, separar e comprimir sem sair da máquina
+TARJA PRETA — O ESCOPO NASCE EM "TODAS AS PÁGINAS"
 
-Ferramenta nova. Junta vários PDFs num só, extrai páginas para um
-documento novo e reduz o tamanho de digitalizações que não cabem no
-sistema de processo.
+Tanto a busca automática quanto a marcação por sinais vinham
+configuradas para agir só na página exibida. Quem tarjava um CPF via a
+tarja aparecer, dava o trabalho por feito e salvava — e as demais
+ocorrências do mesmo CPF, nas outras páginas, continuavam legíveis.
 
-Resolve, antes de tudo, um problema de sigilo: essas três tarefas
-costumam ser feitas em sítio da internet, o que significa enviar peça de
-procedimento para servidor de terceiro, fora do controle do órgão. Aqui
-nada sai da estação.
+O escopo sempre esteve à vista no painel; o que muda é o valor com que
+ele nasce. Agora é o documento inteiro, nos dois casos. Restringir a uma
+página continua a um clique de distância — é a exceção, e exceção se
+escolhe.
 
-E, como nas demais ferramentas do sistema, a operação fica declarada e o
-resultado, conferível:
-
-• Ao mesclar e ao separar, o termo afirma por conferência que nenhuma
-  página foi alterada — cada página do resultado tem resumo criptográfico
-  idêntico ao da página de origem. É afirmação mais forte, e mais útil na
-  peça, do que igualdade de arquivo.
-
-• Na compressão, a peça declara o que a redução custou. Medido num
-  documento de oito páginas que se comporta como digitalização: sem perda
-  não se ganha quase nada num arquivo já limpo; nos graus com perda a
-  redução vai de dois terços a quase tudo, e as páginas mudam.
-
-• A camada de texto sobrevive à compressão em todos os graus — o
-  documento continua pesquisável. Nisto a ferramenta difere da Tarja
-  Preta, que rasteriza a página e perde o texto.
-
-• O documento produzido não herda metadado algum dos originais: é
-  composto do zero e recebe apenas as páginas.
-
-Dividir um documento em vários arquivos ainda não entrou.
+Vale conferir os PDFs tarjados em qualquer versão anterior a esta: onde
+o escopo não foi trocado à mão, só a página que estava na tela foi
+tarjada.
 
 
-VÍDEO DA INTERNET — capturar o que some, e documentar o que se capturou
+TARJA PRETA — A BUSCA AUTOMÁTICA VEM PRIMEIRO
 
-Ferramenta nova. Obtém vídeo publicado em plataforma da internet e emite
-o termo que o identifica: o endereço, os dados que a plataforma publicava
-naquele instante, a hora qualificada da captura e o resumo criptográfico
-do arquivo.
+No painel lateral, a busca automática subiu para o topo e a marcação por
+sinais desceu para o segundo lugar. É a ordem do uso: CPF, CNPJ, RG,
+telefone e e-mail estão em quase todo documento que chega, e tarjá-los
+não exige preparo nenhum. Pôr sinais no texto-fonte pressupõe alguém ter
+passado por ele antes — é o segundo movimento, e não o primeiro.
 
-Serve ao material que desaparece — apagado pelo autor, removido pela
-plataforma, perdido com a conta encerrada. Quem precisa dele num
-procedimento tem de obtê-lo enquanto existe, e tem de poder demonstrar
-depois o que obteve, de onde e quando.
-
-O que a peça afirma, e o que ela não afirma:
-
-• Esta é a única peça do sistema que NÃO promete reprodutibilidade — e
-  não poderia. Baixar o mesmo endereço amanhã pode devolver arquivo
-  diferente, ou nenhum. O que ela afirma é mais estreito e verificável:
-  este arquivo, com este resumo, foi obtido deste endereço neste
-  instante.
-
-• As plataformas servem imagem e som em fluxos separados. O arquivo
-  entregue é a junção local dos dois, feita na estação, e não a cópia
-  byte a byte de um arquivo publicado. O termo declara isso e consigna a
-  versão do FFmpeg que fez a junção.
-
-• Título, canal, data e visualizações são informados pela própria
-  plataforma. A ferramenta os transcreve como estavam; não os certifica.
-
-• Só se alcança o que está publicamente acessível. Nenhuma credencial é
-  apresentada e nenhuma restrição de acesso é contornada: vídeo privado,
-  restrito a membros ou com verificação de idade é recusado, com a razão
-  dita em português. A consulta mostra a disponibilidade antes de
-  qualquer captura.
-
-• A biblioteca que acompanha as mudanças das plataformas envelhece, e
-  cópia antiga falha por motivo obscuro. A idade dela aparece no rodapé
-  do painel, o autoteste a verifica, e uma captura que fracassa menciona
-  a desatualização quando é o caso.
-
-Vem marcada como ferramenta que acessa a rede, ao lado da Constatação Web
-e da Extração Registrada.
+A dica que aparece ao tentar salvar sem nenhuma tarja seguiu a mesma
+ordem, e passou a dizer o que a busca automática encontra, em vez de
+apenas mandar usá-la.
 
 
-PORTAL — três fileiras de seis, na ordem do trabalho
+METADADOS E HASH AGORA SE CHAMA GERADOR DE HASH E METADADOS
 
-Com dezoito ferramentas, seis por fileira fecha em três; antes eram
-quatro fileiras de cinco, com a última pela metade. Cada fileira passou a
-ter sentido próprio: na primeira, a peça e o preparo do documento que a
-instrui; na segunda, o registro da prova onde ela está; na terceira, o
-exame do material e o registro do próprio trabalho.
-
-A janela pede um pouco mais de largura e menos altura do que pedia antes.
-Continua cabendo com folga na tela de catorze polegadas.
-
-
-GRAVAR SEM MICROFONE
-
-Gravar a tela nunca exigiu microfone: há estação que não tem nenhum, e há
-diligência em que não se quer o som da sala. O que atrapalhava era a
-mensagem de erro.
-
-"I/O error" é das mensagens mais genéricas do codificador de vídeo — sai
-por destino inacessível, por disco cheio, por captura recusada — e estava
-traduzida como "o microfone não pôde ser aberto". Quem gravasse sem
-microfone e esbarrasse em qualquer uma dessas causas lia que o problema
-era o microfone, e concluía que a ferramenta exigia um.
-
-Agora as explicações de microfone só aparecem quando um microfone foi de
-fato pedido. Fora disso, aparece o que o codificador realmente disse.
-
-
-BOTÕES QUE NÃO SE VIAM
-
-Duas correções de interface nas ferramentas novas.
-
-• Nos Documentos PDF, os botões Mesclar, Separar e Comprimir estavam
-  lado a lado numa fileira que pedia mais largura do que o painel tem.
-  O que excede a largura do painel não vira barra de rolagem: é
-  decepado. "Comprimir" saía cortado pela metade, e o texto explicativo
-  abaixo era cortado junto. Agora ficam empilhados, cada um com a
-  largura toda.
-
-• Os botões de subir e descer, que reordenam a lista nos Documentos PDF
-  e na Análise de Planilha, usavam o caractere de seta como rótulo e
-  saíam vazios — sem indicação nenhuma do que faziam. A fonte que o
-  Windows entrega para a interface pode não ter esse desenho, e nada
-  avisa. Agora a seta é desenhada, como a de todo botão do sistema, e
-  nos Documentos PDF o nome vai ao lado: Subir e Descer.
-
-
-LEITURA DA SAÍDA DOS PROGRAMAS AUXILIARES
-
-Correção discreta e de fundo. Doze pontos do sistema liam a saída de
-programas auxiliares sem declarar a codificação do texto. Quando o FFmpeg
-devolve um byte que a codificação local não sabe decodificar, a leitura
-morre por dentro — e o que dependia dela some sem explicação.
-
-Atingia a Edição de Vídeo, o Espelhamento de Celular, a Degravação, a
-lista de microfones e o rodapé de todas as peças, que consigna as versões
-dos programas usados. Os doze passaram a declarar a codificação, e o byte
-ilegível vira um caractere de substituição em vez de derrubar a leitura.
+O nome antigo punha os metadados na frente, e o que se procura ali, na
+maior parte das vezes, é o resumo criptográfico para o termo de juntada.
+Nada muda no funcionamento, no que a ferramenta lê ou no documento que
+ela produz: é o mesmo lugar, com o nome do que se vai fazer nele.
