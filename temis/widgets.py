@@ -25,11 +25,12 @@ botões de página.
   • **barra**     — navegação, zoom e modos de visualização do conteúdo
 """
 
-from PyQt6.QtCore import Qt, QRectF, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QRectF, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QGuiApplication, QPainter, QPen
 from PyQt6.QtWidgets import (
-    QComboBox, QFrame, QLabel, QLineEdit, QSpinBox, QDoubleSpinBox,
-    QVBoxLayout, QHBoxLayout, QPushButton, QScrollArea, QWidget,
+    QComboBox, QFrame, QLabel, QLineEdit, QMessageBox, QProgressDialog,
+    QSpinBox, QDoubleSpinBox, QVBoxLayout, QHBoxLayout, QPushButton,
+    QScrollArea, QWidget,
 )
 
 from .icons import draw_icon
@@ -37,6 +38,105 @@ from .theme import PALETTE
 
 #: Largura única do painel lateral em todas as ferramentas.
 SIDEBAR_WIDTH = 330
+
+
+# ─────────────────────────────────────────
+#  TRABALHO DEMORADO, FORA DA THREAD QUE DESENHA A TELA
+# ─────────────────────────────────────────
+
+class Tarefa(QThread):
+    """Executa uma função demorada fora da thread da interface.
+
+    Existe aqui, e não em cada ferramenta, pela mesma razão que o painel
+    lateral: quatro ferramentas precisavam disso e três iam escrever a
+    própria versão. Divergiriam sozinhas — uma esqueceria de fechar a
+    janela de avanço, outra deixaria a exceção cair no vazio —, e cada
+    uma dessas falhas só aparece na estação de quem estava usando.
+
+    `trabalho(tarefa)` recebe esta instância e usa `tarefa.etapa.emit`,
+    `tarefa.avanco.emit` e `tarefa.desistiram()`.
+    """
+
+    avanco = pyqtSignal(int, int)      # feito, total — (0, 0) = indeterminado
+    etapa = pyqtSignal(str)            # o que está acontecendo agora
+    concluido = pyqtSignal(object)     # o que `trabalho` devolveu
+    cancelado = pyqtSignal()
+    falhou = pyqtSignal(str)
+
+    def __init__(self, trabalho, parent=None):
+        super().__init__(parent)
+        self._trabalho = trabalho
+        self._parar = False
+
+    def parar(self):
+        self._parar = True
+
+    def desistiram(self) -> bool:
+        return self._parar
+
+    def run(self):
+        # A exceção precisa virar sinal. Solta numa QThread ela encerra o
+        # `run` em silêncio: `concluido` nunca chega, e a janela de avanço
+        # fica aberta para sempre esperando um fim que não vem.
+        try:
+            resultado = self._trabalho(self)
+        except Exception as e:                          # noqa: BLE001
+            self.falhou.emit(f"{type(e).__name__}: {e}")
+            return
+        if self._parar:
+            self.cancelado.emit()
+            return
+        self.concluido.emit(resultado)
+
+
+def com_avanco(pai, titulo: str, rotulo: str, trabalho, ao_concluir,
+               ao_cancelar=None, ao_falhar=None,
+               cancelavel: bool = True) -> Tarefa:
+    """Roda `trabalho` numa thread, com janela de avanço.
+
+    `cancelavel` é escolha de quem chama, e não enfeite: o botão só deve
+    aparecer onde a desistência possa ser atendida. Oferecer cancelamento
+    a uma operação indivisível — uma chamada única que roda até o fim
+    faça-se o que se fizer — seria prometer o que não se cumpre, e quem
+    clica e não vê efeito conclui que o programa travou de novo.
+
+    Devolve a tarefa para que a ferramenta a guarde: sem referência viva,
+    ela pode ser recolhida no meio do caminho.
+    """
+    dialogo = QProgressDialog(rotulo, "Cancelar", 0, 0, pai)
+    dialogo.setWindowTitle(titulo)
+    dialogo.setWindowModality(Qt.WindowModality.WindowModal)
+    dialogo.setMinimumDuration(0)
+    dialogo.setAutoClose(False)
+    dialogo.setAutoReset(False)
+    if not cancelavel:
+        dialogo.setCancelButton(None)
+    dialogo.setValue(0)
+
+    tarefa = Tarefa(trabalho, pai)
+
+    def avancar(feito: int, total: int):
+        dialogo.setRange(0, max(0, total))
+        if total > 0:
+            dialogo.setValue(feito)
+
+    def encerrar():
+        dialogo.close()
+
+    tarefa.avanco.connect(avancar)
+    tarefa.etapa.connect(dialogo.setLabelText)
+    if cancelavel:
+        dialogo.canceled.connect(tarefa.parar)
+    tarefa.concluido.connect(lambda r: (encerrar(), ao_concluir(r)))
+    tarefa.cancelado.connect(
+        lambda: (encerrar(), ao_cancelar and ao_cancelar()))
+    tarefa.falhou.connect(
+        lambda e: (encerrar(),
+                   ao_falhar(e) if ao_falhar else QMessageBox.critical(
+                       pai, titulo,
+                       "Não foi possível concluir:\n\n" + e)))
+    tarefa.start()
+    return tarefa
 
 #: Altura única da barra de visualização.
 TOOLBAR_HEIGHT = 48

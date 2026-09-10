@@ -1461,7 +1461,8 @@ def abrir(caminho, aba: str = "", linha_cabecalho: int = 1):
     return analise, tabela
 
 
-def reproduzir(analise: Analise, esperado: str) -> tuple[bool, str, str]:
+def reproduzir(analise: Analise, esperado: str,
+               cancelado=None) -> tuple[bool, str, str]:
     """Re-executa o roteiro do arquivo original e confere o resultado.
 
     Esta função é a razão de ser da ferramenta. Ela responde, por
@@ -1469,13 +1470,21 @@ def reproduzir(analise: Analise, esperado: str) -> tuple[bool, str, str]:
     partir deste arquivo e seguir estes passos chega a este resultado?
 
     Devolve (conferiu, resumo obtido, motivo da falha).
+
+    `cancelado()` é opcional, para quem chamar de fora da thread da
+    interface. Desistir devolve `(False, "", "")` — motivo vazio, e não
+    um motivo de divergência: quem interrompeu não constatou nada, e o
+    motivo iria impresso na peça se fosse preenchido. Quem chama confere
+    a própria desistência antes de montar termo algum.
     """
     from .hash_core import sha256_file
 
     try:
-        agora = sha256_file(analise.origem)
+        agora = sha256_file(analise.origem, should_stop=cancelado)
     except OSError as e:
         return False, "", f"não foi possível reler o arquivo original: {e}"
+    if cancelado and cancelado():
+        return False, "", ""
     if analise.resumo_origem and agora != analise.resumo_origem:
         return False, "", ("o arquivo original mudou desde a abertura — "
                            "o resumo criptográfico não confere mais")
@@ -1484,6 +1493,8 @@ def reproduzir(analise: Analise, esperado: str) -> tuple[bool, str, str]:
         final, _ = analise.executar(base)
     except Exception as e:                                   # noqa: BLE001
         return False, "", f"{type(e).__name__}: {e}"
+    if cancelado and cancelado():
+        return False, "", ""
     obtido = final.resumo()
     if obtido != esperado:
         return False, obtido, ("a re-execução produziu resultado diferente "

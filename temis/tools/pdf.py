@@ -25,7 +25,7 @@ from PyQt6.QtWidgets import (
 
 from ..icons import draw_icon
 from ..theme import PALETTE
-from ..widgets import (NoScrollComboBox, SidebarPanel,
+from ..widgets import (NoScrollComboBox, SidebarPanel, com_avanco,
                        field_label, group_title, hsep, output_button,
                        primary_button, subtext)
 from . import derivado_core as derivado
@@ -569,17 +569,36 @@ class PDFTool(ToolPage):
     def _gerar_termo(self):
         if self._roteiro is None or not self._salvo:
             return
-        espera = QProgressDialog("Refazendo a operação para conferir…",
-                                 "", 0, 0, self)
-        espera.setWindowTitle("Conferência de reprodutibilidade")
-        espera.setCancelButton(None)
-        espera.setWindowModality(Qt.WindowModality.WindowModal)
-        espera.show()
-        try:
-            situacao, resumo, explicacao = pc.reproduzir(self._roteiro)
-        finally:
-            espera.close()
+        roteiro, salvo = self._roteiro, self._salvo
+        detalhes = self._detalhes_do_termo()
 
+        # A janela de espera que existia aqui era chamada com `show()` e
+        # logo em seguida o trabalho bloqueava a thread — de modo que ela
+        # nunca chegava a pintar. Boa intenção sem efeito: quem olhava via
+        # a mesma janela parada de sempre, com o "não está respondendo" na
+        # barra. Agora o trabalho sai daqui, e aí a janela funciona.
+        #
+        # Sem botão de cancelar, e de propósito: mesclar e comprimir são
+        # chamadas únicas da biblioteca, que vão até o fim faça-se o que
+        # se fizer. Oferecer desistência que não se cumpre faria quem
+        # clicasse concluir que travou outra vez.
+        def trabalho(tarefa):
+            tarefa.etapa.emit("Refazendo a operação para conferir")
+            situacao, resumo, explicacao = pc.reproduzir(
+                roteiro,
+                progresso=lambda feito, total: tarefa.avanco.emit(feito, total),
+                cancelado=tarefa.desistiram)
+            tarefa.etapa.emit("Resumindo os arquivos")
+            tarefa.avanco.emit(0, 0)
+            item = derivado.medir(roteiro.caminhos, salvo, detalhes=detalhes)
+            return situacao, resumo, explicacao, item
+
+        self._tarefa_termo = com_avanco(
+            self, "Conferência de reprodutibilidade", "Preparando…",
+            trabalho, self._termo_pronto, cancelavel=False)
+
+    def _termo_pronto(self, dados):
+        situacao, resumo, explicacao, item = dados
         r = self._roteiro
         ressalvas = list(self.RESSALVAS)
         if r.operacao == "comprimir":
@@ -590,8 +609,6 @@ class PDFTool(ToolPage):
             ressalvas.append(self.RESSALVA_INTACTAS)
         ressalvas.append(pc.frase_reproducao(situacao, resumo, explicacao))
 
-        item = derivado.medir(r.caminhos, self._salvo,
-                              detalhes=self._detalhes_do_termo())
         termo = derivado.TermoDerivado(
             titulo="Termo de Operação em Documento PDF",
             operacao=r.descrever(),
@@ -608,6 +625,9 @@ class PDFTool(ToolPage):
 
     # ── ciclo de vida ────────────────────
     def shutdown(self):
+        tarefa = getattr(self, "_tarefa_termo", None)
+        if tarefa is not None and tarefa.isRunning():
+            tarefa.wait(5000)
         if self._operario is not None and self._operario.isRunning():
             self._operario.wait(5000)
         if self._producao is not None:

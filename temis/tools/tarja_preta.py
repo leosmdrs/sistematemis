@@ -28,7 +28,7 @@ from ..icons import draw_icon
 from ..pdfview import PaginaPDF, VisorPDFContinuo
 from ..theme import PALETTE
 from ..widgets import (
-    NoScrollComboBox, SidebarPanel, ViewerToolbar, danger_button,
+    NoScrollComboBox, SidebarPanel, ViewerToolbar, com_avanco, danger_button,
     output_button, primary_button, subtext,
 )
 from . import derivado_core as derivado
@@ -1235,14 +1235,43 @@ class TarjaPretaTool(ToolPage):
                                 "imagem " + origem.lstrip(".").upper()
                                 + " convertida em PDF de uma página"))
         roteiro = self._roteiro_atual()
-        situacao, _obtido, explicacao = tarja_core.reproduzir(roteiro)
         if roteiro.resumo_conteudo:
             detalhes.append(("Resumo do conteúdo (SHA-256)",
                              roteiro.resumo_conteudo))
         detalhes.append(("Fator de rasterização", f"{roteiro.escala:g}×"))
+        origem_pdf, salvo = self._caminho_origem, self._ultimo_salvo
 
-        item = derivado.medir(self._caminho_origem, self._ultimo_salvo,
-                              detalhes=detalhes)
+        # Fora da thread que desenha a tela. Conferir a censura é refazê-la:
+        # cada página volta a ser rasterizada, e num documento de trezentas
+        # páginas isso é minuto, não instante. Feito aqui dentro, a janela
+        # ficava sem responder — e sem dizer que estava conferindo, que é
+        # justamente o que dá valor à espera.
+        def trabalho(tarefa):
+            tarefa.etapa.emit("Conferindo a reprodução — refazendo a censura")
+            situacao, _obtido, explicacao = tarja_core.reproduzir(
+                roteiro,
+                progresso=lambda feito, total: tarefa.avanco.emit(feito, total),
+                cancelado=tarefa.desistiram)
+            if tarefa.desistiram():
+                return None
+            tarefa.etapa.emit("Resumindo o original e o documento censurado")
+            tarefa.avanco.emit(0, 0)
+            item = derivado.medir(
+                origem_pdf, salvo, detalhes=detalhes,
+                progresso=lambda lidos, total: tarefa.avanco.emit(lidos, total),
+                cancelado=tarefa.desistiram)
+            if tarefa.desistiram():
+                return None
+            return situacao, explicacao, item
+
+        self._tarefa_termo = com_avanco(
+            self, "Termo de censura", "Preparando…", trabalho,
+            self._termo_pronto,
+            ao_cancelar=lambda: self.status_msg.emit(
+                "Termo cancelado — nada foi produzido"))
+
+    def _termo_pronto(self, dados):
+        situacao, explicacao, item = dados
         termo = derivado.TermoDerivado(
             titulo="Termo de Censura em Dados e Informações Protegidas",
             operacao="tarjamento de dados e informações protegidas",
@@ -1268,6 +1297,10 @@ class TarjaPretaTool(ToolPage):
             self.status_msg.emit("Abra um PDF para começar")
 
     def shutdown(self):
+        tarefa = getattr(self, "_tarefa_termo", None)
+        if tarefa is not None and tarefa.isRunning():
+            tarefa.parar()
+            tarefa.wait(5000)
         if self._doc:
             self._doc.close()
             self._doc = None

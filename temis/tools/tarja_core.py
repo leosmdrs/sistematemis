@@ -143,12 +143,17 @@ def montar(caminho: str, tarjas_por_pagina: dict, escala: float = ESCALA):
 
 
 def compor(doc, tarjas_por_pagina: dict, escala: float = ESCALA,
-           progresso=None) -> tuple:
+           progresso=None, cancelado=None) -> tuple:
     """Rasteriza cada página, cobre as áreas e devolve (documento, resumo).
 
     O resumo sai daqui, e não do arquivo gravado depois: é dos pixels
     produzidos, que são o material da censura. O PDF que os embala carrega
     a hora da gravação e muda de bytes a cada vez.
+
+    Desistir devolve **(None, "")**: composição interrompida não é
+    documento pela metade, é documento que não existe. Quem chama testa
+    o `None` — e um resumo parcial jamais chega a lugar nenhum onde
+    pudesse ser confundido com o do material inteiro.
     """
     saida = fitz.open()
     h = hashlib.sha256()
@@ -156,6 +161,9 @@ def compor(doc, tarjas_por_pagina: dict, escala: float = ESCALA,
     total = len(doc)
 
     for i in range(total):
+        if cancelado is not None and cancelado():
+            saida.close()
+            return None, ""
         if progresso is not None:
             progresso(i + 1, total)
         pagina = doc[i]
@@ -200,7 +208,8 @@ def ler_roteiro(caminho) -> Roteiro:
         json.loads(Path(caminho).read_text(encoding="utf-8")))
 
 
-def reproduzir(roteiro: Roteiro, esperado: str = "") -> tuple:
+def reproduzir(roteiro: Roteiro, esperado: str = "",
+               progresso=None, cancelado=None) -> tuple:
     """Re-executa o roteiro sobre o original e confere o resultado.
 
     É a função que dá razão a todo o resto. Responde, por verificação e
@@ -210,6 +219,14 @@ def reproduzir(roteiro: Roteiro, esperado: str = "") -> tuple:
     Devolve (situação, resumo obtido, explicação). A situação é "sim",
     "nao" ou "impossivel" — e a terceira não é a segunda: original que
     sumiu não é censura que não reproduz.
+
+    Refazer a censura custa o mesmo que fazê-la: cada página é
+    rasterizada de novo. Daí `progresso(feito, total)` e `cancelado()`,
+    opcionais, para quem chamar de uma thread. Desistir devolve
+    **"cancelado"**, e nunca "nao": composição interrompida no meio não
+    diverge do declarado — ela não chegou a produzir nada com que
+    comparar, e chamá-la de divergência poria na peça uma acusação que
+    ninguém constatou.
     """
     from .hash_core import sha256_file
 
@@ -219,9 +236,11 @@ def reproduzir(roteiro: Roteiro, esperado: str = "") -> tuple:
         return "impossivel", "", (
             "o arquivo original não foi encontrado em " + str(caminho))
     try:
-        atual = sha256_file(str(caminho))
+        atual = sha256_file(str(caminho), should_stop=cancelado)
     except OSError as e:
         return "impossivel", "", f"não foi possível ler o original: {e}"
+    if cancelado and cancelado():
+        return "cancelado", "", "a conferência foi interrompida"
     if roteiro.resumo_origem and atual != roteiro.resumo_origem:
         return "impossivel", "", (
             "o arquivo original não é mais o mesmo: o resumo atual não "
@@ -232,11 +251,15 @@ def reproduzir(roteiro: Roteiro, esperado: str = "") -> tuple:
     except Exception as e:                              # noqa: BLE001
         return "impossivel", "", f"não foi possível abrir o original: {e}"
     try:
-        produzido, resumo = compor(doc, roteiro.por_pagina(), roteiro.escala)
-        produzido.close()
+        produzido, resumo = compor(doc, roteiro.por_pagina(), roteiro.escala,
+                                   progresso=progresso, cancelado=cancelado)
+        if produzido is not None:
+            produzido.close()
     finally:
         doc.close()
 
+    if produzido is None:
+        return "cancelado", "", "a conferência foi interrompida"
     if not alvo:
         return "impossivel", resumo, "não há resumo declarado a conferir"
     if resumo == alvo:
