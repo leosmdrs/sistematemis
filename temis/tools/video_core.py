@@ -617,7 +617,8 @@ def ler_roteiro(caminho) -> Roteiro:
         json.loads(Path(caminho).read_text(encoding="utf-8")))
 
 
-def reproduzir(roteiro: Roteiro, esperado: str = "") -> tuple:
+def reproduzir(roteiro: Roteiro, esperado: str = "", duracao: float = 0.0,
+               progresso=None, cancelado=None) -> tuple:
     """Re-executa o roteiro e confere o arquivo produzido.
 
     Devolve (situação, resumo obtido, explicação), com "sim", "nao" ou
@@ -625,6 +626,17 @@ def reproduzir(roteiro: Roteiro, esperado: str = "") -> tuple:
     FFmpeg de outra versão, não é edição que deixou de reproduzir — e
     chamar uma pela outra seria a peça acusando divergência que não
     constatou.
+
+    Re-executar custa o mesmo que executar: conferir uma compactação é
+    compactar de novo. Daí `duracao`, `progresso(fracao)` e `cancelado()`,
+    para quem chamar de uma thread poder mostrar o avanço e interromper.
+    Sem eles a função se comporta como antes, e os três são opcionais
+    porque as demais ferramentas a chamam sem nada disso.
+
+    Desistir devolve **"cancelado"**, e nunca "nao": um resumo que ficou
+    pela metade não diverge do declarado — ele simplesmente não foi
+    calculado, e tratá-lo como divergência põe na peça uma acusação que
+    ninguém constatou.
     """
     import tempfile
 
@@ -640,9 +652,11 @@ def reproduzir(roteiro: Roteiro, esperado: str = "") -> tuple:
             return "impossivel", "", (
                 "arquivo de origem não encontrado: " + arquivo.name)
         try:
-            atual = sha256_file(str(arquivo))
+            atual = sha256_file(str(arquivo), should_stop=cancelado)
         except OSError as e:
             return "impossivel", "", f"não foi possível ler {arquivo.name}: {e}"
+        if cancelado and cancelado():
+            return "cancelado", "", "a conferência foi interrompida"
         if declarado and atual != declarado:
             return "impossivel", "", (
                 "o arquivo de origem não é mais o mesmo: " + arquivo.name)
@@ -654,10 +668,15 @@ def reproduzir(roteiro: Roteiro, esperado: str = "") -> tuple:
             cmd = roteiro.comando(destino, pasta)
         except ValueError as e:
             return "impossivel", "", str(e)
-        deu_certo, erro = executar(cmd)
+        deu_certo, erro = executar(cmd, duracao, progresso=progresso,
+                                   cancelado=cancelado)
         if not deu_certo:
+            if cancelado and cancelado():
+                return "cancelado", "", "a conferência foi interrompida"
             return "impossivel", "", "o FFmpeg falhou na re-execução: " + erro
-        obtido = sha256_file(destino)
+        obtido = sha256_file(destino, should_stop=cancelado)
+        if cancelado and cancelado():
+            return "cancelado", "", "a conferência foi interrompida"
 
     if not alvo:
         return "impossivel", obtido, "não há resumo declarado a conferir"

@@ -99,6 +99,123 @@ class VideoThread(QThread):
         self.concluido.emit(saidas, erros)
 
 
+class TermoThread(QThread):
+    """Monta o termo de edição fora da thread da interface.
+
+    Duas coisas caras acontecem aqui, e eram elas que congelavam a
+    janela: o resumo criptográfico de cada origem e de cada saída, e a
+    conferência de reprodução — que **reexecuta a operação inteira do
+    FFmpeg** e compara o resultado com o que foi declarado.
+
+    A reexecução não é desperdício: é o que autoriza a peça a afirmar
+    que o resultado foi conferido, e não apenas alegado. O que estava
+    errado era fazê-la calada, na thread que desenha a tela: o servidor
+    clicava em "Gerar termo", o Windows carimbava "não está respondendo"
+    e nada dizia que a compactação estava sendo refeita para poder ser
+    atestada.
+    """
+
+    etapa = pyqtSignal(int, int, str)      # atual, total, rótulo
+    progresso = pyqtSignal(float)          # 0..1 da etapa corrente
+    concluido = pyqtSignal(list, tuple)    # itens da peça, veredito
+    cancelado = pyqtSignal()
+    falhou = pyqtSignal(str)
+
+    def __init__(self, produzidas: list, roteiros: list, operacao: str):
+        super().__init__()
+        self._produzidas = produzidas
+        self._roteiros = roteiros
+        self._operacao = operacao
+        self._parar = False
+
+    def parar(self):
+        self._parar = True
+
+    def run(self):
+        # A exceção precisa virar sinal. Solta numa QThread ela encerra
+        # o `run` em silêncio: `concluido` nunca chega, e a janela de
+        # avanço fica aberta para sempre esperando um fim que não vem.
+        try:
+            itens, situacoes = self._trabalhar()
+        except Exception as e:                          # noqa: BLE001
+            self.falhou.emit(f"{type(e).__name__}: {e}")
+            return
+        if itens is None:
+            self.cancelado.emit()
+            return
+        self.concluido.emit(itens, self._veredito(situacoes))
+
+    def _trabalhar(self):
+        """(itens, situações), ou (None, None) se desistiram no meio."""
+        itens, situacoes = [], []
+        total = len(self._produzidas) + len(self._roteiros)
+        passo = 0
+
+        def fracao(lidos, lido_total):
+            if lido_total:
+                self.progresso.emit(lidos / lido_total)
+
+        for i, (origens, saida, detalhes) in enumerate(self._produzidas):
+            if self._parar:
+                return None, None
+            passo += 1
+            self.etapa.emit(passo, total,
+                            "Resumindo " + Path(saida).name)
+            extras = list(detalhes)
+            if i < len(self._roteiros) and self._roteiros[i].ffmpeg:
+                extras.append(("FFmpeg empregado", self._roteiros[i].ffmpeg))
+            itens.append(derivado.medir(origens, saida, extras,
+                                        progresso=fracao,
+                                        cancelado=lambda: self._parar))
+
+        for i, roteiro in enumerate(self._roteiros):
+            if self._parar:
+                return None, None
+            passo += 1
+            self.etapa.emit(
+                passo, total,
+                f"Conferindo a reprodução — reexecutando a {self._operacao}")
+            situacoes.append(core.reproduzir(
+                roteiro, duracao=self._duracao(i),
+                progresso=lambda fr: self.progresso.emit(fr),
+                cancelado=lambda: self._parar))
+
+        if self._parar:
+            return None, None
+        return itens, situacoes
+
+    def _duracao(self, i: int) -> float:
+        """Quanto a re-execução vai durar, para a barra ter escala.
+
+        Medida no arquivo que já saiu, e não na origem: no recorte a
+        saída é um pedaço do original e na mesclagem é a soma de vários,
+        de modo que só a saída serve para as três operações. Falhar aqui
+        custa a escala da barra, e nada mais.
+        """
+        if i >= len(self._produzidas):
+            return 0.0
+        try:
+            return core.sondar(self._produzidas[i][1]).duracao
+        except Exception:                               # noqa: BLE001
+            return 0.0
+
+    @staticmethod
+    def _veredito(situacoes: list) -> tuple:
+        """Uma conferência por arquivo, e a peça relata o pior resultado.
+
+        Dizer "reproduz" quando uma das saídas não reproduziu seria a
+        peça respondendo pela média.
+        """
+        if any(s == "nao" for s, _o, _e in situacoes):
+            return next(x for x in situacoes if x[0] == "nao")
+        if situacoes and all(s == "sim" for s, _o, _e in situacoes):
+            return "sim", "", ""
+        if situacoes:
+            return next((x for x in situacoes if x[0] == "impossivel"),
+                        situacoes[0])
+        return "impossivel", "", "não há roteiro a conferir"
+
+
 # ─────────────────────────────────────────
 #  FERRAMENTA
 # ─────────────────────────────────────────
@@ -112,6 +229,9 @@ class VideoTool(ToolPage):
         self._videos: list[core.VideoInfo] = []
         self._modo = "compactar"
         self._thread: VideoThread | None = None
+        self._thread_termo: TermoThread | None = None
+        self._progresso: QProgressDialog | None = None
+        self._operacao_termo = "edição"
         self._tmpdir = tempfile.TemporaryDirectory(prefix="temis-video-")
 
         self.setAcceptDrops(True)
@@ -549,7 +669,15 @@ class VideoTool(ToolPage):
     def _atualizar_estado(self):
         self._btn_limpar.setEnabled(bool(self._videos))
         rodando = bool(self._thread and self._thread.isRunning())
-        pronto = core.disponivel() and not rodando
+        montando = bool(self._thread_termo
+                        and self._thread_termo.isRunning())
+        pronto = core.disponivel() and not rodando and not montando
+        # Enquanto a conferência corre, o botão do termo sai de cena: um
+        # segundo clique poria duas re-execuções do FFmpeg a disputar a
+        # mesma máquina, e quem esperava um termo ganharia dois.
+        self._btn_termo.setEnabled(
+            bool(getattr(self, "_produzidas", []))
+            and not rodando and not montando)
 
         if self._modo == "mesclar":
             self._atualizar_aviso_mesclar()
@@ -751,34 +879,71 @@ class VideoTool(ToolPage):
         produzidas = getattr(self, "_produzidas", [])
         if not produzidas:
             return
-        roteiros = getattr(self, "_roteiros", [])
-        itens = []
-        for i, (origens, saida, detalhes) in enumerate(produzidas):
-            extras = list(detalhes)
-            if i < len(roteiros) and roteiros[i].ffmpeg:
-                extras.append(("FFmpeg empregado", roteiros[i].ffmpeg))
-            itens.append(derivado.medir(origens, saida, extras))
-
-        # Uma conferência por arquivo produzido, e a peça relata o pior
-        # dos resultados: dizer "reproduz" quando uma das saídas não
-        # reproduziu seria a peça respondendo pela média.
-        situacoes = [core.reproduzir(r) for r in roteiros]
-        if any(s == "nao" for s, _o, _e in situacoes):
-            veredito = next((x for x in situacoes if x[0] == "nao"))
-        elif situacoes and all(s == "sim" for s, _o, _e in situacoes):
-            veredito = ("sim", "", "")
-        elif situacoes:
-            veredito = next((x for x in situacoes if x[0] == "impossivel"))
-        else:
-            veredito = ("impossivel", "", "não há roteiro a conferir")
-        operacao = {
+        if self._thread_termo and self._thread_termo.isRunning():
+            return
+        self._operacao_termo = {
             "compactar": "compactação",
             "fatiar": "recorte",
             "mesclar": "mesclagem",
         }.get(self._modo, "edição")
+
+        # O trabalho vai para uma thread, com a mesma janela de avanço que
+        # a conversão já recebe. Não é só cortesia: o rótulo diz que a
+        # operação está sendo *reexecutada* para poder ser atestada, que é
+        # a razão da espera e era exatamente o que ninguém tinha como
+        # saber enquanto a janela ficava parada.
+        self._progresso = QProgressDialog(
+            "Preparando…", "Cancelar", 0, 100, self)
+        self._progresso.setWindowTitle("Termo de edição")
+        self._progresso.setWindowModality(Qt.WindowModality.WindowModal)
+        self._progresso.setMinimumDuration(0)
+        self._progresso.setAutoClose(False)
+        self._progresso.setAutoReset(False)
+        self._progresso.setValue(0)
+        self._progresso.canceled.connect(self._cancelar_termo)
+
+        self._thread_termo = TermoThread(
+            produzidas, getattr(self, "_roteiros", []), self._operacao_termo)
+        self._thread_termo.etapa.connect(self._ao_etapa_termo)
+        self._thread_termo.progresso.connect(
+            lambda f: self._progresso.setValue(int(f * 100)))
+        self._thread_termo.concluido.connect(self._ao_termo_pronto)
+        self._thread_termo.cancelado.connect(self._ao_termo_cancelado)
+        self._thread_termo.falhou.connect(self._ao_termo_falhar)
+        self._thread_termo.start()
+        self._atualizar_estado()
+
+    def _ao_etapa_termo(self, atual: int, total: int, rotulo: str):
+        self._progresso.setLabelText(
+            f"{rotulo}\n\nEtapa {atual} de {total}"
+            if total > 1 else rotulo)
+        self._progresso.setValue(0)
+
+    def _cancelar_termo(self):
+        if self._thread_termo and self._thread_termo.isRunning():
+            self._thread_termo.parar()
+            self.status_msg.emit("Cancelando a conferência…")
+
+    def _fechar_progresso_termo(self):
+        if self._progresso is not None:
+            self._progresso.close()
+        self._atualizar_estado()
+
+    def _ao_termo_cancelado(self):
+        self._fechar_progresso_termo()
+        self.status_msg.emit("Termo cancelado — nada foi produzido")
+
+    def _ao_termo_falhar(self, erro: str):
+        self._fechar_progresso_termo()
+        QMessageBox.critical(
+            self, "Erro ao montar o termo",
+            "Não foi possível montar o termo de edição:\n\n" + erro)
+
+    def _ao_termo_pronto(self, itens: list, veredito: tuple):
+        self._fechar_progresso_termo()
         termo = derivado.TermoDerivado(
             titulo="Termo de Edição de Material Audiovisual",
-            operacao=f"{operacao} audiovisual",
+            operacao=f"{self._operacao_termo} audiovisual",
             ressalvas=self.RESSALVAS + (
                 core.frase_reproducao(veredito[0], veredito[2]),),
             motores=("video",),
@@ -914,6 +1079,13 @@ class VideoTool(ToolPage):
             else f"{n} vídeo(s) na lista")
 
     def can_close(self) -> bool:
+        if self._thread_termo and self._thread_termo.isRunning():
+            return QMessageBox.question(
+                self, "Conferência em andamento",
+                "O termo está sendo conferido. Encerrar mesmo assim?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            ) == QMessageBox.StandardButton.Yes
         if self._thread and self._thread.isRunning():
             return QMessageBox.question(
                 self, "Conversão em andamento",
@@ -927,4 +1099,10 @@ class VideoTool(ToolPage):
         if self._thread and self._thread.isRunning():
             self._thread.parar()
             self._thread.wait(5000)
+        # Também a do termo: ela tem um FFmpeg próprio rodando a
+        # re-execução, e deixá-lo para trás seria repor o processo órfão
+        # que a 1.10.0 acabou de tirar do caminho.
+        if self._thread_termo and self._thread_termo.isRunning():
+            self._thread_termo.parar()
+            self._thread_termo.wait(5000)
         self._tmpdir.cleanup()

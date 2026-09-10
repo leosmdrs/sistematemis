@@ -75,17 +75,24 @@ class Arquivo:
         return Path(self.caminho).name if self.caminho else ""
 
 
-def ler(caminho) -> Arquivo:
+def ler(caminho, progresso=None, cancelado=None) -> Arquivo:
     """Mede um arquivo. Falha em ler não impede o termo de existir.
 
     Um termo que não aparece é pior do que um termo que declara não ter
     conseguido ler um dos arquivos — este segundo, ao menos, diz o que
     houve, e quem o lê decide o que fazer.
+
+    `progresso(lidos, total)` e `cancelado()` atravessam até o cálculo do
+    resumo. Resumir um vídeo de câmera corporal leva segundos de trabalho
+    contínuo, e quem chama de dentro de uma thread precisa poder mostrar
+    o avanço e desistir no meio. Sem eles não há o que mostrar nem como
+    parar, e a janela fica sem responder até o último bloco.
     """
     a = Arquivo(caminho=str(caminho))
     try:
         a.tamanho = Path(caminho).stat().st_size
-        a.resumo = sha256_file(caminho)
+        a.resumo = sha256_file(caminho, progress=progresso,
+                               should_stop=cancelado)
     except OSError as e:
         a.erro = f"{type(e).__name__}: {e}"
     return a
@@ -120,14 +127,17 @@ class Derivacao:
                 for a in [*self.origens, self.saida] if a.erro]
 
 
-def medir(origens, saida, detalhes=None) -> Derivacao:
+def medir(origens, saida, detalhes=None, progresso=None,
+          cancelado=None) -> Derivacao:
     """Lê tamanho e resumo da origem (ou origens) e do resultado."""
     if isinstance(origens, (str, Path)):
         origens = [origens]
     from ..relogio import agora, carimbo
-    return Derivacao(origens=[ler(o) for o in origens], saida=ler(saida),
-                     detalhes=list(detalhes or []),
-                     medido_em=carimbo(agora()))
+    return Derivacao(
+        origens=[ler(o, progresso, cancelado) for o in origens],
+        saida=ler(saida, progresso, cancelado),
+        detalhes=list(detalhes or []),
+        medido_em=carimbo(agora()))
 
 
 @dataclass
