@@ -30,6 +30,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -173,7 +174,7 @@ BLOCO = 256 * 1024
 
 
 def pasta_download() -> Path:
-    base = os.environ.get("LOCALAPPDATA") or os.environ.get("TMPDIR") or "/tmp"
+    base = os.environ.get("LOCALAPPDATA") or os.environ.get("TMPDIR") or tempfile.gettempdir()
     destino = Path(base) / "SistemaTemis" / "atualizacoes"
     destino.mkdir(parents=True, exist_ok=True)
     return destino

@@ -1,0 +1,5 @@
+# Dependências para rodar a suíte de testes (tests/).
+# Não inclui requirements.txt: os módulos testados hoje não dependem
+# de PyQt6/WinRT/áudio, então os testes rodam sem instalar isso tudo.
+pytest>=8.0
+pytest-cov>=5.0

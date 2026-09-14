@@ -1,6 +1,11 @@
 __pycache__/
 *.py[cod]
 
+# ── Testes ────────────────────────────────────────────────
+.coverage
+.pytest_cache/
+htmlcov/
+
 # ── Saídas de build ──────────────────────────────────────
 dist/
 build/_work/
