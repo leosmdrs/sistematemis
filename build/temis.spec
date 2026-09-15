@@ -175,6 +175,17 @@ exe = EXE(
     entitlements_file=None,
     icon=ICON,
     version=os.path.join(ROOT, "build", "version_info.txt"),
+    # O pacote do Python fica ao lado do executável, em SistemaTemis.pkg,
+    # e não colado no fim dele.
+    #
+    # Colado, o SistemaTemis.exe era um executável de 300 KB carregando
+    # 20 MB de dado comprimido depois da última seção, sem assinatura — o
+    # desenho típico de quem esconde carga, e foi o que bastou para o
+    # aprendizado de máquina do Trend Micro pôr o programa em quarentena
+    # durante a instalação (Troj.Win32.TRX.XXPE50…, 15/09/2026). Separado,
+    # o executável é só o carregador, e o .pkg não é executável que o
+    # antivírus avalie como tal. O carregador procura o .pkg sozinho.
+    append_pkg=False,
 )
 
 coll = COLLECT(

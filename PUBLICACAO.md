@@ -105,6 +105,9 @@ próprio Windows que verifica quem assinou antes de executar. Enquanto não
 houver, convém avisar quem for instalar que o alerta vai aparecer — para
 que ninguém aprenda a clicar em "executar assim mesmo" por hábito.
 
+Antivírus corporativo que ponha o programa em quarentena é outro caso,
+tratado em [ASSINATURA.md](ASSINATURA.md#antivírus-corporativo).
+
 ---
 
 ## Primeira distribuição
