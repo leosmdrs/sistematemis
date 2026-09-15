@@ -1,16 +1,18 @@
-CORREÇÃO DE SEGURANÇA — pasta de download não depende mais de um caminho fixo
+CORREÇÃO — antivírus deixa de confundir o programa com ameaça
 
-Uma varredura de segurança (SonarQube) apontou que a função que escolhe
-onde guardar o instalador baixado caía para o caminho fixo "/tmp" quando
-as variáveis de ambiente esperadas não estavam definidas — um diretório
-publicamente gravável, vulnerável a ataques de symlink. No Windows, onde
-o sistema roda, essa variável quase sempre existe, então o risco prático
-era baixo; mesmo assim, o fallback agora usa a função do próprio Python
-que resolve o diretório temporário correto do sistema operacional, em
-vez de um caminho fixo copiado de sistemas Unix.
+Um antivírus corporativo (Trend Micro) pôs o SistemaTemis.exe em
+quarentena durante a instalação. Foi um falso positivo do módulo de
+aprendizado de máquina, que julga o arquivo pelo formato, e não por
+qualquer comportamento do programa.
 
-Aproveitou-se para cobrir com testes automatizados todo o módulo de
-atualização — verificação de nova versão, download com conferência de
-SHA-256, cancelamento e instalação: 42 testes, 100% das linhas.
+O executável carregava dentro de si, comprimido, todo o restante do
+sistema — cerca de 20 MB anexados a um programa de 300 KB, sem
+assinatura digital. É o mesmo desenho de arquivo usado por programas que
+escondem carga, e bastou para o alerta. A partir desta versão essa parte
+fica num arquivo separado, ao lado do executável (SistemaTemis.pkg), e o
+SistemaTemis.exe passa a conter só o carregador.
+
+Se o antivírus de alguma estação ainda alertar, a equipe de TI pode
+liberar a pasta de instalação do sistema no console do antivírus.
 
 Sem mudança visível para quem usa o sistema.
