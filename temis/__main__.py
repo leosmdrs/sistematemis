@@ -51,7 +51,33 @@ def _preparar_webengine():
         Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
 
 
+def _calar_telemetria():
+    """Desliga a telemetria das bibliotecas de terceiro, por precaução.
+
+    Nenhuma delas envia telemetria no caminho que o sistema usa — isto
+    foi conferido no código: a biblioteca de download de modelos define a
+    função de telemetria mas não a chama, e o baixador de vídeo só
+    instancia o seu atualizador pela linha de comando, que aqui não se
+    usa. Estas variáveis existem para que a afirmação não dependa de
+    conferir o código de cada versão nova das dependências.
+
+    A terceira fecha um caminho diferente, e por isso está aqui: a
+    biblioteca de modelos acrescenta ao cabeçalho das requisições o
+    conteúdo de `HF_HUB_USER_AGENT_ORIGIN`, lido do ambiente. Uma
+    variável qualquer na estação passaria texto arbitrário para fora.
+    Fixando-a, o que sai não depende do ambiente da máquina.
+    """
+    import os
+
+    os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
+    os.environ["DISABLE_TELEMETRY"] = "1"
+    os.environ["DO_NOT_TRACK"] = "1"
+    os.environ["HF_HUB_USER_AGENT_ORIGIN"] = "SistemaTemis"
+
+
 def main() -> int:
+    _calar_telemetria()
+
     # No Windows, informar o AppUserModelID faz a barra de tarefas usar o
     # ícone do programa em vez do ícone genérico do interpretador Python.
     if sys.platform == "win32":
