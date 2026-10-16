@@ -1,18 +1,47 @@
-CORREÇÃO — antivírus deixa de confundir o programa com ameaça
+ENCARREGADO DE IPS — a ferramenta sai do sistema
 
-Um antivírus corporativo (Trend Micro) pôs o SistemaTemis.exe em
-quarentena durante a instalação. Foi um falso positivo do módulo de
-aprendizado de máquina, que julga o arquivo pelo formato, e não por
-qualquer comportamento do programa.
+A ferramenta de montagem da Informação da Investigação Preliminar
+Sumária foi removida. O sistema passa de dezoito para dezessete
+ferramentas, dispostas em três fileiras de seis, seis e cinco.
 
-O executável carregava dentro de si, comprimido, todo o restante do
-sistema — cerca de 20 MB anexados a um programa de 300 KB, sem
-assinatura digital. É o mesmo desenho de arquivo usado por programas que
-escondem carga, e bastou para o alerta. A partir desta versão essa parte
-fica num arquivo separado, ao lado do executável (SistemaTemis.pkg), e o
-SistemaTemis.exe passa a conter só o carregador.
+Atenção, para não haver confusão: o que saiu foi a ferramenta. O **IPS
+como tipo de procedimento continua** — todos os termos do sistema seguem
+oferecendo IPS, PAD ou outro procedimento, e citando o número dos autos
+como sempre citaram. Nenhuma peça muda por causa disto.
 
-Se o antivírus de alguma estação ainda alertar, a equipe de TI pode
-liberar a pasta de instalação do sistema no console do antivírus.
 
-Sem mudança visível para quem usa o sistema.
+RECONSTRUIR CONVERSA — a peça volta a ser legível na tela
+
+A conversa reconstruída e o termo apareciam escuros sobre fundo escuro,
+praticamente ilegíveis. A peça é escrita em tinta marinho, para papel, e
+estava sendo exibida sobre o fundo escuro do programa.
+
+Convém registrar o alcance do defeito, para quem tenha emitido peça
+neste intervalo: **o PDF e o HTML gravados sempre saíram corretos**. O
+problema era apenas de exibição, e nada do que foi produzido precisa ser
+refeito.
+
+Agora as duas telas mostram a peça sobre branco, como as demais
+ferramentas do sistema sempre fizeram.
+
+
+REDE — telemetria desligada expressamente, e cabeçalho que não depende
+da estação
+
+Duas medidas de reforço, no contexto da análise da DTIC para habilitação
+do sistema nas estações da PRF.
+
+• O programa passa a desligar expressamente, na própria inicialização, a
+  telemetria das bibliotecas de terceiro. Nenhuma delas a enviava no
+  caminho que o sistema usa — isto foi conferido no código —, mas assim
+  a garantia não depende de reexaminar cada versão nova das
+  dependências.
+
+• No download dos modelos de reconhecimento de fala, a identificação
+  enviada ao servidor deixa de ser lida de variável de ambiente da
+  estação e passa a ser fixa. Antes, uma variável de ambiente qualquer
+  podia fazer chegar texto arbitrário àquele cabeçalho.
+
+O repositório passou a trazer também o documento REDE.md, que relaciona
+todos os endereços acessados pelo sistema, por qual função, o que
+trafega em cada um e o que acontece se forem bloqueados.

@@ -14,7 +14,7 @@ habilitação do referido sistema para uso nas estações de trabalho da
 Polícia Rodoviária Federal, vem prestar os esclarecimentos requeridos e
 <b>DECLARAR</b> o que segue.</p>
 
-<p>Os esclarecimentos referem-se à <b>versão 1.14.2</b> do sistema, cujo
+<p>Os esclarecimentos referem-se à <b>versão 1.15.0</b> do sistema, cujo
 código-fonte é público e está disponível, sob licença AGPL-3.0, em
 <i>github.com/leosmdrs/sistematemis</i>. Tudo quanto adiante se afirma é
 verificável naquele código, nos pontos indicados.</p>
@@ -44,7 +44,7 @@ sessão, que permanece na pasta <i>Documentos\Sistema Têmis\Sessões</i>.</p>
 
 <p><b>2. DAS FUNCIONALIDADES QUE ACESSAM A REDE</b></p>
 
-<p>Das dezoito ferramentas que compõem o sistema, <b>quinze não acessam a
+<p>Das dezessete ferramentas que compõem o sistema, <b>catorze não acessam a
 rede em hipótese alguma</b>. As três que acessam estão assinaladas na
 própria interface do programa e na documentação. Existem, ademais, a
 verificação de atualização do próprio programa e o download, por
@@ -137,15 +137,13 @@ fixos: <i>SistemaTemis-atualizador</i>, na verificação de atualização;
 de fala, o cabeçalho é montado pela biblioteca de download e informa
 apenas as versões dela própria e do interpretador Python.</p>
 
-<p>Quanto a este último, consigno que, <b>até a versão 1.14.2,
-inclusive</b>, sua parcela final é lida da variável de ambiente
-<i>HF_HUB_USER_AGENT_ORIGIN</i> da estação, de modo que uma variável de
-ambiente poderia fazer chegar texto arbitrário àquele cabeçalho. Não há,
-por esse caminho, remessa de dado do usuário, e a variável não existe em
-instalação comum do sistema operacional; não obstante, o valor deixou de
-depender do ambiente, passando a ser fixo, por alteração já incorporada
-ao código-fonte, <b>que vigorará a partir da próxima versão
-publicada</b>.</p>
+<p>Quanto a este último, consigno que sua parcela final é <b>fixa a
+partir da versão 1.15.0</b>. Até a versão 1.14.2, inclusive, era lida da
+variável de ambiente <i>HF_HUB_USER_AGENT_ORIGIN</i> da estação, de modo
+que uma variável de ambiente poderia fazer chegar texto arbitrário àquele
+cabeçalho. Não houve, por esse caminho, remessa de dado do usuário, e a
+referida variável não existe em instalação comum do sistema operacional;
+não obstante, o valor deixou de depender do ambiente da máquina.</p>
 
 <p>Como em qualquer acesso à rede, o endereço IP da estação é visível ao
 servidor contatado, o que é inerente ao protocolo e não decorre de
@@ -165,10 +163,10 @@ componente de captura de vídeo somente instancia seu atualizador pela
 interface de linha de comando, que o sistema não emprega.</p>
 
 <p>Em reforço, e para que a afirmação não dependa de reexame do código a
-cada versão nova das dependências, o programa passa a desligar
-expressamente a telemetria na própria inicialização, por alteração já
-incorporada ao código-fonte, <b>que vigorará a partir da próxima versão
-publicada</b>.</p>
+cada versão nova das dependências, o programa desliga expressamente a
+telemetria na própria inicialização, <b>a partir da versão 1.15.0</b>.
+Para as versões anteriores vale a conferência de código acima descrita,
+que é, em qualquer caso, o que sustenta a afirmação.</p>
 
 <p><b>6. DAS RESTRIÇÕES DE SAÍDA QUE PODEM SER APLICADAS</b></p>
 
@@ -184,7 +182,7 @@ deixa de haver aviso de versão nova; a separação de locutores e a
 Degravação ficam indisponíveis enquanto os modelos não forem instalados
 por outro meio; e a Constatação Web passa a emitir a peça consignando que
 o dado de registro do domínio não foi obtido. <b>Bloqueada a saída por
-inteiro, as quinze ferramentas restantes permanecem integralmente
+inteiro, as catorze ferramentas restantes permanecem integralmente
 funcionais</b>, assim como a Degravação, desde que previamente instalados
 os modelos.</p>
 

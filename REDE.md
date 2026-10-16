@@ -3,7 +3,7 @@
 Documento de resposta ao questionamento da DTIC sobre tráfego de rede,
 para instrução do processo de autorização de uso nas estações da PRF.
 
-Versão a que se refere: **1.14.2**.
+Versão a que se refere: **1.15.0**.
 Código-fonte: <https://github.com/leosmdrs/sistematemis> (AGPL-3.0).
 
 Tudo o que segue é verificável no código-fonte, nos pontos indicados.
@@ -22,7 +22,7 @@ vídeo, indexação de acervo — ocorre inteiramente na estação. Não há
 serviço de nuvem, não há API de terceiro que receba conteúdo, não há
 envio de amostras, não há telemetria de uso.
 
-Das dezoito ferramentas do sistema, **quinze não acessam a rede em
+Das dezessete ferramentas do sistema, **catorze não acessam a rede em
 hipótese alguma**. As três que acessam estão assinaladas na própria
 interface e no README, e o que elas acessam é descrito no item 3.
 
@@ -198,15 +198,14 @@ estação ou de órgão. Os cabeçalhos são fixos:
 O último é montado pela biblioteca de download e informa apenas as
 versões da própria biblioteca e do interpretador.
 
-**Ressalva quanto à parcela final (`origin/…`).** Até a versão 1.14.2,
-inclusive, ela é lida da variável de ambiente `HF_HUB_USER_AGENT_ORIGIN`
-da estação — de modo que uma variável de ambiente poderia fazer chegar
-texto arbitrário a esse cabeçalho. Não há envio de dado do usuário por
-esse caminho, e a variável não existe numa instalação comum do Windows;
-ainda assim, o valor deixou de depender do ambiente: passou a ser fixo
-em `SistemaTemis`, por alteração já incorporada ao código-fonte
-(`temis/__main__.py`, função `_calar_telemetria`), **que vigorará a
-partir da próxima versão publicada**.
+**Quanto à parcela final (`origin/…`).** Ela é fixa em `SistemaTemis`
+**a partir da versão 1.15.0** (`temis/__main__.py`, função
+`_calar_telemetria`). Até a 1.14.2, inclusive, era lida da variável de
+ambiente `HF_HUB_USER_AGENT_ORIGIN` da estação — de modo que uma
+variável de ambiente poderia fazer chegar texto arbitrário a esse
+cabeçalho. Não houve, por esse caminho, envio de dado do usuário, e a
+variável não existe numa instalação comum do Windows; ainda assim, o
+valor deixou de depender do ambiente da máquina.
 
 O cabeçalho só é emitido no download dos modelos de fala, descrito no
 item 3.2 — isto é, apenas quando o operador manda instalar a Degravação.
@@ -244,10 +243,9 @@ DISABLE_TELEMETRY        = 1
 DO_NOT_TRACK             = 1
 ```
 
-**Esta medida está no código-fonte e vigorará a partir da próxima versão
-publicada.** Até a 1.14.2, inclusive, vale a conferência de código
-descrita acima — que é o que sustenta a afirmação, sendo as variáveis
-apenas reforço.
+**Esta medida vigora a partir da versão 1.15.0.** Para as versões
+anteriores vale a conferência de código descrita acima — que é, em
+qualquer caso, o que sustenta a afirmação; as variáveis são reforço.
 
 ---
 
@@ -266,7 +264,7 @@ Caso a DTIC opte por restringir a saída das estações, estes são os
 **Todos os demais acessos são a endereços determinados pelo operador**,
 nas três ferramentas assinaladas, e não a destinos fixos do sistema.
 
-Bloqueando a saída inteira, as quinze ferramentas restantes continuam
+Bloqueando a saída inteira, as catorze ferramentas restantes continuam
 funcionando integralmente, e a Degravação também, desde que os modelos
 já tenham sido instalados.
 
@@ -290,4 +288,4 @@ já tenham sido instalados.
 
 ---
 
-*Documento preparado em 16/10/2026, referente à versão 1.14.2.*
+*Documento preparado em 16/10/2026, referente à versão 1.15.0.*
