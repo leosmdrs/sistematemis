@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-br"><head><meta charset="utf-8">
+<title>Declaração — tráfego de rede do Sistema Têmis</title></head>
+<body style="font-family:'Times New Roman',serif; font-size:12pt; line-height:150%; text-align:justify;">
+
+<p align="center"><b>DECLARAÇÃO DO DESENVOLVEDOR</b><br/>
+<span style="font-size:11pt;">Tráfego de rede do Sistema Têmis</span></p>
+
+<p><b>LEONARDO SILVA MEDEIROS</b>, Policial Rodoviário Federal, matrícula
+nº 3312264, lotado no NICAI/ES, na condição de autor e desenvolvedor do
+<b>Sistema Têmis</b>, em atenção à solicitação da Diretoria de Tecnologia
+da Informação e Comunicação, formulada no âmbito do procedimento de
+habilitação do referido sistema para uso nas estações de trabalho da
+Polícia Rodoviária Federal, vem prestar os esclarecimentos requeridos e
+<b>DECLARAR</b> o que segue.</p>
+
+<p>Os esclarecimentos referem-se à <b>versão 1.14.2</b> do sistema, cujo
+código-fonte é público e está disponível, sob licença AGPL-3.0, em
+<i>github.com/leosmdrs/sistematemis</i>. Tudo quanto adiante se afirma é
+verificável naquele código, nos pontos indicados.</p>
+
+<p><b>1. DA AUSÊNCIA DE REMESSA DE DOCUMENTOS E DADOS A SERVIÇOS
+EXTERNOS</b></p>
+
+<p>Declaro que <b>o Sistema Têmis não remete a serviço externo algum os
+documentos, arquivos, planilhas, vídeos, áudios ou quaisquer dados que
+processa</b>.</p>
+
+<p>Todo o processamento — extração de metadados, cálculo de resumos
+criptográficos, censura de documentos, reconhecimento óptico de
+caracteres, transcrição de áudio, análise de planilha, operações em
+documentos PDF, edição de vídeo e indexação de acervo — ocorre
+integralmente na estação de trabalho. O sistema não possui serviço em
+nuvem, não consome interface de programação de terceiro que receba
+conteúdo, não remete amostras e não coleta estatística de uso.</p>
+
+<p>Declaro, especificamente, que <b>nunca deixam a estação</b>: os
+documentos e arquivos processados; o conteúdo de planilhas, documentos
+PDF, vídeos e áudios; o texto obtido por transcrição ou por
+reconhecimento óptico; as peças e termos produzidos; os resumos
+criptográficos calculados; o nome, a matrícula, a lotação e o órgão do
+operador; o número do procedimento; e o registro de atividades da
+sessão, que permanece na pasta <i>Documentos\Sistema Têmis\Sessões</i>.</p>
+
+<p><b>2. DAS FUNCIONALIDADES QUE ACESSAM A REDE</b></p>
+
+<p>Das dezoito ferramentas que compõem o sistema, <b>quinze não acessam a
+rede em hipótese alguma</b>. As três que acessam estão assinaladas na
+própria interface do programa e na documentação. Existem, ademais, a
+verificação de atualização do próprio programa e o download, por
+solicitação expressa do operador, dos modelos de reconhecimento de fala.</p>
+
+<p>Em nenhuma dessas hipóteses há tráfego de conteúdo de arquivo do
+usuário: <b>o tráfego é de entrada — o sistema busca, e não remete</b>.</p>
+
+<p><b>3. DOS ENDEREÇOS ACESSADOS</b></p>
+
+<p><b>3.1. Verificação de atualização.</b> Uma única consulta, na abertura
+do programa, ao endereço
+<i>https://github.com/leosmdrs/sistematemis/releases/latest/download/versao.json</i>
+(host <i>github.com</i>, com possível redirecionamento para
+<i>objects.githubusercontent.com</i>). Trata-se de requisição do tipo GET
+que transmite tão somente o cabeçalho fixo
+<i>User-Agent: SistemaTemis-atualizador</i>, <b>sem versão instalada, sem
+nome de máquina, sem nome de usuário, sem domínio e sem identificador de
+qualquer espécie</b>. Recebe-se arquivo JSON limitado a 64 KB, contendo o
+número da versão mais recente, o endereço do instalador e o resumo
+SHA-256 correspondente. O tempo-limite é de 6 segundos e, não havendo
+resposta, o programa abre normalmente. O download de versão nova somente
+ocorre por ação do operador, e o arquivo obtido é conferido pelo resumo
+SHA-256 antes de qualquer execução.</p>
+
+<p><b>3.2. Modelos de reconhecimento de fala e de separação de
+locutores.</b> Utilizados pela ferramenta Degravação, são obtidos
+<b>uma única vez</b>, por ação expressa do operador, e permanecem na
+estação; a partir de então a transcrição opera sem rede. Os endereços
+são: <i>https://huggingface.co/Systran/faster-whisper-&lt;modelo&gt;</i>
+(hosts <i>huggingface.co</i> e <i>cdn-lfs.huggingface.co</i>) e, para os
+modelos de locutor, os arquivos publicados nos lançamentos do projeto
+<i>sherpa-onnx</i> em <i>github.com/k2-fsa/sherpa-onnx</i> (host
+<i>objects.githubusercontent.com</i>). Transmite-se o nome do modelo
+solicitado e o cabeçalho referido no item 4. <b>Nenhum áudio, nenhum
+trecho de áudio e nenhum resultado de transcrição trafega.</b> Os
+repositórios adotados não exigem cadastro nem credencial de acesso.</p>
+
+<p><b>3.3. Constatação Web.</b> Ferramenta destinada a documentar conteúdo
+publicado na internet; por sua natureza, acessa <b>o endereço que o
+operador determinar</b>, não havendo lista fixa de destinos. O navegador
+embutido é constituído, a cada diligência, <b>sem extensões, sem sessão
+anterior, sem cookie persistente e com cache exclusivamente em
+memória</b>, não havendo sincronização com conta alguma nem
+aproveitamento de credenciais do navegador do usuário. Além do endereço
+informado, a ferramenta realiza duas consultas acessórias destinadas a
+qualificar a prova: (i) conexão direta ao próprio host consultado, na
+porta 443, para registro do certificado TLS apresentado; e (ii) consulta
+ao registro do domínio pelo protocolo RDAP, dirigida a
+<i>https://data.iana.org/rdap/dns.json</i>, para identificação do servidor
+autoritativo da terminação, e, em seguida, ao servidor do registro
+competente — por exemplo, <i>rdap.registro.br</i>, no caso de domínios
+<i>.br</i>.</p>
+
+<p><b>Ressalva que entendo dever consignar expressamente:</b> a consulta
+RDAP referida transmite ao registro competente <b>o nome do domínio que
+está sendo verificado</b>. É o único ponto do sistema em que um dado da
+diligência chega a terceiro. A consulta é dirigida diretamente à fonte
+autoritativa, sem intermediário, justamente para não acrescentar parte
+estranha ao caminho da prova, e não é acompanhada de identificação do
+consulente, do procedimento ou do órgão. A ferramenta opera sem essa
+consulta: não obtido o dado, a peça é emitida consignando a
+circunstância.</p>
+
+<p><b>3.4. Extração Registrada.</b> Ferramenta destinada a documentar
+extração de dados em sistema institucional; acessa <b>o sistema que o
+operador abrir</b>, tipicamente da própria Polícia Rodoviária Federal ou
+de órgão parceiro, transmitindo o que o próprio operador fizer —
+autenticação e consultas que ele mesmo preencher. O navegador possui a
+mesma constituição isolada descrita no item 3.3. <b>As credenciais
+eventualmente utilizadas pelo operador não são armazenadas, não são
+transmitidas a destino diverso do próprio sistema acessado e não são
+registradas na peça produzida.</b></p>
+
+<p><b>3.5. Vídeo da Internet.</b> Ferramenta destinada a preservar vídeo
+publicado, acessa <b>o endereço que o operador informar</b> e os
+servidores de distribuição da própria plataforma. Alcança
+<b>exclusivamente conteúdo publicamente acessível</b>, não apresentando
+credencial a plataforma alguma; vídeo privado, restrito a membros ou
+sujeito a verificação de idade é recusado, com indicação do motivo ao
+operador.</p>
+
+<p><b>4. DOS CABEÇALHOS TRANSMITIDOS</b></p>
+
+<p>Nenhuma requisição originada pelo sistema carrega identificação de
+usuário, de estação ou de órgão. Os cabeçalhos de identificação são
+fixos: <i>SistemaTemis-atualizador</i>, na verificação de atualização;
+<i>SistemaTemis/RDAP</i>, na consulta de registro de domínio; e
+<i>Temis</i>, na obtenção dos modelos de locutor. Na obtenção dos modelos
+de fala, o cabeçalho é montado pela biblioteca de download e informa
+apenas as versões dela própria e do interpretador Python.</p>
+
+<p>Quanto a este último, consigno que, <b>até a versão 1.14.2,
+inclusive</b>, sua parcela final é lida da variável de ambiente
+<i>HF_HUB_USER_AGENT_ORIGIN</i> da estação, de modo que uma variável de
+ambiente poderia fazer chegar texto arbitrário àquele cabeçalho. Não há,
+por esse caminho, remessa de dado do usuário, e a variável não existe em
+instalação comum do sistema operacional; não obstante, o valor deixou de
+depender do ambiente, passando a ser fixo, por alteração já incorporada
+ao código-fonte, <b>que vigorará a partir da próxima versão
+publicada</b>.</p>
+
+<p>Como em qualquer acesso à rede, o endereço IP da estação é visível ao
+servidor contatado, o que é inerente ao protocolo e não decorre de
+remessa praticada pelo sistema.</p>
+
+<p><b>5. DA INEXISTÊNCIA DE TELEMETRIA</b></p>
+
+<p>Declaro que <b>o Sistema Têmis não possui telemetria</b>, não havendo
+coleta de uso, de erro, de desempenho ou de qualquer outra natureza.</p>
+
+<p>Quanto às bibliotecas de terceiro que o sistema emprega, verifiquei no
+respectivo código-fonte que <b>nenhuma remete telemetria no caminho
+utilizado</b>: a biblioteca de download de modelos define a função de
+telemetria sem invocá-la em ponto algum de seu próprio código, apenas a
+expondo a quem queira utilizá-la, o que o Sistema Têmis não faz; e o
+componente de captura de vídeo somente instancia seu atualizador pela
+interface de linha de comando, que o sistema não emprega.</p>
+
+<p>Em reforço, e para que a afirmação não dependa de reexame do código a
+cada versão nova das dependências, o programa passa a desligar
+expressamente a telemetria na própria inicialização, por alteração já
+incorporada ao código-fonte, <b>que vigorará a partir da próxima versão
+publicada</b>.</p>
+
+<p><b>6. DAS RESTRIÇÕES DE SAÍDA QUE PODEM SER APLICADAS</b></p>
+
+<p>Caso esta Diretoria opte por restringir a saída das estações, registro
+que os únicos destinos de que o sistema necessita para funções próprias
+são <i>github.com</i> e <i>objects.githubusercontent.com</i> (verificação
+de atualização e modelos de locutor), <i>huggingface.co</i> e
+<i>cdn-lfs.huggingface.co</i> (modelos de reconhecimento de fala) e
+<i>data.iana.org</i> (descoberta do servidor de registro de domínio).</p>
+
+<p>O bloqueio de tais destinos não impede o funcionamento do sistema:
+deixa de haver aviso de versão nova; a separação de locutores e a
+Degravação ficam indisponíveis enquanto os modelos não forem instalados
+por outro meio; e a Constatação Web passa a emitir a peça consignando que
+o dado de registro do domínio não foi obtido. <b>Bloqueada a saída por
+inteiro, as quinze ferramentas restantes permanecem integralmente
+funcionais</b>, assim como a Degravação, desde que previamente instalados
+os modelos.</p>
+
+<p><b>7. DOS MEIOS DE VERIFICAÇÃO</b></p>
+
+<p>Para conferência independente do aqui declarado, registro que: o
+código-fonte é integralmente público, sob licença AGPL-3.0; os únicos
+pontos do programa capazes de estabelecer conexão são os cinco acima
+descritos, localizáveis por busca no diretório <i>temis/</i> pelos termos
+<i>urlopen</i>, <i>urllib.request</i>, <i>socket.create_connection</i> e
+<i>snapshot_download</i>; o programa dispõe de autoteste embutido,
+acionável por <i>SistemaTemis.exe --autoteste</i>, que relaciona seus
+componentes; e a instalação pode ser submetida a captura de tráfego em
+estação de teste, sendo certo que, excetuada a verificação de atualização
+na abertura, nenhuma conexão parte do sistema sem ação do operador.</p>
+
+<p>Por ser expressão da verdade, firmo a presente declaração, assumindo
+responsabilidade pelo seu teor.</p>
+
+<p>&nbsp;</p>
+
+<p align="center"><b>LEONARDO SILVA MEDEIROS</b><br/>
+Policial Rodoviário Federal<br/>
+Matrícula nº 3312264<br/>
+NICAI/ES</p>
+
+</body></html>
