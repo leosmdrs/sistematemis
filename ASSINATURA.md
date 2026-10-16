@@ -31,6 +31,41 @@ Vale registrar duas informações que costumam circular erradas:
   removido em 2024; hoje EV e OV passam pelo mesmo acúmulo. Pagar o prêmio
   do EV só por causa do aviso deixou de se justificar.
 
+## Antivírus corporativo
+
+Em 15/09/2026 o Trend Micro de uma estação pôs o `SistemaTemis.exe` em
+quarentena durante a instalação, pelo motor de **aprendizado de máquina**
+(*Predictive Machine Learning*), com o nome `Troj.Win32.TRX.XXPE50…`. Não
+é assinatura de vírus conhecido: é o modelo julgando pelo formato do
+arquivo. Nomes `TRX` são exatamente isso.
+
+O formato que ele viu, até a 1.14.1, era um executável de 300 KB com
+20 MB de dado comprimido colado depois da última seção, sem assinatura
+digital e com hash novo a cada versão — o mesmo desenho de programa que
+esconde carga. O carregador do PyInstaller, além disso, é idêntico ao de
+muito malware escrito em Python, que usa a mesma ferramenta.
+
+**O que já foi feito:** o pacote do Python passou a ficar ao lado do
+executável, em `SistemaTemis.pkg` (`append_pkg=False` no
+`build/temis.spec`). O `.exe` ficou só com o carregador.
+
+**O que resolve de vez:** a assinatura, abaixo. Um modelo de reputação
+trata arquivo assinado por certificado reconhecido de outro jeito, e a
+exceção no console passa a poder ser feita por certificado, que não muda
+de uma versão para a outra.
+
+**Enquanto isso, onde o alerta ainda aparecer:**
+
+- *A equipe de TI da instituição* libera no console do Apex One: exceção
+  do Predictive Machine Learning por **caminho**
+  (`C:\Program Files\SistemaTemis\` e
+  `%LOCALAPPDATA%\Programs\SistemaTemis\`). Exceção por hash precisaria
+  ser refeita a cada versão.
+- *Quem publica* envia o arquivo à Trend Micro como falso positivo
+  (formulário de reavaliação de detecção no site da Trend Micro), com o
+  nome da detecção, o link do repositório e o da release. Liberado lá,
+  vale para todas as estações na atualização seguinte do padrão.
+
 ## O caminho escolhido: SignPath Foundation
 
 A [SignPath Foundation](https://signpath.org/) assina gratuitamente

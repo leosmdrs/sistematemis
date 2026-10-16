@@ -472,7 +472,8 @@ def ler_roteiro(caminho) -> Roteiro:
         json.loads(Path(caminho).read_text(encoding="utf-8")))
 
 
-def reproduzir(roteiro: Roteiro, esperado: str = "") -> tuple:
+def reproduzir(roteiro: Roteiro, esperado: str = "",
+               progresso=None, cancelado=None) -> tuple:
     """Refaz a operação sobre as origens e confere o resultado.
 
     É a função que dá razão a todo o resto: responde por verificação, e
@@ -482,6 +483,12 @@ def reproduzir(roteiro: Roteiro, esperado: str = "") -> tuple:
     Devolve (situação, resumo obtido, explicação). A situação é "sim",
     "nao" ou "impossivel" — e a terceira não é a segunda: origem que
     sumiu não é operação que não reproduz.
+
+    `progresso` e `cancelado` são opcionais, para quem chamar de fora da
+    thread da interface. A desistência é conferida entre as etapas e não
+    dentro delas: mesclar e comprimir são chamadas únicas da biblioteca,
+    que vão até o fim faça-se o que se fizer. Desistir devolve
+    **"cancelado"**, nunca "nao".
     """
     from .hash_core import sha256_file
 
@@ -492,9 +499,11 @@ def reproduzir(roteiro: Roteiro, esperado: str = "") -> tuple:
             return "impossivel", "", (
                 "o arquivo de origem não foi encontrado em " + str(p))
         try:
-            atual = sha256_file(str(p))
+            atual = sha256_file(str(p), should_stop=cancelado)
         except OSError as e:
             return "impossivel", "", f"não foi possível ler {p.name}: {e}"
+        if cancelado and cancelado():
+            return "cancelado", "", "a conferência foi interrompida"
         if resumo_declarado and atual != resumo_declarado:
             return "impossivel", "", (
                 f"{p.name} não é mais o mesmo arquivo: o resumo atual não "
@@ -502,12 +511,14 @@ def reproduzir(roteiro: Roteiro, esperado: str = "") -> tuple:
 
     try:
         producao = executar(roteiro.operacao, roteiro.caminhos,
-                            roteiro.parametros)
+                            roteiro.parametros, progresso=progresso)
     except Exception as e:                                  # noqa: BLE001
         return "impossivel", "", f"{type(e).__name__}: {e}"
     obtido = producao.resumo
     producao.fechar()
 
+    if cancelado and cancelado():
+        return "cancelado", "", "a conferência foi interrompida"
     if not alvo:
         return "impossivel", obtido, "não há resumo declarado a conferir"
     if obtido == alvo:

@@ -517,7 +517,7 @@ GRUPO_REDUNDANTE = "Arquivo"
 def ler_metadados(caminho: Path) -> tuple[list, str]:
     """Metadados do arquivo e as coordenadas, se houver.
 
-    Reaproveita o extrator da ferramenta de Metadados e Hash, que já sabe
+    Reaproveita o extrator do Gerador de Hash e Metadados, que já sabe
     ler EXIF de fotografia, propriedades de documento de escritório e
     marcas de mídia. Aqui o resumo criptográfico é dispensado porque a
     varredura já o calculou.

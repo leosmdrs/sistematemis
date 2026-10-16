@@ -31,8 +31,8 @@ from PyQt6.QtWidgets import (
 from ..icons import draw_icon
 from ..theme import PALETTE
 from ..widgets import (NoScrollComboBox, NoScrollSpinBox, SidebarPanel,
-                       field_label, fit_to_screen, group_title, hsep,
-                       output_button, primary_button, subtext)
+                       com_avanco, field_label, fit_to_screen, group_title,
+                       hsep, output_button, primary_button, subtext)
 from . import planilha_core as pc
 from .base import ToolMeta, ToolPage
 from .derivado_dialogo import TermoDerivadoDialog
@@ -1331,21 +1331,33 @@ class PlanilhaTool(ToolPage):
     def _gerar_termo(self):
         if self._analise is None or not self._salvo:
             return
-        # A conferência roda antes da peça, e não depois: o que ela
-        # apurar vai impresso, inclusive quando não confere.
-        espera = QProgressDialog("Re-executando a análise para conferir…",
-                                 "", 0, 0, self)
-        espera.setWindowTitle("Conferência de reprodutibilidade")
-        espera.setCancelButton(None)
-        espera.setWindowModality(Qt.WindowModality.WindowModal)
-        espera.show()
-        try:
-            ok, _, motivo = pc.reproduzir(self._analise,
-                                          self._resultado.resumo())
-        finally:
-            espera.close()
-        termo = pc.montar_termo(self._analise, self._resultado, self._passos,
-                                self._salvo, "sim" if ok else motivo)
+        analise, resultado = self._analise, self._resultado
+        passos, salvo = self._passos, self._salvo
+
+        # A conferência roda antes da peça, e não depois: o que ela apurar
+        # vai impresso, inclusive quando não confere.
+        #
+        # Fora da thread da interface: reler a planilha do zero leva
+        # quinze segundos em cem mil linhas, e a janela de espera que
+        # havia aqui era mostrada e logo atropelada pelo próprio trabalho,
+        # sem chegar a pintar. Sem botão de cancelar, como antes — a
+        # releitura e a re-execução são indivisíveis, e desistência que
+        # não se cumpre é pior que desistência que não se oferece.
+        def trabalho(tarefa):
+            tarefa.etapa.emit("Re-executando a análise para conferir")
+            ok, _, motivo = pc.reproduzir(analise, resultado.resumo(),
+                                          cancelado=tarefa.desistiram)
+            tarefa.etapa.emit("Resumindo os arquivos")
+            termo = pc.montar_termo(analise, resultado, passos, salvo,
+                                    "sim" if ok else motivo)
+            return ok, motivo, termo
+
+        self._tarefa_termo = com_avanco(
+            self, "Conferência de reprodutibilidade", "Preparando…",
+            trabalho, self._termo_pronto, cancelavel=False)
+
+    def _termo_pronto(self, dados):
+        ok, motivo, termo = dados
         if not ok:
             QMessageBox.warning(
                 self, "A conferência não passou",
@@ -1356,5 +1368,8 @@ class PlanilhaTool(ToolPage):
 
     # ── ciclo de vida ────────────────────
     def shutdown(self):
+        tarefa = getattr(self, "_tarefa_termo", None)
+        if tarefa is not None and tarefa.isRunning():
+            tarefa.wait(5000)
         if self._leitor is not None and self._leitor.isRunning():
             self._leitor.wait(3000)
