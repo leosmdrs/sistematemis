@@ -536,16 +536,6 @@ def draw_icon(kind: str, size: int = 16, color: str = None, width: float = 1.8) 
         p.drawLine(QPointF(c, m), QPointF(c, s - m))
     elif kind == "check":
         poly((m, c), (c - s * 0.06, s - m - s * 0.04), (s - m, m + s * 0.04))
-    elif kind == "tool_ips":
-        # documento com uma pena
-        poly((m, s - m), (m, m), (c + s * 0.08, m),
-             (c + s * 0.08, m + s * 0.18), (s - m * 1.2, m + s * 0.18))
-        p.drawLine(QPointF(m + s * 0.08, c - s * 0.04),
-                   QPointF(c + s * 0.02, c - s * 0.04))
-        p.drawLine(QPointF(m + s * 0.08, c + s * 0.14),
-                   QPointF(c - s * 0.04, c + s * 0.14))
-        p.drawLine(QPointF(c + s * 0.06, s - m - s * 0.02),
-                   QPointF(s - m, c - s * 0.10))
     elif kind == "camera":
         # recorte de tela: cantos de enquadramento com uma objetiva
         for dx, dy in ((0, 0), (1, 0), (0, 1), (1, 1)):

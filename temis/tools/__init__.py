@@ -13,7 +13,6 @@ from .antiinj import AntiInjectionTool
 from .atividades import AtividadesTool
 from .constatacao import ConstatacaoTool
 from .conversa import ConversaTool
-from .ips import IPSTool
 from .metadados import MetadadosTool
 from .espelhamento import EspelhamentoTool
 from .extracao import ExtracaoTool
@@ -41,7 +40,6 @@ from .videoweb import VideoWebTool
 #: obriga a tabela do README a acompanhar.
 REGISTRY: list[tuple[ToolMeta, type | None]] = [
     # primeira fileira — a peça, e o preparo do documento que a instrui
-    (IPSTool.meta,           IPSTool),
     (TarjaPretaTool.meta,    TarjaPretaTool),
     (PDFTool.meta,           PDFTool),
     (OCRPDFTool.meta,        OCRPDFTool),

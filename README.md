@@ -71,7 +71,7 @@ instalar.
 
 ## Ferramentas
 
-**Dezoito ferramentas**, todas disponíveis. A ordem abaixo é a do
+**Dezessete ferramentas**, todas disponíveis. A ordem abaixo é a do
 portal, disposta por etapa do trabalho e não em ordem alfabética: na
 primeira, a peça e o preparo do documento que a instrui; na segunda, o
 registro da prova onde ela está; na terceira, o exame do material e o
@@ -79,7 +79,6 @@ registro do próprio trabalho.
 
 | Ferramenta | O que faz |
 |---|---|
-| **Encarregado de IPS** | Monta a Informação da Investigação Preliminar Sumária parte por parte, com o roteiro do que entra em cada uma e o respaldo normativo à mão — art. 92 da IN PRF nº 127/2024. Exporta HTML já diagramado para importar no SEI, e PDF. |
 | **Tarja Preta** | Tarjamento irreversível de PDFs — a página é rasterizada ao salvar, então o texto sob a tarja sai do arquivo, e não fica apenas coberto. Tarja manual, tarja por seleção de texto, marcação por sinal à escolha (`[ ]`, `{ }` ou `( )`) e busca automática de CPF, CNPJ, RG, telefone e e-mail. |
 | **Documentos PDF** | Mesclar, extrair páginas e comprimir sem enviar peça de procedimento a sítio de terceiro. Ao mesclar e ao separar, o termo afirma por conferência que nenhuma página foi alterada: cada página do resultado tem resumo idêntico ao da origem. Na compressão, declara o que a redução custou — e a camada de texto sobrevive. |
 | **PDF Pesquisável** | Acrescenta camada de texto invisível a PDFs escaneados e a fotos de documentos, encaixada palavra por palavra sobre a imagem. O documento fica igual ao original, mas passa a permitir busca, seleção e cópia — e a ser encontrado pela Varredura. |
@@ -98,7 +97,7 @@ registro do próprio trabalho.
 | **Edição de Vídeo** | Compactar, fatiar e mesclar gravações para a juntada aos autos. Trabalha com videomonitoramento, câmeras corporais e vídeos anexados pelas partes. |
 | **Relatório de Atividades** | Documenta cada execução do sistema, do abrir ao fechar, sem que ninguém precise ligá-la: ferramentas usadas e por quanto tempo, o que cada uma relatou ao concluir, e a identificação da estação e da rede. Grava enquanto a sessão corre. Fica só nesta máquina. |
 
-Três acessam a rede, e estão marcadas acima. As outras quinze leem e
+Três acessam a rede, e estão marcadas acima. As outras catorze leem e
 processam tudo na própria estação. Fora delas, o sistema só sai à rede
 para conferir se há versão nova, sem enviar identificação — e isso se
 desliga em **Sobre**.

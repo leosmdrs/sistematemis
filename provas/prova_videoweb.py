@@ -200,6 +200,20 @@ class OQueAPecaAfirma(unittest.TestCase):
         self.assertEqual(vc.formatar_duracao(0), "—")
 
 
+#: Recusas que vêm da rede ou da plataforma, e não do programa. Uma
+#: prova que falha por causa delas não diz nada sobre o Sistema Têmis —
+#: e prova que falha à toa ensina a ignorar prova.
+ALHEIO_AO_PROGRAMA = (
+    "não foi possível alcançar o endereço",
+    "passou a exigir identificação",
+    "não está disponível",
+    "timed out",
+    "timeout",
+    "connection",
+    "temporarily",
+)
+
+
 class ComRede(unittest.TestCase):
     """As que precisam alcançar a plataforma."""
 
@@ -208,8 +222,20 @@ class ComRede(unittest.TestCase):
         if not tem_rede():
             raise unittest.SkipTest("a estação não alcança a rede")
 
+    def nao_foi_o_programa(self, erro: str):
+        """Pula quando a recusa veio da rede ou da plataforma.
+
+        A distinção importa: erro de transporte não é defeito a corrigir,
+        e tratá-lo como falha faria a suíte acusar o programa por uma
+        oscilação de rede. Qualquer outra mensagem continua reprovando.
+        """
+        baixo = (erro or "").lower()
+        if any(m in baixo for m in ALHEIO_AO_PROGRAMA):
+            raise unittest.SkipTest("a plataforma não respondeu: " + erro)
+
     def test_sondar_traz_o_que_a_peca_precisa(self):
         p = vc.sondar(URL_LIVRE)
+        self.nao_foi_o_programa(p.erro)
         self.assertEqual(p.erro, "")
         self.assertTrue(p.titulo)
         self.assertTrue(p.canal)
@@ -226,6 +252,7 @@ class ComRede(unittest.TestCase):
     def test_baixar_de_verdade_e_medir_o_que_veio(self):
         with tempfile.TemporaryDirectory() as pasta:
             c = vc.baixar(URL_LIVRE, pasta, qualidade="480")
+            self.nao_foi_o_programa(c.erro)
             self.assertEqual(c.erro, "")
             arquivo = Path(c.arquivo)
             self.assertTrue(arquivo.is_file())

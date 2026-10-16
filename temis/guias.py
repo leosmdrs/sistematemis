@@ -54,51 +54,6 @@ class Guia:
 GUIAS: dict[str, Guia] = {
 
     # ── vértice: o procedimento ───────────
-    "ips": Guia(
-        finalidade=(
-            "Monta a Informação de Juízo de Admissibilidade — a peça que o "
-            "encarregado assina para dizer se um fato comunicado merece ou "
-            "não apuração formal. É o documento que abre, ou encerra, o "
-            "procedimento correcional.\n\n"
-            "O trabalho de fato não é escrever: é não deixar nada de fora. "
-            "A Informação tem seis partes obrigatórias e cada uma responde "
-            "a uma exigência da IN 127. A ferramenta guarda esse roteiro "
-            "pronto, com a orientação e o texto padrão de cada item, e "
-            "numera tudo sozinha conforme se preenche."),
-        quando=(
-            "Chegou uma denúncia, representação ou comunicação de "
-            "irregularidade e é preciso decidir sobre a admissibilidade.",
-            "A peça precisa sair no formato que o SEI aceita, com a "
-            "numeração dos itens correta.",
-            "Uma Informação começada precisa ser retomada dias depois, do "
-            "ponto em que parou.",
-        ),
-        passos=(
-            "Clique em <b>Nova Informação</b> e dê um nome que você "
-            "reconheça depois — costuma ser o número do processo.",
-            "Percorra as etapas pela lista da esquerda. Cada uma traz, no "
-            "alto, o que aquele item precisa conter; onde a IN 127 tem "
-            "texto próprio, ele já vem escrito.",
-            "Escreva em cada bloco. Os botões ao lado do campo inserem "
-            "<b>Parágrafo</b>, <b>Tabela</b> e imagens; a numeração dos "
-            "itens se refaz sozinha.",
-            "Use <b>O que diz a norma</b> sempre que a exigência do item "
-            "não estiver clara.",
-            "Marque cada parte como concluída ao terminá-la, para "
-            "enxergar o que falta.",
-            "Confira em <b>Ver prévia da Informação</b> e exporte com "
-            "<b>Exportar HTML para o SEI</b> — ou em PDF, se for para "
-            "circular fora dos autos.",
-        ),
-        limites=(
-            "O trabalho fica gravado neste computador, e não no SEI. "
-            "Terminada a peça, exporte e junte aos autos.",
-            "O roteiro e os textos padrão seguem a IN 127. Norma nova pede "
-            "conferência antes de reaproveitar a peça.",
-        ),
-    ),
-
-    # ── identificação e captura da prova ──
     "metadados": Guia(
         finalidade=(
             "Faz duas coisas que sempre andaram juntas: calcula o SHA-256 "

@@ -110,11 +110,18 @@ class ConversaTool(ToolPage):
         lay.addWidget(group_title("Conversa reconstruída"))
         self._vista = QTextBrowser()
         self._vista.setOpenExternalLinks(False)
+        # Sobre branco, como as demais peças do sistema — e não sobre o
+        # fundo escuro do tema. O HTML do termo é escrito em tinta
+        # marinho, para papel; pintado sobre o fundo escuro ficava
+        # marinho sobre marinho, e a peça aparecia ilegível na tela
+        # ainda que saísse correta no PDF e no HTML gravados.
         self._vista.setStyleSheet(
-            f"QTextBrowser {{ background: {PALETTE['bg']}; border: none; }}")
+            "QTextBrowser { background: #FFFFFF; color: #16233A; "
+            f"border: 1px solid {PALETTE['border']}; border-radius: 6px; "
+            "padding: 26px; }")
         self._vista.setHtml(
-            "<p style='color:%s'>Abra uma exportação de conversa para "
-            "reconstruí-la aqui.</p>" % PALETTE["text3"])
+            "<p style='color:#5A6B85'>Abra uma exportação de conversa "
+            "para reconstruí-la aqui.</p>")
         lay.addWidget(self._vista, 1)
         return w
 
@@ -189,6 +196,12 @@ class _TermoConversaDialog(QDialog):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(18, 16, 18, 14)
         visor = QTextBrowser()
+        # Também aqui sobre branco: sem folha própria, o visor herdava o
+        # tema escuro do programa e a peça saía marinho sobre marinho.
+        visor.setStyleSheet(
+            "QTextBrowser { background: #FFFFFF; color: #16233A; "
+            f"border: 1px solid {PALETTE['border']}; border-radius: 6px; "
+            "padding: 26px; }")
         visor.setHtml(html)
         lay.addWidget(visor, 1)
 
