@@ -3,7 +3,7 @@
 Documento de resposta ao questionamento da DTIC sobre tráfego de rede,
 para instrução do processo de autorização de uso nas estações da PRF.
 
-Versão a que se refere: **1.12.0**.
+Versão a que se refere: **1.14.2**.
 Código-fonte: <https://github.com/leosmdrs/sistematemis> (AGPL-3.0).
 
 Tudo o que segue é verificável no código-fonte, nos pontos indicados.
@@ -113,7 +113,8 @@ natureza, acessa o endereço que o operador determina.
 
 O navegador embutido é configurado para cada diligência **sem extensão,
 sem sessão anterior, sem cookie persistente e com cache apenas em
-memória** (`temis/tools/constatacao.py`, linhas 345–357). Não há
+memória** (ajustes `NoPersistentCookies` e `MemoryHttpCache`, em
+`temis/tools/constatacao.py`). Não há
 sincronização com conta alguma, nem reaproveitamento de credenciais do
 navegador do usuário.
 
@@ -148,8 +149,9 @@ sistema da própria PRF ou de órgão parceiro.
 | **O que é enviado** | o que o operador fizer: autenticação no sistema, consultas e parâmetros que ele mesmo preencher |
 | **Código** | `temis/tools/extracao.py` |
 
-O navegador tem a mesma configuração isolada da Constatação Web (linhas
-540–552): sem extensão, sem cookie persistente, cache em memória.
+O navegador tem a mesma configuração isolada da Constatação Web, pelos
+mesmos ajustes (`temis/tools/extracao.py`): sem extensão, sem cookie
+persistente, cache em memória.
 
 As credenciais que o operador usar são digitadas por ele no sistema de
 destino, como em qualquer navegador. **O Sistema Têmis não as armazena,
@@ -194,11 +196,20 @@ estação ou de órgão. Os cabeçalhos são fixos:
 | Modelos de fala | `unknown/None; hf_hub/<versão>; python/<versão>; origin/SistemaTemis` |
 
 O último é montado pela biblioteca de download e informa apenas as
-versões da própria biblioteca e do interpretador. A parcela final era,
-antes da versão 1.12.0, lida de variável de ambiente da estação — o que
-permitiria a uma variável qualquer injetar texto arbitrário num cabeçalho
-de saída. **Passou a ser fixa** (`temis/__main__.py`,
-`_calar_telemetria`).
+versões da própria biblioteca e do interpretador.
+
+**Ressalva quanto à parcela final (`origin/…`).** Até a versão 1.14.2,
+inclusive, ela é lida da variável de ambiente `HF_HUB_USER_AGENT_ORIGIN`
+da estação — de modo que uma variável de ambiente poderia fazer chegar
+texto arbitrário a esse cabeçalho. Não há envio de dado do usuário por
+esse caminho, e a variável não existe numa instalação comum do Windows;
+ainda assim, o valor deixou de depender do ambiente: passou a ser fixo
+em `SistemaTemis`, por alteração já incorporada ao código-fonte
+(`temis/__main__.py`, função `_calar_telemetria`), **que vigorará a
+partir da próxima versão publicada**.
+
+O cabeçalho só é emitido no download dos modelos de fala, descrito no
+item 3.2 — isto é, apenas quando o operador manda instalar a Degravação.
 
 Como em qualquer acesso à rede, o endereço IP da estação é visível ao
 servidor contatado. Isso é inerente ao protocolo e não decorre de
@@ -211,18 +222,32 @@ qualquer envio feito pelo sistema.
 **Não existe telemetria no Sistema Têmis.** Não há coleta de uso, de
 erro, de desempenho nem de qualquer outra natureza.
 
-Quanto às bibliotecas de terceiro, foi conferido no código que nenhuma
-envia telemetria no caminho utilizado pelo sistema. Ainda assim, por
-precaução e para que a afirmação não dependa de reexaminar cada versão
-nova das dependências, o programa **desliga explicitamente a telemetria
-na própria inicialização**, antes de qualquer outra coisa
-(`temis/__main__.py`, `_calar_telemetria`):
+Quanto às bibliotecas de terceiro, foi conferido no código-fonte que
+**nenhuma envia telemetria no caminho utilizado pelo sistema**:
+
+* a biblioteca de download de modelos (`huggingface_hub`) define a
+  função de telemetria mas não a invoca em nenhum ponto do seu próprio
+  código — apenas a expõe para quem queira usá-la, e o Sistema Têmis não
+  usa;
+* o baixador de vídeo (`yt-dlp`) só instancia o seu atualizador pela
+  interface de linha de comando, que o sistema não emprega.
+
+Ainda assim, por precaução e para que a afirmação não dependa de
+reexaminar o código de cada versão nova das dependências, o programa
+passa a **desligar explicitamente a telemetria na própria
+inicialização**, antes de qualquer outra coisa (`temis/__main__.py`,
+função `_calar_telemetria`):
 
 ```
 HF_HUB_DISABLE_TELEMETRY = 1
 DISABLE_TELEMETRY        = 1
 DO_NOT_TRACK             = 1
 ```
+
+**Esta medida está no código-fonte e vigorará a partir da próxima versão
+publicada.** Até a 1.14.2, inclusive, vale a conferência de código
+descrita acima — que é o que sustenta a afirmação, sendo as variáveis
+apenas reforço.
 
 ---
 
@@ -265,4 +290,4 @@ já tenham sido instalados.
 
 ---
 
-*Documento preparado em 16/10/2026, referente à versão 1.12.0.*
+*Documento preparado em 16/10/2026, referente à versão 1.14.2.*
