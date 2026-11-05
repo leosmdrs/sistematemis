@@ -250,100 +250,108 @@ class Monitor:
         return self.chave == "desktop"
 
 
-def _retangulos_fisicos() -> dict[str, tuple[int, int, int, int]]:
-    """Cada monitor, em pixels de verdade, pelo nome que o Windows lhe dá.
+def _enumerar_monitores(user32, ctypes, wintypes) -> dict:
+    """Retângulo de cada monitor, pelo nome do dispositivo, no contexto de
+    escala em que a thread estiver."""
 
-    O Qt não serve para isto. Ele devolve a posição de cada tela no
-    sistema do próprio monitor e o tamanho já dividido pela escala — um
-    monitor de 2880×1620 a 150% sai como 1920×1080 começando em −2880. O
-    FFmpeg entende outra coisa, e a região pedida caía fora da área que
-    ele enxerga: "Capture area extends outside window area", e a
-    gravação não começava. Perguntar ao Windows, com a thread declarada
-    ciente da escala de cada monitor, dá o retângulo em pixels físicos —
-    o mesmo sistema em que o FFmpeg passa a trabalhar (ver
-    `_ambiente_da_captura`).
+    class MONITORINFOEXW(ctypes.Structure):
+        _fields_ = [("cbSize", wintypes.DWORD),
+                    ("rcMonitor", wintypes.RECT),
+                    ("rcWork", wintypes.RECT),
+                    ("dwFlags", wintypes.DWORD),
+                    ("szDevice", wintypes.WCHAR * 32)]
 
-    Fora do Windows, ou se a consulta falhar, devolve vazio, e quem chama
-    faz a conta a partir do Qt.
+    user32.GetMonitorInfoW.argtypes = [wintypes.HMONITOR,
+                                       ctypes.POINTER(MONITORINFOEXW)]
+    user32.GetMonitorInfoW.restype = wintypes.BOOL
+    PROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HMONITOR,
+                              wintypes.HDC, ctypes.POINTER(wintypes.RECT),
+                              wintypes.LPARAM)
+    user32.EnumDisplayMonitors.argtypes = [wintypes.HDC, ctypes.c_void_p,
+                                           PROC, wintypes.LPARAM]
+    saida: dict[str, tuple[int, int, int, int]] = {}
+
+    def _um(hmon, _hdc, _rect, _dado):
+        info = MONITORINFOEXW()
+        info.cbSize = ctypes.sizeof(MONITORINFOEXW)
+        if user32.GetMonitorInfoW(hmon, ctypes.byref(info)):
+            r = info.rcMonitor
+            saida[info.szDevice] = (r.left, r.top,
+                                    r.right - r.left, r.bottom - r.top)
+        return True
+
+    user32.EnumDisplayMonitors(None, None, PROC(_um), 0)
+    return saida
+
+
+def _monitores_do_windows() -> list[tuple[str, tuple, tuple]]:
+    """Cada monitor como o Têmis o enxerga e como ele é, em pixels.
+
+    Devolve `(dispositivo, como_o_processo_ve, em_pixels_fisicos)`.
+
+    São dois sistemas de coordenadas, e confundi-los foi o defeito. O
+    FFmpeg declara, no manifesto do próprio executável, que é ciente da
+    escala de cada monitor: ele mede tudo em pixels físicos. O Têmis não —
+    o Windows lhe mostra os monitores escalados pela escala do principal.
+    Numa estação com o principal a 150% e um monitor de 1920×1080 a 100% à
+    esquerda, o FFmpeg vê esse monitor em (−1920, 6) e o Têmis, em
+    (−2880, 9). A região pedida caía fora da área do FFmpeg — "Capture
+    area extends outside window area" — e a gravação não começava.
+
+    A primeira leitura sai no contexto do processo, o mesmo em que o Qt
+    mede, e serve para achar qual monitor é cada tela. A segunda sai com a
+    thread declarada ciente da escala de cada monitor, e dá o retângulo
+    que o FFmpeg entende. O nome do dispositivo junta as duas.
+
+    Fora do Windows, ou se a consulta falhar, devolve vazio.
     """
     if sys.platform != "win32":
-        return {}
+        return []
     try:
         import ctypes
         from ctypes import wintypes
-
         user32 = ctypes.windll.user32
 
-        class MONITORINFOEXW(ctypes.Structure):
-            _fields_ = [("cbSize", wintypes.DWORD),
-                        ("rcMonitor", wintypes.RECT),
-                        ("rcWork", wintypes.RECT),
-                        ("dwFlags", wintypes.DWORD),
-                        ("szDevice", wintypes.WCHAR * 32)]
+        como_ve = _enumerar_monitores(user32, ctypes, wintypes)
 
+        mudar = getattr(user32, "SetThreadDpiAwarenessContext", None)
+        if mudar is None:
+            return []
+        mudar.restype = ctypes.c_void_p
+        mudar.argtypes = [ctypes.c_void_p]
         # DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = (HANDLE)-4. Só a
         # thread muda, e só durante a consulta.
-        anterior = None
-        mudar = getattr(user32, "SetThreadDpiAwarenessContext", None)
-        if mudar is not None:
-            mudar.restype = ctypes.c_void_p
-            mudar.argtypes = [ctypes.c_void_p]
-            anterior = mudar(ctypes.c_void_p(-4))
-
-        saida: dict[str, tuple[int, int, int, int]] = {}
-        PROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HMONITOR,
-                                  wintypes.HDC, ctypes.POINTER(wintypes.RECT),
-                                  wintypes.LPARAM)
-
-        def _um(hmon, _hdc, _rect, _dado):
-            info = MONITORINFOEXW()
-            info.cbSize = ctypes.sizeof(MONITORINFOEXW)
-            if user32.GetMonitorInfoW(hmon, ctypes.byref(info)):
-                r = info.rcMonitor
-                saida[info.szDevice] = (r.left, r.top,
-                                        r.right - r.left, r.bottom - r.top)
-            return True
-
+        anterior = mudar(ctypes.c_void_p(-4))
+        if not anterior:
+            return []
         try:
-            user32.EnumDisplayMonitors(None, None, PROC(_um), 0)
+            fisicos = _enumerar_monitores(user32, ctypes, wintypes)
         finally:
-            if mudar is not None and anterior:
-                mudar(ctypes.c_void_p(anterior))
-        return saida
+            mudar(ctypes.c_void_p(anterior))
+
+        return [(nome, como_ve[nome], fisicos[nome])
+                for nome in como_ve if nome in fisicos]
     except Exception:                                        # noqa: BLE001
-        return {}
+        return []
 
 
-def _ambiente_da_captura() -> dict[str, str]:
-    """O ambiente em que o FFmpeg captura a tela: ciente da escala.
+def _retangulo_da_tela(tela, do_windows: list) -> tuple[int, int, int, int]:
+    """Retângulo de uma QScreen em pixels físicos, os que o FFmpeg usa.
 
-    O FFmpeg não se declara ciente da escala de cada monitor, e o Windows
-    lhe mostra uma área de trabalho de faz de conta, com os monitores
-    escalados encolhidos. Com dois monitores de escalas diferentes, o
-    retângulo de um deles não existe nesse faz de conta — e a área
-    inteira sai com parte de uma tela cortada. A camada de
-    compatibilidade `HighDpiAware`, passada pela variável
-    `__COMPAT_LAYER` só a este processo, faz o Windows tratá-lo como
-    ciente da escala de cada monitor: ele passa a ver pixels físicos,
-    como `_retangulos_fisicos`. Nada é gravado no registro.
+    A tela é achada pela posição: o Qt guarda a origem de cada tela tal
+    como o processo a vê, e é essa a primeira leitura do Windows. O nome
+    serve de reserva — o Qt 6 nem sempre o dá no formato do Windows.
     """
-    amb = dict(os.environ)
-    if sys.platform == "win32":
-        camadas = amb.get("__COMPAT_LAYER", "").split()
-        if not any(c.lower() == "highdpiaware" for c in camadas):
-            camadas.append("HighDpiAware")
-        amb["__COMPAT_LAYER"] = " ".join(camadas)
-    return amb
-
-
-def _retangulo_da_tela(tela, fisicos: dict) -> tuple[int, int, int, int]:
-    """Retângulo de uma QScreen em pixels físicos."""
-    achado = fisicos.get(tela.name())
-    if achado:
-        return achado
-    # Sem o Windows para perguntar: o Qt guarda a origem de cada tela no
-    # sistema nativo e o tamanho dividido pela escala dela.
     g = tela.geometry()
+    for nome, (x, y, _l, _a), fisico in do_windows:
+        if (x, y) == (g.x(), g.y()):
+            return fisico
+    for nome, _ve, fisico in do_windows:
+        if nome == tela.name():
+            return fisico
+    # Sem o Windows para perguntar: a origem como o Qt a guarda e o
+    # tamanho devolvido à escala da tela. Vale quando todas as telas
+    # estão na mesma escala, que é o caso comum.
     escala = tela.devicePixelRatio() or 1.0
     return (g.x(), g.y(), round(g.width() * escala),
             round(g.height() * escala))
@@ -362,9 +370,9 @@ def monitores() -> list[Monitor]:
     saida = [Monitor("desktop", "Área de trabalho inteira (todos os monitores)")]
     try:
         from PyQt6.QtGui import QGuiApplication
-        fisicos = _retangulos_fisicos()
+        do_windows = _monitores_do_windows()
         for i, tela in enumerate(QGuiApplication.screens()):
-            x, y, largura, altura = _retangulo_da_tela(tela, fisicos)
+            x, y, largura, altura = _retangulo_da_tela(tela, do_windows)
             saida.append(Monitor(
                 f"monitor:{i}",
                 f"Monitor {i + 1} — {largura}×{altura}"
@@ -530,7 +538,13 @@ def _explicar_falha(erro: str, microfone: str = "") -> str:
         if so_com_microfone and not microfone:
             continue
         if marca.lower() in erro.lower():
-            return f"{explicacao}\n\nO codificador informou: {marca}"
+            # A linha inteira, e não só a marca: é nela que vêm as medidas
+            # (a região pedida, a área disponível) sem as quais não se
+            # sabe, de longe, o que de fato aconteceu.
+            linha = next((x.strip() for x in erro.splitlines()
+                          if marca.lower() in x.lower()), marca)
+            linha = re.sub(r"^\[[^\]]*\]\s*", "", linha)
+            return f"{explicacao}\n\nO codificador informou: {linha}"
     linhas = [x.strip() for x in erro.splitlines() if x.strip()]
     if linhas:
         return ("A gravação não começou. O codificador informou:\n\n"
@@ -1056,8 +1070,7 @@ class Gravador:
 
         self._processo = subprocess.Popen(
             self.comando(), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, creationflags=_SEM_JANELA,
-            env=_ambiente_da_captura())
+            stderr=subprocess.PIPE, creationflags=_SEM_JANELA)
         # Se o Têmis cair de repente, o Windows mata este FFmpeg junto —
         # sem isto, ele seguiria capturando a tela e o cursor piscaria.
         atar_ao_encerramento(self._processo)

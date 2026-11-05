@@ -395,13 +395,18 @@ primeiro, alterar depois.
 **`gdigrab` com dois monitores devolve dimensão ímpar**, e o libx264
 recusa. Daí o filtro de corte para dimensão par na Gravação de Tela.
 
-**`gdigrab` não é ciente da escala de cada monitor.** Com um monitor a
-150% ao lado de outro a 100%, a região que o Qt dá para um monitor (origem
-nativa, tamanho dividido pela escala) cai fora da área que o FFmpeg
-enxerga — "Capture area … extends outside window area" — e a gravação
-não começa. O FFmpeg roda com `__COMPAT_LAYER=HighDpiAware` (só no
-ambiente do processo filho) e as regiões vêm do Windows em pixels
-físicos (`_retangulos_fisicos`).
+**O FFmpeg e o Têmis medem a tela em sistemas diferentes.** O `ffmpeg.exe`
+da gyan.dev declara no manifesto `PerMonitorV2`: mede em pixels físicos.
+O Têmis enxerga os monitores escalados pela escala do principal. Com o
+principal a 150% e um 1920×1080 a 100% à esquerda, o FFmpeg vê esse
+monitor em (−1920, 6) e o Qt, em (−2880, 9) — e a região caía fora:
+"Capture area … extends outside window area". A 1.15.1 tentou resolver
+com `__COMPAT_LAYER=HighDpiAware` e casando a tela pelo nome; não
+resolveu (o FFmpeg já era ciente da escala, e o Qt 6 não dá o nome no
+formato do Windows). O que vale: `_monitores_do_windows()` lê os
+monitores duas vezes — no contexto do processo, para achar a tela pela
+posição, e com a thread em `PER_MONITOR_AWARE_V2`, para o retângulo que
+o FFmpeg entende.
 
 **Credencial colada no chat não se usa, nunca.** A release se publica
 pelo navegador, pelo link acima. Foi assim em todas as anteriores.
