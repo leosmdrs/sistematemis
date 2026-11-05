@@ -1,47 +1,19 @@
-ENCARREGADO DE IPS — a ferramenta sai do sistema
+GRAVAÇÃO DE TELA E EXTRAÇÃO REGISTRADA — monitores em escalas diferentes
 
-A ferramenta de montagem da Informação da Investigação Preliminar
-Sumária foi removida. O sistema passa de dezoito para dezessete
-ferramentas, dispostas em três fileiras de seis, seis e cinco.
+Em estações com dois monitores em escalas diferentes (por exemplo, um a
+100% e outro a 150%, em Configurações › Sistema › Tela), escolher um
+monitor para gravar impedia a diligência de começar. Aparecia a janela
+"Não foi possível gravar", com a mensagem "Capture area ... extends
+outside window area".
 
-Atenção, para não haver confusão: o que saiu foi a ferramenta. O **IPS
-como tipo de procedimento continua** — todos os termos do sistema seguem
-oferecendo IPS, PAD ou outro procedimento, e citando o número dos autos
-como sempre citaram. Nenhuma peça muda por causa disto.
+A causa era a forma de medir a tela: o sistema calculava a posição do
+monitor de um jeito e o codificador de vídeo, de outro, e a região pedida
+caía fora da área que o codificador enxergava.
 
+Agora as medidas dos monitores vêm do próprio Windows, em pixels reais,
+e o codificador passa a trabalhar nesse mesmo sistema. O nome de cada
+monitor na lista de escolha mostra o tamanho real da tela.
 
-RECONSTRUIR CONVERSA — a peça volta a ser legível na tela
-
-A conversa reconstruída e o termo apareciam escuros sobre fundo escuro,
-praticamente ilegíveis. A peça é escrita em tinta marinho, para papel, e
-estava sendo exibida sobre o fundo escuro do programa.
-
-Convém registrar o alcance do defeito, para quem tenha emitido peça
-neste intervalo: **o PDF e o HTML gravados sempre saíram corretos**. O
-problema era apenas de exibição, e nada do que foi produzido precisa ser
-refeito.
-
-Agora as duas telas mostram a peça sobre branco, como as demais
-ferramentas do sistema sempre fizeram.
-
-
-REDE — telemetria desligada expressamente, e cabeçalho que não depende
-da estação
-
-Duas medidas de reforço, no contexto da análise da DTIC para habilitação
-do sistema nas estações da PRF.
-
-• O programa passa a desligar expressamente, na própria inicialização, a
-  telemetria das bibliotecas de terceiro. Nenhuma delas a enviava no
-  caminho que o sistema usa — isto foi conferido no código —, mas assim
-  a garantia não depende de reexaminar cada versão nova das
-  dependências.
-
-• No download dos modelos de reconhecimento de fala, a identificação
-  enviada ao servidor deixa de ser lida de variável de ambiente da
-  estação e passa a ser fixa. Antes, uma variável de ambiente qualquer
-  podia fazer chegar texto arbitrário àquele cabeçalho.
-
-O repositório passou a trazer também o documento REDE.md, que relaciona
-todos os endereços acessados pelo sistema, por qual função, o que
-trafega em cada um e o que acontece se forem bloqueados.
+Se, ainda assim, a região não puder ser aberta, a mensagem explica em
+português o que fazer: escolher "Área de trabalho inteira" ou deixar os
+monitores na mesma escala.
