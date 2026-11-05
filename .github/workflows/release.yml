@@ -1,0 +1,89 @@
+# Publica a release a partir de uma execução do workflow "Instalador".
+#
+# Não compila nada: pega o instalador e o versao.json que aquela
+# execução produziu, confere que o SHA-256 do instalador é o que o
+# versao.json declara, e cria a release com a etiqueta apontando para o
+# commit que gerou o instalador — não para o topo do main.
+#
+# Publicar é o gesto que faz TODAS as estações receberem o aviso de
+# atualização (releases/latest/download/versao.json). Por isso é um
+# workflow à parte, disparado por uma pessoa, e não o fim da compilação.
+
+name: Publicar release
+
+on:
+  workflow_dispatch:
+    inputs:
+      execucao:
+        description: "Número da execução do workflow Instalador (o do endereço: .../actions/runs/NÚMERO)"
+        required: true
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ler a execução de origem
+        id: origem
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          dados=$(gh api "repos/${{ github.repository }}/actions/runs/${{ inputs.execucao }}")
+          nome=$(jq -r .name <<<"$dados")
+          conclusao=$(jq -r .conclusion <<<"$dados")
+          sha=$(jq -r .head_sha <<<"$dados")
+          [ "$nome" = "Instalador" ] || { echo "A execução ${{ inputs.execucao }} é de '$nome', não do Instalador."; exit 1; }
+          [ "$conclusao" = "success" ] || { echo "A execução ${{ inputs.execucao }} terminou em '$conclusao'."; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.execucao }}
+          github-token: ${{ github.token }}
+          path: artefato
+          merge-multiple: true
+
+      - name: Conferir e publicar
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.origem.outputs.sha }}
+        run: |
+          set -euo pipefail
+          cd artefato
+          ls -la
+          versao=$(jq -r .versao versao.json)
+          esperado=$(jq -r .sha256 versao.json)
+          instalador="SistemaTemis-${versao}-setup.exe"
+          obtido=$(sha256sum "$instalador" | cut -d' ' -f1)
+          [ "$obtido" = "$esperado" ] || { echo "SHA-256 não confere: versao.json declara $esperado, o arquivo tem $obtido"; exit 1; }
+
+          # A versão no código daquele commit tem de ser a do manifesto.
+          declarada=$(gh api "repos/${{ github.repository }}/contents/temis/__init__.py?ref=$SHA" --jq .content \
+                      | base64 -d | sed -n 's/^__version__ = "\(.*\)"/\1/p')
+          [ "$declarada" = "$versao" ] || { echo "O commit $SHA declara $declarada, e o manifesto $versao."; exit 1; }
+
+          if gh release view "v$versao" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "A release v$versao já existe. Nada foi alterado."; exit 1
+          fi
+
+          jq -r .notas versao.json > notas.md
+          gh release create "v$versao" "$instalador" versao.json \
+            --repo "${{ github.repository }}" \
+            --target "$SHA" \
+            --title "Sistema Têmis $versao" \
+            --notes-file notas.md \
+            --latest
+
+          {
+            echo "## Release v$versao publicada"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Commit | \`$SHA\` |"
+            echo "| Instalador | \`$instalador\` |"
+            echo "| SHA-256 | \`$obtido\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
