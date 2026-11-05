@@ -1,0 +1,149 @@
+# Compila o instalador do Sistema Têmis num Windows do GitHub.
+#
+# Faz o mesmo que `python build/publicar.py X.Y.Z --notas notas.txt` numa
+# máquina montada à mão, mas sem depender de que essa máquina exista: o
+# FFmpeg e o scrcpy são baixados das versões declaradas no TERCEIROS.md e
+# conferidos pelo SHA-256 antes de entrar no pacote.
+#
+# NÃO publica nada. O instalador e o versao.json ficam como anexo da
+# execução (aba Actions → a execução → Artifacts). Quem publica a release,
+# pelo navegador, continua sendo uma pessoa — quem pode escrever ali pode
+# instalar código em todas as estações (PUBLICACAO.md).
+#
+# Uso: Actions → "Instalador" → Run workflow → versão (ex.: 1.15.1). A
+# versão tem de ser a mesma que já está em temis/__init__.py no commit
+# escolhido; a execução recusa se não for, para que a etiqueta da release
+# aponte para o commit que de fato gerou o instalador.
+
+name: Instalador
+
+on:
+  workflow_dispatch:
+    inputs:
+      versao:
+        description: "Versão a compilar (ex.: 1.15.1) — igual à de temis/__init__.py"
+        required: true
+      critica:
+        description: "Marcar a atualização como importante"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: "1"
+  # Versões declaradas no TERCEIROS.md. Mudou a versão, muda o resumo.
+  FFMPEG_URL: https://github.com/GyanD/codexffmpeg/releases/download/9.0.1/ffmpeg-9.0.1-essentials_build.zip
+  FFMPEG_SHA256: fec81ae03971d9dd4be3ebe02e263bd2ec1d789483f931bdba5f5715e65da2e9
+  SCRCPY_URL: https://github.com/Genymobile/scrcpy/releases/download/v4.1/scrcpy-win64-v4.1.zip
+  SCRCPY_SHA256: 5b12172b3264b2889f4583ee64752ce832e29bc8b1089dca81093459697165db
+
+jobs:
+  compilar:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Conferir a versão declarada
+        run: |
+          $declarada = (Select-String -Path temis/__init__.py -Pattern '__version__ = "([^"]+)"').Matches[0].Groups[1].Value
+          if ($declarada -ne "${{ inputs.versao }}") {
+            throw "temis/__init__.py declara $declarada, e foi pedida a ${{ inputs.versao }}. Atualize a versão no código antes de compilar."
+          }
+          "Versão $declarada, commit $env:GITHUB_SHA"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+
+      - name: Baixar e conferir FFmpeg e scrcpy
+        run: |
+          function Baixar($url, $esperado, $arquivo) {
+            Invoke-WebRequest -Uri $url -OutFile $arquivo
+            $obtido = (Get-FileHash $arquivo -Algorithm SHA256).Hash.ToLower()
+            if ($obtido -ne $esperado) {
+              throw "$arquivo não confere: esperado $esperado, obtido $obtido"
+            }
+            "$arquivo confere ($obtido)"
+          }
+          Baixar $env:FFMPEG_URL $env:FFMPEG_SHA256 ffmpeg.zip
+          Baixar $env:SCRCPY_URL $env:SCRCPY_SHA256 scrcpy.zip
+
+          Expand-Archive ffmpeg.zip -DestinationPath _ffmpeg
+          New-Item -ItemType Directory -Force vendor/ffmpeg/bin | Out-Null
+          Copy-Item _ffmpeg/*/bin/ffmpeg.exe, _ffmpeg/*/bin/ffprobe.exe vendor/ffmpeg/bin/
+
+          Expand-Archive scrcpy.zip -DestinationPath _scrcpy
+          New-Item -ItemType Directory -Force vendor/scrcpy | Out-Null
+          Copy-Item _scrcpy/*/* vendor/scrcpy/
+          Get-ChildItem vendor -Recurse | Select-Object FullName, Length | Format-Table -AutoSize
+
+      - name: Garantir o Inno Setup
+        run: |
+          $iscc = @("C:\Program Files (x86)\Inno Setup 6\ISCC.exe", "C:\Program Files\Inno Setup 6\ISCC.exe") |
+                  Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) { choco install innosetup --no-progress -y }
+
+      - name: Compilar
+        run: |
+          $argumentos = @("build/publicar.py", "${{ inputs.versao }}", "--notas", "notas.txt")
+          if ("${{ inputs.critica }}" -eq "true") { $argumentos += "--critica" }
+          python @argumentos
+          if ($LASTEXITCODE -ne 0) { throw "publicar.py falhou ($LASTEXITCODE)" }
+          if (git status --porcelain -- temis build/installer.iss build/version_info.txt) {
+            throw "A compilação alterou arquivos de versão: o commit não estava pronto para a ${{ inputs.versao }}."
+          }
+
+      - name: Autoteste do pacote
+        # Informativo: o computador do GitHub não tem placa de som nem
+        # todos os recursos de uma estação, e alguma verificação pode
+        # falhar por isso. O relatório fica no resumo da execução.
+        continue-on-error: true
+        timeout-minutes: 10
+        run: |
+          $p = Start-Process dist/SistemaTemis/SistemaTemis.exe -ArgumentList "--autoteste" -PassThru
+          if (-not $p.WaitForExit(300000)) { Stop-Process $p -Force; throw "o autoteste não terminou em 5 minutos" }
+          $relatorio = Join-Path $env:LOCALAPPDATA "SistemaTemis/autoteste.txt"
+          if (Test-Path $relatorio) {
+            Get-Content $relatorio
+            "## Autoteste`n``````" + "`n" + (Get-Content $relatorio -Raw) + "``````" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          }
+          exit $p.ExitCode
+
+      - name: Resumo
+        run: |
+          $instalador = Get-Item "dist/SistemaTemis-${{ inputs.versao }}-setup.exe"
+          $hash = (Get-FileHash $instalador -Algorithm SHA256).Hash.ToLower()
+          $mb = [math]::Round($instalador.Length / 1MB, 1)
+          @"
+          ## Sistema Têmis ${{ inputs.versao }}
+
+          | | |
+          |---|---|
+          | Commit | ``$env:GITHUB_SHA`` |
+          | Instalador | ``$($instalador.Name)`` ($mb MB) |
+          | SHA-256 | ``$hash`` |
+
+          Para publicar: crie a release com a etiqueta ``v${{ inputs.versao }}``
+          apontando para o commit acima e anexe os dois arquivos do artefato.
+          "@ | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SistemaTemis-${{ inputs.versao }}
+          path: |
+            dist/SistemaTemis-${{ inputs.versao }}-setup.exe
+            dist/versao.json
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0

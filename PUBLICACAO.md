@@ -46,6 +46,24 @@ Ficam prontos dois arquivos em `dist/`:
 - `SistemaTemis-1.1.0-setup.exe`
 - `versao.json`
 
+### Sem uma máquina montada: compilar no GitHub
+
+O workflow **Instalador** (`.github/workflows/instalador.yml`) faz o mesmo
+que o `publicar.py` num Windows do próprio GitHub. Ele baixa o FFmpeg e o
+scrcpy das versões declaradas no `TERCEIROS.md` e confere cada um pelo
+SHA-256 antes de empacotar.
+
+1. Suba para o `main` o commit com a versão nova já escrita (o
+   `publicar.py` faz isso; ou edite os três arquivos) e o `notas.txt`.
+2. No GitHub: **Actions → Instalador → Run workflow**, informe a versão.
+   A execução recusa se ela não for a de `temis/__init__.py`.
+3. Ao fim (uns 30 a 50 minutos), baixe o artefato `SistemaTemis-X.Y.Z`:
+   traz o instalador e o `versao.json`. O resumo da execução mostra o
+   commit, o SHA-256 e o autoteste do pacote.
+
+O workflow **não publica nada**: a release continua sendo criada à mão,
+com a etiqueta apontando para o commit que o resumo informa.
+
 ---
 
 ## Publicar no GitHub
