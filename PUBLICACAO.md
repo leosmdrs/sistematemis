@@ -61,8 +61,17 @@ SHA-256 antes de empacotar.
    traz o instalador e o `versao.json`. O resumo da execução mostra o
    commit, o SHA-256 e o autoteste do pacote.
 
-O workflow **não publica nada**: a release continua sendo criada à mão,
-com a etiqueta apontando para o commit que o resumo informa.
+O workflow **não publica nada**. Para publicar, há dois caminhos:
+
+- à mão, pelo navegador, com a etiqueta apontando para o commit que o
+  resumo informa; ou
+- **Actions → Publicar release → Run workflow**, informando o número da
+  execução do Instalador (o do endereço `.../actions/runs/NÚMERO`). Ele
+  confere o SHA-256 do instalador contra o `versao.json`, confere a versão
+  no código daquele commit e cria a release `vX.Y.Z` apontando para ele,
+  com os dois anexos e as notas do manifesto.
+
+Publicar faz **todas** as estações receberem o aviso de atualização.
 
 ---
 
