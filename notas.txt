@@ -1,19 +1,18 @@
-GRAVAÇÃO DE TELA E EXTRAÇÃO REGISTRADA — monitores em escalas diferentes
+GRAVAÇÃO DE TELA E EXTRAÇÃO REGISTRADA — gravar o monitor que não é o principal
 
-Em estações com dois monitores em escalas diferentes (por exemplo, um a
-100% e outro a 150%, em Configurações › Sistema › Tela), escolher um
-monitor para gravar impedia a diligência de começar. Aparecia a janela
-"Não foi possível gravar", com a mensagem "Capture area ... extends
-outside window area".
+A 1.15.1 resolveu a gravação no monitor principal, mas o outro monitor
+continuava recusado quando os dois estavam em escalas diferentes (por
+exemplo, o principal a 150% e o outro a 100%). Aparecia a janela "Não foi
+possível gravar", dizendo que a região ficou fora da área que o Windows
+mostrou ao codificador.
 
-A causa era a forma de medir a tela: o sistema calculava a posição do
-monitor de um jeito e o codificador de vídeo, de outro, e a região pedida
-caía fora da área que o codificador enxergava.
+A causa era a mesma, num ponto que a correção anterior não alcançou: para
+saber onde fica cada monitor em pixels reais, o sistema procurava o
+monitor pelo nome, e o nome que chegava não era o que o Windows usa. Sem
+achar, voltava à conta antiga, que erra justamente no monitor de escala
+diferente da do principal. Agora o monitor é achado pela posição na tela,
+que não depende do nome.
 
-Agora as medidas dos monitores vêm do próprio Windows, em pixels reais,
-e o codificador passa a trabalhar nesse mesmo sistema. O nome de cada
-monitor na lista de escolha mostra o tamanho real da tela.
-
-Se, ainda assim, a região não puder ser aberta, a mensagem explica em
-português o que fazer: escolher "Área de trabalho inteira" ou deixar os
-monitores na mesma escala.
+Se a região ainda assim não puder ser aberta, a mensagem passa a trazer
+as medidas que o codificador informou, o que permite saber, de longe, o
+que aconteceu.

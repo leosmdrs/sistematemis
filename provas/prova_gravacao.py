@@ -285,13 +285,13 @@ class ACapturaDeTela(unittest.TestCase):
 
 
 class MonitoresEmEscalasDiferentes(unittest.TestCase):
-    """Um monitor a 150% ao lado de outro a 100% não pode barrar a gravação.
+    """Monitores em escalas diferentes não podem barrar a gravação.
 
-    O Qt dava a região com origem nativa e tamanho dividido pela escala;
-    o FFmpeg, sem se declarar ciente da escala, enxergava outra área de
-    trabalho. A região caía fora dela — "Capture area (-2880,9),(-960,1089)
-    extends outside window area (-1920,0),(1920,1086)" — e a diligência
-    não começava.
+    Estação real: principal de 1920×1080 a 150%; à esquerda, 1920×1080 a
+    100%. O FFmpeg, ciente da escala de cada monitor, via esse monitor em
+    (−1920, 6); o Têmis, só ciente da escala do principal, em (−2880, 9).
+    A região pedida caía fora — "Capture area (-2880,9),(-960,1089)
+    extends outside window area (-1920,0),(1920,1086)".
     """
 
     class _Tela:
@@ -310,37 +310,47 @@ class MonitoresEmEscalasDiferentes(unittest.TestCase):
         def devicePixelRatio(self):
             return self._escala
 
-    def test_sem_o_windows_o_tamanho_volta_a_pixels_fisicos(self):
-        tela = self._Tela("\\\\.\\DISPLAY2", -2880, 9, 1920, 1080, 1.5)
-        self.assertEqual(gc._retangulo_da_tela(tela, {}),
-                         (-2880, 9, 2880, 1620))
+    #: Como o Windows descreve a estação acima: (nome, como o Têmis vê,
+    #: em pixels físicos).
+    ESTACAO = [
+        ("\\\\.\\DISPLAY1", (0, 0, 2880, 1620), (0, 0, 1920, 1080)),
+        ("\\\\.\\DISPLAY2", (-2880, 9, 2880, 1620), (-1920, 6, 1920, 1080)),
+    ]
 
-    def test_o_que_o_windows_diz_prevalece(self):
-        tela = self._Tela("D2", -2880, 9, 1920, 1080, 1.5)
-        self.assertEqual(
-            gc._retangulo_da_tela(tela, {"D2": (-2880, 9, 2880, 1620)}),
-            (-2880, 9, 2880, 1620))
+    def test_a_tela_e_achada_pela_posicao_mesmo_com_outro_nome(self):
+        # O Qt 6 pode dar o nome comercial do monitor, e não o do Windows.
+        tela = self._Tela("DELL P2419H", -2880, 9, 1920, 1080, 1.5)
+        self.assertEqual(gc._retangulo_da_tela(tela, self.ESTACAO),
+                         (-1920, 6, 1920, 1080))
 
-    def test_o_codificador_captura_ciente_da_escala_no_windows(self):
+    def test_o_principal_fica_onde_estava(self):
+        tela = self._Tela("Integrado", 0, 0, 1920, 1080, 1.5)
+        self.assertEqual(gc._retangulo_da_tela(tela, self.ESTACAO),
+                         (0, 0, 1920, 1080))
+
+    def test_o_nome_serve_de_reserva(self):
+        tela = self._Tela("\\\\.\\DISPLAY2", 123, 456, 1920, 1080, 1.5)
+        self.assertEqual(gc._retangulo_da_tela(tela, self.ESTACAO),
+                         (-1920, 6, 1920, 1080))
+
+    def test_sem_o_windows_faz_a_conta_pelo_qt(self):
+        tela = self._Tela("X", 1920, 0, 1280, 720, 1.5)
+        self.assertEqual(gc._retangulo_da_tela(tela, []), (1920, 0, 1920, 1080))
+
+    def test_fora_do_windows_nao_consulta_nada(self):
         from unittest import mock
-        with mock.patch.object(gc.sys, "platform", "win32"), \
-                mock.patch.dict(gc.os.environ, {"__COMPAT_LAYER": "RunAsInvoker"}):
-            amb = gc._ambiente_da_captura()
-        self.assertEqual(amb["__COMPAT_LAYER"], "RunAsInvoker HighDpiAware")
+        with mock.patch.object(gc.sys, "platform", "linux"):
+            self.assertEqual(gc._monitores_do_windows(), [])
 
-    def test_a_camada_nao_se_repete(self):
-        from unittest import mock
-        with mock.patch.object(gc.sys, "platform", "win32"), \
-                mock.patch.dict(gc.os.environ, {"__COMPAT_LAYER": "highdpiaware"}):
-            amb = gc._ambiente_da_captura()
-        self.assertEqual(amb["__COMPAT_LAYER"], "highdpiaware")
-
-    def test_a_falha_e_explicada_em_portugues(self):
+    def test_a_falha_e_explicada_e_traz_as_medidas(self):
         erro = ("[in#0 @ 000001b9039a42c0] Capture area (-2880,9),(-960,1089) "
-                "extends outside window area (-1920,0),(1920,1086)")
+                "extends outside window area (-1920,0),(1920,1086)\n"
+                "Error opening input: I/O error")
         texto = gc._explicar_falha(erro)
         self.assertIn("escalas", texto)
         self.assertIn("Área de trabalho inteira", texto)
+        self.assertIn("(-2880,9),(-960,1089)", texto)
+        self.assertNotIn("000001b9039a42c0", texto)
 
 
 class AEscolhaDeMonitor(unittest.TestCase):
