@@ -50,12 +50,24 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Conferir a versão declarada
+        # Os três arquivos que declaram a versão têm de concordar com a
+        # pedida já no commit: o publicar.py os reescreveria, e o
+        # instalador sairia de um código diferente do que a etiqueta marca.
         run: |
-          $declarada = (Select-String -Path temis/__init__.py -Pattern '__version__ = "([^"]+)"').Matches[0].Groups[1].Value
-          if ($declarada -ne "${{ inputs.versao }}") {
-            throw "temis/__init__.py declara $declarada, e foi pedida a ${{ inputs.versao }}. Atualize a versão no código antes de compilar."
+          $v = "${{ inputs.versao }}"
+          $quadra = (($v -split '\.') + @("0", "0", "0"))[0..2] -join ", "
+          $conferencias = @(
+            @("temis/__init__.py",      "__version__ = `"$v`""),
+            @("build/installer.iss",    "#define AppVersion\s+`"$([regex]::Escape($v))`""),
+            @("build/version_info.txt", "filevers=\($([regex]::Escape($quadra)), 0\)"),
+            @("build/version_info.txt", "'ProductVersion', '$([regex]::Escape($v)).0'")
+          )
+          foreach ($c in $conferencias) {
+            if (-not (Select-String -Path $c[0] -Pattern $c[1] -Quiet)) {
+              throw "$($c[0]) não declara a versão $v. Rode o publicar.py (ou atualize os três arquivos) e suba o commit antes de compilar."
+            }
           }
-          "Versão $declarada, commit $env:GITHUB_SHA"
+          "Versão $v nos três arquivos, commit $env:GITHUB_SHA"
 
       - uses: actions/setup-python@v5
         with:
@@ -100,9 +112,6 @@ jobs:
           if ("${{ inputs.critica }}" -eq "true") { $argumentos += "--critica" }
           python @argumentos
           if ($LASTEXITCODE -ne 0) { throw "publicar.py falhou ($LASTEXITCODE)" }
-          if (git status --porcelain -- temis build/installer.iss build/version_info.txt) {
-            throw "A compilação alterou arquivos de versão: o commit não estava pronto para a ${{ inputs.versao }}."
-          }
 
       - name: Autoteste do pacote
         # Informativo: o computador do GitHub não tem placa de som nem
