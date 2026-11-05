@@ -250,24 +250,127 @@ class Monitor:
         return self.chave == "desktop"
 
 
+def _retangulos_fisicos() -> dict[str, tuple[int, int, int, int]]:
+    """Cada monitor, em pixels de verdade, pelo nome que o Windows lhe dá.
+
+    O Qt não serve para isto. Ele devolve a posição de cada tela no
+    sistema do próprio monitor e o tamanho já dividido pela escala — um
+    monitor de 2880×1620 a 150% sai como 1920×1080 começando em −2880. O
+    FFmpeg entende outra coisa, e a região pedida caía fora da área que
+    ele enxerga: "Capture area extends outside window area", e a
+    gravação não começava. Perguntar ao Windows, com a thread declarada
+    ciente da escala de cada monitor, dá o retângulo em pixels físicos —
+    o mesmo sistema em que o FFmpeg passa a trabalhar (ver
+    `_ambiente_da_captura`).
+
+    Fora do Windows, ou se a consulta falhar, devolve vazio, e quem chama
+    faz a conta a partir do Qt.
+    """
+    if sys.platform != "win32":
+        return {}
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        user32 = ctypes.windll.user32
+
+        class MONITORINFOEXW(ctypes.Structure):
+            _fields_ = [("cbSize", wintypes.DWORD),
+                        ("rcMonitor", wintypes.RECT),
+                        ("rcWork", wintypes.RECT),
+                        ("dwFlags", wintypes.DWORD),
+                        ("szDevice", wintypes.WCHAR * 32)]
+
+        # DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = (HANDLE)-4. Só a
+        # thread muda, e só durante a consulta.
+        anterior = None
+        mudar = getattr(user32, "SetThreadDpiAwarenessContext", None)
+        if mudar is not None:
+            mudar.restype = ctypes.c_void_p
+            mudar.argtypes = [ctypes.c_void_p]
+            anterior = mudar(ctypes.c_void_p(-4))
+
+        saida: dict[str, tuple[int, int, int, int]] = {}
+        PROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HMONITOR,
+                                  wintypes.HDC, ctypes.POINTER(wintypes.RECT),
+                                  wintypes.LPARAM)
+
+        def _um(hmon, _hdc, _rect, _dado):
+            info = MONITORINFOEXW()
+            info.cbSize = ctypes.sizeof(MONITORINFOEXW)
+            if user32.GetMonitorInfoW(hmon, ctypes.byref(info)):
+                r = info.rcMonitor
+                saida[info.szDevice] = (r.left, r.top,
+                                        r.right - r.left, r.bottom - r.top)
+            return True
+
+        try:
+            user32.EnumDisplayMonitors(None, None, PROC(_um), 0)
+        finally:
+            if mudar is not None and anterior:
+                mudar(ctypes.c_void_p(anterior))
+        return saida
+    except Exception:                                        # noqa: BLE001
+        return {}
+
+
+def _ambiente_da_captura() -> dict[str, str]:
+    """O ambiente em que o FFmpeg captura a tela: ciente da escala.
+
+    O FFmpeg não se declara ciente da escala de cada monitor, e o Windows
+    lhe mostra uma área de trabalho de faz de conta, com os monitores
+    escalados encolhidos. Com dois monitores de escalas diferentes, o
+    retângulo de um deles não existe nesse faz de conta — e a área
+    inteira sai com parte de uma tela cortada. A camada de
+    compatibilidade `HighDpiAware`, passada pela variável
+    `__COMPAT_LAYER` só a este processo, faz o Windows tratá-lo como
+    ciente da escala de cada monitor: ele passa a ver pixels físicos,
+    como `_retangulos_fisicos`. Nada é gravado no registro.
+    """
+    amb = dict(os.environ)
+    if sys.platform == "win32":
+        camadas = amb.get("__COMPAT_LAYER", "").split()
+        if not any(c.lower() == "highdpiaware" for c in camadas):
+            camadas.append("HighDpiAware")
+        amb["__COMPAT_LAYER"] = " ".join(camadas)
+    return amb
+
+
+def _retangulo_da_tela(tela, fisicos: dict) -> tuple[int, int, int, int]:
+    """Retângulo de uma QScreen em pixels físicos."""
+    achado = fisicos.get(tela.name())
+    if achado:
+        return achado
+    # Sem o Windows para perguntar: o Qt guarda a origem de cada tela no
+    # sistema nativo e o tamanho dividido pela escala dela.
+    g = tela.geometry()
+    escala = tela.devicePixelRatio() or 1.0
+    return (g.x(), g.y(), round(g.width() * escala),
+            round(g.height() * escala))
+
+
 def monitores() -> list[Monitor]:
     """Área de trabalho inteira e cada monitor separadamente.
 
     A área inteira é a primeira opção de propósito: gravar só um monitor
     deixa de fora o que estava no outro, e é exatamente isso que se
     alegaria depois.
+
+    As medidas são em pixels físicos — as mesmas que o FFmpeg usa ao
+    recortar a região, e as mesmas que o vídeo terá.
     """
     saida = [Monitor("desktop", "Área de trabalho inteira (todos os monitores)")]
     try:
         from PyQt6.QtGui import QGuiApplication
+        fisicos = _retangulos_fisicos()
         for i, tela in enumerate(QGuiApplication.screens()):
-            g = tela.geometry()
+            x, y, largura, altura = _retangulo_da_tela(tela, fisicos)
             saida.append(Monitor(
                 f"monitor:{i}",
-                f"Monitor {i + 1} — {g.width()}×{g.height()}"
+                f"Monitor {i + 1} — {largura}×{altura}"
                 + ("  (principal)"
                    if tela is QGuiApplication.primaryScreen() else ""),
-                g.x(), g.y(), g.width(), g.height()))
+                x, y, largura, altura))
     except Exception:                                        # noqa: BLE001
         pass
     return saida
@@ -403,6 +506,12 @@ _FALHAS = (
     ("I/O error",
      "O microfone escolhido não pôde ser aberto. Ele pode estar em uso "
      "por outro programa.", True),
+    ("extends outside window area",
+     "A região do monitor escolhido ficou fora da área que o Windows "
+     "mostrou ao codificador. Costuma acontecer com monitores em escalas "
+     "diferentes (por exemplo, um a 100% e outro a 150%). Escolha "
+     "“Área de trabalho inteira” ou deixe os monitores na mesma escala "
+     "em Configurações › Sistema › Tela, e tente de novo.", False),
     ("Permission denied",
      "O sistema não deixou gravar no arquivo de destino.", False),
     ("No such file or directory",
@@ -947,7 +1056,8 @@ class Gravador:
 
         self._processo = subprocess.Popen(
             self.comando(), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, creationflags=_SEM_JANELA)
+            stderr=subprocess.PIPE, creationflags=_SEM_JANELA,
+            env=_ambiente_da_captura())
         # Se o Têmis cair de repente, o Windows mata este FFmpeg junto —
         # sem isto, ele seguiria capturando a tela e o cursor piscaria.
         atar_ao_encerramento(self._processo)

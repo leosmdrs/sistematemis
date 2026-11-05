@@ -284,6 +284,65 @@ class ACapturaDeTela(unittest.TestCase):
         self.assertNotIn("Capturas de tela", texto)
 
 
+class MonitoresEmEscalasDiferentes(unittest.TestCase):
+    """Um monitor a 150% ao lado de outro a 100% não pode barrar a gravação.
+
+    O Qt dava a região com origem nativa e tamanho dividido pela escala;
+    o FFmpeg, sem se declarar ciente da escala, enxergava outra área de
+    trabalho. A região caía fora dela — "Capture area (-2880,9),(-960,1089)
+    extends outside window area (-1920,0),(1920,1086)" — e a diligência
+    não começava.
+    """
+
+    class _Tela:
+        def __init__(self, nome, x, y, w, h, escala):
+            self._nome, self._g, self._escala = nome, (x, y, w, h), escala
+
+        def name(self):
+            return self._nome
+
+        def geometry(self):
+            from types import SimpleNamespace
+            x, y, w, h = self._g
+            return SimpleNamespace(x=lambda: x, y=lambda: y,
+                                   width=lambda: w, height=lambda: h)
+
+        def devicePixelRatio(self):
+            return self._escala
+
+    def test_sem_o_windows_o_tamanho_volta_a_pixels_fisicos(self):
+        tela = self._Tela("\\\\.\\DISPLAY2", -2880, 9, 1920, 1080, 1.5)
+        self.assertEqual(gc._retangulo_da_tela(tela, {}),
+                         (-2880, 9, 2880, 1620))
+
+    def test_o_que_o_windows_diz_prevalece(self):
+        tela = self._Tela("D2", -2880, 9, 1920, 1080, 1.5)
+        self.assertEqual(
+            gc._retangulo_da_tela(tela, {"D2": (-2880, 9, 2880, 1620)}),
+            (-2880, 9, 2880, 1620))
+
+    def test_o_codificador_captura_ciente_da_escala_no_windows(self):
+        from unittest import mock
+        with mock.patch.object(gc.sys, "platform", "win32"), \
+                mock.patch.dict(gc.os.environ, {"__COMPAT_LAYER": "RunAsInvoker"}):
+            amb = gc._ambiente_da_captura()
+        self.assertEqual(amb["__COMPAT_LAYER"], "RunAsInvoker HighDpiAware")
+
+    def test_a_camada_nao_se_repete(self):
+        from unittest import mock
+        with mock.patch.object(gc.sys, "platform", "win32"), \
+                mock.patch.dict(gc.os.environ, {"__COMPAT_LAYER": "highdpiaware"}):
+            amb = gc._ambiente_da_captura()
+        self.assertEqual(amb["__COMPAT_LAYER"], "highdpiaware")
+
+    def test_a_falha_e_explicada_em_portugues(self):
+        erro = ("[in#0 @ 000001b9039a42c0] Capture area (-2880,9),(-960,1089) "
+                "extends outside window area (-1920,0),(1920,1086)")
+        texto = gc._explicar_falha(erro)
+        self.assertIn("escalas", texto)
+        self.assertIn("Área de trabalho inteira", texto)
+
+
 class AEscolhaDeMonitor(unittest.TestCase):
     """Gravar um monitor, e não os dois — o que se pediu na Extração."""
 
