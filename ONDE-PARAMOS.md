@@ -395,6 +395,14 @@ primeiro, alterar depois.
 **`gdigrab` com dois monitores devolve dimensão ímpar**, e o libx264
 recusa. Daí o filtro de corte para dimensão par na Gravação de Tela.
 
+**`gdigrab` não é ciente da escala de cada monitor.** Com um monitor a
+150% ao lado de outro a 100%, a região que o Qt dá para um monitor (origem
+nativa, tamanho dividido pela escala) cai fora da área que o FFmpeg
+enxerga — "Capture area … extends outside window area" — e a gravação
+não começa. O FFmpeg roda com `__COMPAT_LAYER=HighDpiAware` (só no
+ambiente do processo filho) e as regiões vêm do Windows em pixels
+físicos (`_retangulos_fisicos`).
+
 **Credencial colada no chat não se usa, nunca.** A release se publica
 pelo navegador, pelo link acima. Foi assim em todas as anteriores.
 
