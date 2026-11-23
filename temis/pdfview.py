@@ -35,6 +35,19 @@ MARGEM_RENDER = 1
 ESPACO = 18
 
 
+#: Quantos pixels uma página pode ter na tela. Uma folha A0 a 400% de
+#: zoom fica aquém disto; o que passa é arquivo defeituoso ou feito para
+#: isso — um PDF de 522 bytes que declara uma folha de quilômetros pedia
+#: 593 MiB de imagem por página, e 9,5 GB no zoom máximo.
+TETO_PIXELS = 40_000_000
+
+
+def escala_segura(largura_pt: float, altura_pt: float, zoom: float) -> float:
+    """O zoom pedido, ou o maior que cabe no teto de pixels da página."""
+    area = max(1.0, largura_pt * altura_pt)
+    return min(zoom, (TETO_PIXELS / area) ** 0.5)
+
+
 class PaginaPDF(QLabel):
     """Uma página do documento, base para as sobreposições das ferramentas."""
 
@@ -160,7 +173,9 @@ class VisorPDFContinuo(QScrollArea):
         for i in range(len(doc)):
             pagina = self._fabrica(i)
             r = doc[i].rect
-            pagina.definir_medidas(r.width, r.height, self._zoom)
+            pagina.definir_medidas(
+                r.width, r.height,
+                escala_segura(r.width, r.height, self._zoom))
             self._pilha.addWidget(pagina, 0, Qt.AlignmentFlag.AlignHCenter)
             self._paginas.append(pagina)
         self._vazio.setVisible(False)
@@ -249,7 +264,9 @@ class VisorPDFContinuo(QScrollArea):
 
         self._zoom = z
         for p in self._paginas:
-            p.definir_medidas(p.largura_pt, p.altura_pt, z)
+            p.definir_medidas(
+                p.largura_pt, p.altura_pt,
+                escala_segura(p.largura_pt, p.altura_pt, z))
             p.liberar()
 
         self._suporte.adjustSize()
@@ -349,8 +366,11 @@ class VisorPDFContinuo(QScrollArea):
     def _render(self, indice: int):
         pagina = self._paginas[indice]
         try:
+            # Na escala da própria página, que é a do zoom salvo quando
+            # a folha é grande demais para ele. É a mesma escala que a
+            # página usa para converter o mouse em posição no papel.
             pix = self._doc[indice].get_pixmap(
-                matrix=fitz.Matrix(self._zoom, self._zoom), alpha=False)
+                matrix=fitz.Matrix(pagina.escala, pagina.escala), alpha=False)
         except Exception:
             return
         pagina.definir_imagem(

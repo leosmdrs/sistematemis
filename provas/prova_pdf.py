@@ -555,5 +555,46 @@ class ARessalvaSegueAConferencia(unittest.TestCase):
             self.assertIn("anotações", texto)
 
 
+class OVisorNaoDesenhaPaginaDescomunal(unittest.TestCase):
+    """O tamanho da folha é o arquivo quem declara."""
+
+    def test_folha_gigante_e_desenhada_abaixo_do_teto(self):
+        from temis import pdfview
+        doc = fitz.open()
+        doc.new_page(width=14000, height=14000)      # quase 5 m de lado
+        pagina = doc[0]
+        escala = pdfview.escala_segura(pagina.rect.width, pagina.rect.height,
+                                       4.0)
+        pix = pagina.get_pixmap(matrix=fitz.Matrix(escala, escala))
+        self.assertLessEqual(pix.width * pix.height,
+                             pdfview.TETO_PIXELS * 1.01)
+        doc.close()
+
+    def test_folha_comum_mantem_o_zoom_pedido(self):
+        from temis import pdfview
+        for zoom in (0.5, 1.0, 2.0, 4.0):
+            self.assertEqual(pdfview.escala_segura(595, 842, zoom), zoom)
+
+    def test_o_visor_abre_o_documento_de_folha_gigante(self):
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PyQt6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+        from temis import pdfview
+        doc = fitz.open()
+        doc.new_page(width=14000, height=14000)
+        visor = pdfview.VisorPDFContinuo()
+        self.addCleanup(visor.deleteLater)
+        visor.carregar(doc)
+        visor.definir_zoom(4.0)
+        pagina = visor._paginas[0]
+        self.assertLessEqual(pagina.width() * pagina.height(),
+                             pdfview.TETO_PIXELS * 1.01)
+        visor._render(0)
+        self.assertTrue(pagina.pronta())
+        visor.carregar(None)
+        doc.close()
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
