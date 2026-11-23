@@ -1506,34 +1506,118 @@ def reproduzir(analise: Analise, esperado: str,
 #  GRAVAÇÃO DO RESULTADO
 # ─────────────────────────────────────────
 
-def gravar(t: Tabela, caminho) -> None:
+#: Com o que começa o texto que um programa de planilha lê como fórmula.
+_INICIO_DE_FORMULA = ("=", "+", "-", "@")
+_NUMERO_COM_SINAL = re.compile(r"[+-]\d+(?:[.,]\d+)*")
+
+
+def parece_formula(v) -> bool:
+    """Texto que, aberto num programa de planilha, seria executado.
+
+    A célula de uma planilha recebida é dado de terceiro. Um texto
+    `=HYPERLINK(...)` ou `=1+1`, gravado como veio, deixa de ser texto no
+    arquivo de resultado: o programa que o abrir calcula, e mostra coisa
+    diferente da que foi analisada. Número escrito com sinal (`-12,50`)
+    fica de fora — é lido como o mesmo número.
+    """
+    if not isinstance(v, str) or not v.startswith(_INICIO_DE_FORMULA):
+        return False
+    return not _NUMERO_COM_SINAL.fullmatch(v)
+
+
+def contar_formulas(t: Tabela) -> int:
+    """Quantas células do resultado seriam lidas como fórmula."""
+    return sum(1 for linha in t.linhas for c in linha if parece_formula(c))
+
+
+def gravar(t: Tabela, caminho) -> int:
     """Grava o resultado. Formato pela extensão do nome escolhido.
 
     Os valores vão como estão — data como data, número como número,
     texto como texto. Converter tudo em texto na saída faria o arquivo
     entregue diferir do que foi analisado, e o resumo dos dados deixaria
     de servir para conferir o que está nos autos.
+
+    Texto continuar texto inclui o que começa por `=`: em XLSX ele é
+    gravado com o tipo texto, sem tocar no conteúdo. Em CSV não existe
+    tipo, e o único meio é o apóstrofo na frente — que altera o que está
+    no arquivo, e por isso o termo o declara. Devolve quantas células
+    passaram por isso.
     """
     caminho = str(caminho)
+    quantas = 0
     if Path(caminho).suffix.lower() in (".csv", ".txt"):
+        def celula(c):
+            nonlocal quantas
+            escrito = texto(c)
+            if parece_formula(c):
+                quantas += 1
+                return "'" + escrito
+            return escrito
+
         # Ponto-e-vírgula e BOM: é o que o Excel em português abre em
         # colunas e com acento certo, sem assistente de importação.
         with open(caminho, "w", encoding="utf-8-sig", newline="") as f:
             w = csv.writer(f, delimiter=";")
             w.writerow(t.colunas)
-            w.writerows([texto(c) for c in l] for l in t.linhas)
-        return
+            w.writerows([celula(c) for c in l] for l in t.linhas)
+        return quantas
     from openpyxl import Workbook
+    from openpyxl.cell import WriteOnlyCell
 
     # `write_only` grava a linha e a esquece, em vez de manter a planilha
     # inteira em memória: é a diferença entre gravar cem mil linhas em
     # segundos ou em minuto e meio.
     livro = Workbook(write_only=True)
     folha = livro.create_sheet("Resultado")
-    folha.append(list(t.colunas))
+
+    def celula(c):
+        nonlocal quantas
+        if c == VAZIO:
+            return None
+        # A biblioteca grava como fórmula toda cadeia iniciada por `=`,
+        # a menos que a célula diga que é texto. Vale também para o
+        # nome de coluna, que vem do arquivo de terceiro.
+        if isinstance(c, str) and c.startswith("="):
+            quantas += 1
+            escrita = WriteOnlyCell(folha, value=c)
+            escrita.data_type = "s"
+            return escrita
+        return c
+
+    folha.append([celula(c) for c in t.colunas])
+    quantas = 0                      # o cabeçalho não entra na contagem
     for linha in t.linhas:
-        folha.append([c if c != VAZIO else None for c in linha])
+        folha.append([celula(c) for c in linha])
     livro.save(caminho)
+    return quantas
+
+
+def ressalva_formulas(t: Tabela, saida) -> tuple:
+    """O que o termo diz quando o resultado tem texto com cara de fórmula.
+
+    Só aparece quando há o que declarar. Em CSV a declaração é devida: o
+    arquivo entregue traz um apóstrofo que o dado analisado não tinha.
+    """
+    if Path(str(saida)).suffix.lower() in (".csv", ".txt"):
+        quantas = contar_formulas(t)
+        if not quantas:
+            return ()
+        return (
+            f"{quantas} célula(s) do resultado trazem texto iniciado por "
+            "=, +, - ou @, que um programa de planilha executaria como "
+            "fórmula. No arquivo gravado em CSV esse texto vai precedido "
+            "de um apóstrofo, para ser lido como texto. O apóstrofo não "
+            "integra o dado analisado: o resumo do conteúdo, acima, é "
+            "calculado sem ele.",)
+    quantas = sum(1 for linha in t.linhas for c in linha
+                  if isinstance(c, str) and c.startswith("="))
+    if not quantas:
+        return ()
+    return (
+        f"{quantas} célula(s) do resultado trazem texto iniciado por =. "
+        "No arquivo gravado elas constam como texto, com o conteúdo "
+        "inalterado, e não como fórmula.",)
 
 
 def salvar_roteiro(analise: Analise, caminho) -> None:
@@ -1781,7 +1865,7 @@ def montar_termo(analise: Analise, resultado: Tabela, passos: list,
         titulo="Termo de Análise de Planilha",
         operacao="exame analítico",
         ressalvas=RESSALVAS + ((RESSALVA_CRUZAMENTO,) if auxiliares
-                               else ()),
+                               else ()) + ressalva_formulas(resultado, saida),
         motores=("planilha",),
         itens=[item],
         passos=list(passos),

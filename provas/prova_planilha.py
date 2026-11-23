@@ -8,6 +8,7 @@ transforma a análise inteira em papel.
 """
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -407,6 +408,78 @@ class CruzarComOutraPlanilha(unittest.TestCase):
         # A mesma planilha duas vezes conta uma só: a peça relaciona
         # arquivos, não passos.
         self.assertEqual(pc.arquivos_auxiliares(analise), [str(self.direita)])
+
+
+class TextoComCaraDeFormulaContinuaTexto(unittest.TestCase):
+    """A célula de uma planilha recebida é dado de terceiro.
+
+    Um `=1+1` gravado como veio vira fórmula no arquivo de resultado: o
+    programa que o abrir mostra `2`, e não o que foi analisado — e um
+    `=HYPERLINK(...)` vira elo clicável na peça. O princípio da
+    ferramenta é texto continuar texto.
+    """
+
+    PERIGOSOS = ["=1+1", '=HYPERLINK("http://exemplo.test";"clique")',
+                 "@SUM(A1)", "+cmd|' /C calc'!A0", "-2+3"]
+    INOFENSIVOS = ["-12,50", "+55", "texto = comum", "a@b.gov.br"]
+
+    def setUp(self):
+        self.pasta = tempfile.TemporaryDirectory()
+        self.addCleanup(self.pasta.cleanup)
+        self.tabela = pc.Tabela(
+            colunas=("Dado",),
+            linhas=[(v,) for v in self.PERIGOSOS + self.INOFENSIVOS])
+
+    def test_no_xlsx_nenhuma_celula_e_gravada_como_formula(self):
+        from openpyxl import load_workbook
+        saida = Path(self.pasta.name) / "r.xlsx"
+        pc.gravar(self.tabela, saida)
+        folha = load_workbook(saida).active
+        lidas = [c for (c,) in folha.iter_rows(min_row=2)]
+        self.assertEqual([c.value for c in lidas],
+                         self.PERIGOSOS + self.INOFENSIVOS)
+        for c in lidas:
+            self.assertNotEqual(c.data_type, "f", c.value)
+
+    def test_o_xlsx_relido_tem_o_mesmo_resumo(self):
+        saida = Path(self.pasta.name) / "r.xlsx"
+        pc.gravar(self.tabela, saida)
+        self.assertEqual(pc.carregar(str(saida)).resumo(),
+                         self.tabela.resumo())
+
+    def test_nome_de_coluna_tambem_nao_vira_formula(self):
+        from openpyxl import load_workbook
+        saida = Path(self.pasta.name) / "c.xlsx"
+        pc.gravar(pc.Tabela(colunas=("=1+1",), linhas=[("a",)]), saida)
+        celula = load_workbook(saida).active["A1"]
+        self.assertEqual(celula.value, "=1+1")
+        self.assertNotEqual(celula.data_type, "f")
+
+    def test_no_csv_o_perigoso_vai_com_apostrofo_e_o_resto_intacto(self):
+        import csv
+        saida = Path(self.pasta.name) / "r.csv"
+        quantas = pc.gravar(self.tabela, saida)
+        with open(saida, encoding="utf-8-sig", newline="") as f:
+            lidas = [l[0] for l in csv.reader(f, delimiter=";")][1:]
+        self.assertEqual(lidas, ["'" + v for v in self.PERIGOSOS]
+                         + self.INOFENSIVOS)
+        self.assertEqual(quantas, len(self.PERIGOSOS))
+
+    def test_o_termo_declara_o_apostrofo_do_csv(self):
+        analise = pc.Analise(origem=str(Path(self.pasta.name) / "o.xlsx"),
+                             operacoes=[])
+        pc.gravar(self.tabela, analise.origem)
+        saida = Path(self.pasta.name) / "r.csv"
+        pc.gravar(self.tabela, saida)
+        termo = pc.montar_termo(analise, self.tabela, [], str(saida))
+        texto = " ".join(termo.ressalvas)
+        self.assertIn("apóstrofo", texto)
+        self.assertIn(f"{len(self.PERIGOSOS)} célula(s)", texto)
+
+    def test_sem_texto_perigoso_o_termo_nao_ganha_ressalva(self):
+        limpa = pc.Tabela(colunas=("Dado",), linhas=[("a",), ("-1",)])
+        self.assertEqual(pc.ressalva_formulas(limpa, "r.csv"), ())
+        self.assertEqual(pc.ressalva_formulas(limpa, "r.xlsx"), ())
 
 
 if __name__ == "__main__":
