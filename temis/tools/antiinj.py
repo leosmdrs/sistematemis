@@ -411,6 +411,9 @@ class AntiInjectionTool(ToolPage):
 
         self._doc: fitz.Document | None = None
         self._path = ""
+        #: Caminho do arquivo cuja análise terminou bem. É o que autoriza
+        #: o relatório — e não o simples fato de haver documento aberto.
+        self._analisado = ""
         self._escolhido: core.Finding | None = None
         self._mode = "Normal"
         self._findings: list[core.Finding] = []
@@ -580,18 +583,57 @@ class AntiInjectionTool(ToolPage):
             self, "Abrir PDF", "", "Arquivos PDF (*.pdf)")
         if not path:
             return
+        # O relatório é do documento analisado, e de nenhum outro. Ao
+        # trocar de arquivo ele se desliga, e só volta ao fim de uma
+        # análise bem-sucedida **deste** arquivo. Ficando ligado, saía
+        # com o nome do arquivo novo e a frase de que nada foi
+        # encontrado — sobre um documento que a ferramenta nem leu.
+        self._sem_analise()
         try:
             if self._doc:
+                # O visor ainda aponta para o documento que vai fechar.
+                self._visor.carregar(None)
                 self._doc.close()
-            self._doc = fitz.open(path)
+            self._doc = None
+            doc = fitz.open(path)
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Não foi possível abrir o PDF:\n{e}")
             return
+        if doc.needs_pass:
+            doc.close()
+            self._lbl_file.setText(Path(path).name)
+            self._marcar_nao_analisado(
+                "Documento protegido por senha — não foi analisado.")
+            QMessageBox.warning(
+                self, "Documento protegido por senha",
+                "Este PDF exige senha de abertura, e o conteúdo dele não "
+                "pôde ser lido.\n\nNenhuma análise foi feita, e nenhum "
+                "relatório é emitido: a ferramenta não tem o que afirmar "
+                "sobre um documento que não leu.")
+            return
 
+        self._doc = doc
         self._path = path
-        self._findings = []
         self._lbl_file.setText(Path(path).name)
         self._analyze()
+
+    def _sem_analise(self):
+        """Volta ao estado de quem ainda não analisou nada."""
+        self._findings = []
+        self._analisado = ""
+        self._btn_report.setEnabled(False)
+
+    def _marcar_nao_analisado(self, motivo: str):
+        """Mostra, no lugar dos achados, que não há conclusão alguma."""
+        self._sem_analise()
+        self._list.clear()
+        self._lbl_count.setText("—")
+        self._lbl_breakdown.setText(
+            f"<span style='color:{PALETTE['danger']}'>{motivo}</span>")
+        item = QListWidgetItem("  " + motivo)
+        item.setForeground(QColor(PALETTE["text3"]))
+        self._list.addItem(item)
+        self.status_msg.emit(motivo)
 
     def _analyze(self):
         progress = QProgressDialog("Analisando páginas…", None, 0,
@@ -601,15 +643,22 @@ class AntiInjectionTool(ToolPage):
         progress.setMinimumDuration(0)
         progress.setValue(0)
 
+        caminho = self._path
         self._thread = AnalyzeThread(self._doc)
         self._thread.progress.connect(lambda c, _t: progress.setValue(c))
-        self._thread.done.connect(lambda f: self._on_analyzed(f, progress))
-        self._thread.failed.connect(lambda e: self._on_failed(e, progress))
+        self._thread.done.connect(
+            lambda f: self._on_analyzed(f, progress, caminho))
+        self._thread.failed.connect(
+            lambda e: self._on_failed(e, progress, caminho))
         self._thread.start()
 
-    def _on_analyzed(self, findings: list, progress: QProgressDialog):
+    def _on_analyzed(self, findings: list, progress: QProgressDialog,
+                     caminho: str = ""):
         progress.close()
+        if caminho and caminho != self._path:
+            return                    # resultado de um arquivo já trocado
         self._findings = findings
+        self._analisado = self._path
         self._populate_list()
         self._update_alert()
         self._btn_report.setEnabled(True)
@@ -626,9 +675,17 @@ class AntiInjectionTool(ToolPage):
                 f"{s['total']} achado(s) em {s['paginas']} página(s) — "
                 f"{s['critica']} crítico(s)")
 
-    def _on_failed(self, err: str, progress: QProgressDialog):
+    def _on_failed(self, err: str, progress: QProgressDialog,
+                   caminho: str = ""):
         progress.close()
-        QMessageBox.critical(self, "Erro na análise", f"Ocorreu um erro:\n{err}")
+        if caminho and caminho != self._path:
+            return
+        self._marcar_nao_analisado(
+            "A análise falhou — não há conclusão sobre este documento.")
+        QMessageBox.critical(
+            self, "Erro na análise",
+            f"Ocorreu um erro:\n{err}\n\nO documento não foi analisado, "
+            "e nenhum relatório é emitido sobre ele.")
 
     # ─────────────────────────────────────
     #  PAINEL DE ACHADOS
@@ -779,7 +836,9 @@ class AntiInjectionTool(ToolPage):
     # ─────────────────────────────────────
 
     def _show_report(self):
-        if not self._doc:
+        # Só há relatório do arquivo cuja análise terminou bem.
+        if not self._doc or not self._analisado \
+                or self._analisado != self._path:
             return
         when = datetime.datetime.now().strftime("%d/%m/%Y às %H:%M")
         ReportDialog(Path(self._path).name, len(self._doc),
