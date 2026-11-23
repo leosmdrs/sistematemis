@@ -212,7 +212,31 @@ def preparar_escritor(caminho: str, titulo: str = "",
     escritor.setResolution(resolucao)
     if titulo:
         escritor.setTitle(titulo)
+    # O escritor não diz de volta para onde grava; guarda-se aqui, para
+    # a conferência de que o arquivo saiu.
+    escritor.caminho_de_saida = str(caminho)
     return escritor
+
+
+def conferir_gravado(caminho) -> None:
+    """Levanta `OSError` se o arquivo não existir ou estiver vazio.
+
+    O Qt não levanta erro quando não consegue abrir o arquivo de saída —
+    pasta sem permissão, PDF aberto num leitor que o trava —: desenha no
+    vazio e devolve. Quem chamava anunciava "PDF salvo" sem haver PDF, e
+    a peça era dada por juntável. Sucesso só se anuncia depois disto.
+    """
+    import os
+
+    try:
+        tamanho = os.path.getsize(str(caminho))
+    except OSError:
+        raise OSError(
+            f"o arquivo não foi gravado em {caminho} — confira se a pasta "
+            "aceita gravação e se o arquivo não está aberto em outro "
+            "programa") from None
+    if tamanho <= 0:
+        raise OSError(f"o arquivo gravado em {caminho} ficou vazio")
 
 
 def imprimir_documento(doc: QTextDocument, escritor: QPdfWriter,
@@ -233,6 +257,11 @@ def imprimir_documento(doc: QTextDocument, escritor: QPdfWriter,
     contexto.palette = paleta
 
     pintor = QPainter(escritor)
+    if not pintor.isActive():
+        raise OSError(
+            "não foi possível abrir o arquivo de saída para gravação — "
+            "confira se a pasta aceita gravação e se o arquivo não está "
+            "aberto em outro programa")
     try:
         escala = escritor.resolution() / dpi_doc
         pintor.scale(escala, escala)
@@ -246,6 +275,9 @@ def imprimir_documento(doc: QTextDocument, escritor: QPdfWriter,
             pintor.restore()
     finally:
         pintor.end()
+    destino = getattr(escritor, "caminho_de_saida", "")
+    if destino:
+        conferir_gravado(destino)
 
 
 # ─────────────────────────────────────────

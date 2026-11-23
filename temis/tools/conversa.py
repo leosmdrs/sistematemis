@@ -232,12 +232,20 @@ class _TermoConversaDialog(QDialog):
             return
         if not caminho.lower().endswith(".pdf"):
             caminho += ".pdf"
-        from ..impressao import documento_html, preparar_escritor
+        from ..impressao import (conferir_gravado, documento_html,
+                                 preparar_escritor)
         from PyQt6.QtGui import QTextDocument
         doc = QTextDocument()
         doc.setHtml(documento_html(self._html, "Reconstrução de Conversa"))
-        escritor = preparar_escritor(caminho, "Reconstrução de Conversa")
-        doc.print(escritor)
+        try:
+            escritor = preparar_escritor(caminho, "Reconstrução de Conversa")
+            doc.print(escritor)
+            del escritor                   # fecha o arquivo antes de medir
+            conferir_gravado(caminho)
+        except Exception as e:                              # noqa: BLE001
+            QMessageBox.warning(self, "O PDF não foi salvo",
+                                f"{type(e).__name__}: {e}")
+            return
         self._aviso_salvo(caminho)
 
     def _salvar_html(self):

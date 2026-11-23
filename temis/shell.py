@@ -1178,21 +1178,110 @@ class TemisWindow(QMainWindow):
         pasta = self._sessao_trabalho.garantir()
         base = f"registro-da-sessao-{sessao.identificador}"
         html = atividades_core.relatorio_html(sessao)
-        try:
+        # O que de fato ficou na pasta, e o que não ficou. O aviso de
+        # fechamento afirma só o primeiro e nomeia o segundo: dizer
+        # "registrada" e "com o registro encadeado" sem conferir era
+        # afirmar uma gravação que podia não ter havido.
+        self._depositados, self._nao_depositados = [], []
+
+        def tentar(nome, gravar):
+            try:
+                gravar(pasta / nome)
+                if (pasta / nome).stat().st_size <= 0:
+                    raise OSError("arquivo vazio")
+                self._depositados.append(nome)
+            except Exception:                               # noqa: BLE001
+                self._nao_depositados.append(nome)
+
+        def em_pdf(alvo):
             from PyQt6.QtGui import QTextDocument
             from .impressao import imprimir_documento, preparar_escritor
             doc = QTextDocument()
             doc.setHtml(html)
-            escritor = preparar_escritor(str(pasta / f"{base}.pdf"),
-                                         "Registro da sessão")
-            imprimir_documento(doc, escritor)
-        except Exception:                                   # noqa: BLE001
-            pass
-        try:
-            (pasta / f"{base}.html").write_text(html, encoding="utf-8")
-        except Exception:                                   # noqa: BLE001
-            pass
+            imprimir_documento(
+                doc, preparar_escritor(str(alvo), "Registro da sessão"))
+
+        def encadeado(alvo):
+            # O arquivo com os elos, tal como está em disco: é dele que
+            # se reconfere a corrente. Sem ele na pasta entregue, o que
+            # ia para os autos era só a leitura da corrente, e não ela.
+            import shutil
+            shutil.copyfile(self._registrador.caminho_dados(), alvo)
+
+        tentar(f"{base}.pdf", em_pdf)
+        tentar(f"{base}.html",
+               lambda alvo: alvo.write_text(html, encoding="utf-8"))
+        tentar(f"{base}.json", encadeado)
         return pasta
+
+    def _situacao_do_registro(self, destino, pasta_sessao):
+        """O que o aviso de fechamento pode afirmar, conferido em disco.
+
+        Devolve (gravado, título, corpo). `gravado` é falso quando o
+        arquivo da sessão não está em disco — pasta de Documentos sem
+        permissão de escrita, por exemplo —, e aí o aviso diz que o
+        registro **não** foi gravado, em vez de dizer que foi.
+        """
+        registrador = self._registrador
+        dados = registrador.caminho_dados() if registrador else None
+        try:
+            gravado = bool(dados) and dados.is_file() \
+                and dados.stat().st_size > 0
+        except OSError:
+            gravado = False
+        erros = list(registrador.sessao.erros) if registrador else []
+
+        if not gravado:
+            corpo = ("O registro desta sessão <b>não pôde ser gravado</b> "
+                     "nesta máquina, e não há arquivo dele a juntar.")
+            if erros:
+                corpo += ("<br><br>Motivo informado pelo sistema:<br><code>"
+                          + _html.escape(erros[-1]) + "</code>")
+            if pasta_sessao is not None:
+                corpo += ("<br><br>As peças produzidas continuam na pasta "
+                          "da sessão:<br><code>"
+                          + _html.escape(str(pasta_sessao)) + "</code>")
+            return False, "<b>O registro da sessão não foi gravado.</b>", corpo
+
+        if pasta_sessao is not None:
+            depositados = getattr(self, "_depositados", [])
+            faltaram = getattr(self, "_nao_depositados", [])
+            corpo = (
+                "Tudo o que esta sessão produziu está reunido numa pasta só "
+                "— os termos, os documentos e os arquivos recebidos.")
+            if depositados:
+                corpo += (" Foram acrescentados a ela, do registro da "
+                          "sessão: " + ", ".join(
+                              f"<code>{_html.escape(n)}</code>"
+                              for n in depositados) + ".")
+            if faltaram:
+                corpo += ("<br><br><b>Não foi possível gravar na pasta:</b> "
+                          + ", ".join(f"<code>{_html.escape(n)}</code>"
+                                      for n in faltaram)
+                          + ". O registro permanece em:<br><code>"
+                          + _html.escape(str(dados)) + "</code>")
+            else:
+                corpo += (" Reunida assim, a diligência inteira fica pronta "
+                          "para juntar aos autos, e cada peça carrega a "
+                          "sessão em que nasceu.")
+            corpo += ("<br><br>A pasta será aberta a seguir:<br><code>"
+                      + _html.escape(str(pasta_sessao)) + "</code>")
+            return True, "<b>A sessão foi registrada.</b>", corpo
+
+        corpo = (
+            "Recomenda-se juntar o registro desta sessão aos autos "
+            "<b>junto com os termos, documentos e arquivos</b> que tenham "
+            "sido gerados durante ela. O registro documenta, em ordem "
+            "cronológica e encadeada, o que foi feito, e é o que reforça a "
+            "cadeia de custódia das peças produzidas.")
+        if destino:
+            corpo += ("<br><br>O relatório foi gravado em:<br>"
+                      f"<code>{_html.escape(str(destino))}</code>")
+        else:
+            corpo += ("<br><br>O relatório de leitura não pôde ser "
+                      "gravado; o registro encadeado está em:<br><code>"
+                      + _html.escape(str(dados)) + "</code>")
+        return True, "<b>A sessão foi registrada.</b>", corpo
 
     def _recomendar_juntar_registro(self, destino, pasta_sessao=None):
         """Ao fechar, recomenda juntar o registro às peças da sessão.
@@ -1207,36 +1296,25 @@ class TemisWindow(QMainWindow):
         o modal aponta essa pasta e a abre ao ser fechado, para que o que
         se juntar aos autos seja a diligência inteira, num lugar só.
         """
+        gravado, titulo, corpo = self._situacao_do_registro(
+            destino, pasta_sessao)
         caixa = QMessageBox(self)
-        caixa.setIcon(QMessageBox.Icon.Information)
+        caixa.setIcon(QMessageBox.Icon.Information if gravado
+                      else QMessageBox.Icon.Warning)
         caixa.setWindowTitle("Registro desta sessão")
         caixa.setTextFormat(Qt.TextFormat.RichText)
-        caixa.setText("<b>A sessão foi registrada.</b>")
+        caixa.setText(titulo)
+        caixa.setInformativeText(corpo)
 
         if pasta_sessao is not None:
-            caixa.setInformativeText(
-                "Tudo o que esta sessão produziu está reunido numa pasta só "
-                "— os termos, os documentos e os arquivos recebidos —, agora "
-                "com o registro encadeado do que foi feito e o relatório da "
-                "sessão em <b>PDF</b>. Reunida assim, a diligência inteira "
-                "fica pronta para juntar aos autos, e cada peça carrega a "
-                "sessão em que nasceu.<br><br>A pasta será aberta a seguir:"
-                f"<br><code>{_html.escape(str(pasta_sessao))}</code>")
             caixa.addButton("Fechar", QMessageBox.ButtonRole.AcceptRole)
             caixa.exec()
             self._abrir_no_explorador(pasta_sessao)
             return
-
-        corpo = (
-            "Recomenda-se juntar o registro desta sessão aos autos "
-            "<b>junto com os termos, documentos e arquivos</b> que tenham "
-            "sido gerados durante ela. O registro documenta, em ordem "
-            "cronológica e encadeada, o que foi feito, e é o que reforça a "
-            "cadeia de custódia das peças produzidas.")
-        if destino:
-            corpo += ("<br><br>O relatório foi gravado em:<br>"
-                      f"<code>{_html.escape(str(destino))}</code>")
-        caixa.setInformativeText(corpo)
+        if not gravado:
+            caixa.addButton("Fechar", QMessageBox.ButtonRole.AcceptRole)
+            caixa.exec()
+            return
 
         abrir = None
         if destino:
