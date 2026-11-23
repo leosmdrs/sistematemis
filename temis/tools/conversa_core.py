@@ -301,12 +301,20 @@ def _abrir_pacote(caminho: Path, conversa: Conversa) -> None:
             conversa.mensagens, conversa.avisos = parse_texto(texto)
 
             # Resumo de cada mídia presente, ligado à mensagem que a cita.
+            # Em blocos, e uma vez por mídia. Cada mídia era
+            # descomprimida inteira na memória, de novo a cada mensagem
+            # que a citasse: um vídeo encaminhado dez vezes era lido dez
+            # vezes, e a memória ia a três vezes e meia o tamanho dele.
+            from .hash_core import sha256_de_membro
             presentes = {Path(n).name: n for n in nomes if n != alvo}
+            resumos: dict = {}
             for m in conversa.mensagens:
                 if m.midia and m.midia in presentes:
-                    dados = z.read(presentes[m.midia])
-                    m.midia_sha256 = hashlib.sha256(dados).hexdigest()
-                    m.midia_caminho = presentes[m.midia]
+                    interno = presentes[m.midia]
+                    if interno not in resumos:
+                        resumos[interno] = sha256_de_membro(z, interno)
+                    m.midia_sha256 = resumos[interno]
+                    m.midia_caminho = interno
     except zipfile.BadZipFile:
         conversa.avisos.append("O arquivo não é um pacote .zip válido.")
 
@@ -314,10 +322,16 @@ def _abrir_pacote(caminho: Path, conversa: Conversa) -> None:
 def midia_bytes(caminho_zip, interno: str) -> bytes:
     """Os bytes de uma mídia dentro do pacote, para exibição."""
     try:
+        from .hash_core import ler_membro
         with zipfile.ZipFile(caminho_zip) as z:
-            return z.read(interno)
+            return ler_membro(z, interno, TETO_MIDIA_EXIBIDA)
     except Exception:                                       # noqa: BLE001
         return b""
+
+
+#: Acima disto a mídia não é carregada para exibição na tela. O resumo
+#: dela é calculado do mesmo jeito — em blocos, sem teto.
+TETO_MIDIA_EXIBIDA = 200 * 1024 * 1024
 
 
 # ─────────────────────────────────────────

@@ -230,5 +230,35 @@ class OPeriodoEODaConversaInteira(unittest.TestCase):
         self.assertTrue(fim.startswith("2025-01-12"))
 
 
+class AMidiaEResumidaUmaVezEmBlocos(unittest.TestCase):
+
+    def test_midia_citada_varias_vezes_e_lida_uma_so(self):
+        from temis.tools import hash_core
+        texto = "".join(
+            f"10/01/2025 09:0{i} - Fulano: IMG-1.jpg (arquivo anexado)\n"
+            for i in range(5))
+        with tempfile.TemporaryDirectory() as pasta:
+            alvo = Path(pasta) / "conversa.zip"
+            with zipfile.ZipFile(alvo, "w") as z:
+                z.writestr("_chat.txt", texto)
+                z.writestr("IMG-1.jpg", b"imagem" * 1000)
+            chamadas = []
+            original = hash_core.sha256_de_membro
+
+            def contando(pacote, nome):
+                chamadas.append(nome)
+                return original(pacote, nome)
+
+            hash_core.sha256_de_membro = contando
+            self.addCleanup(setattr, hash_core, "sha256_de_membro", original)
+            conversa = cc.abrir(str(alvo))
+        import hashlib
+        esperado = hashlib.sha256(b"imagem" * 1000).hexdigest()
+        com_midia = [m for m in conversa.mensagens if m.midia_sha256]
+        self.assertEqual(len(com_midia), 5)
+        self.assertTrue(all(m.midia_sha256 == esperado for m in com_midia))
+        self.assertEqual(chamadas, ["IMG-1.jpg"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

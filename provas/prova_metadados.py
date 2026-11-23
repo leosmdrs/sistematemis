@@ -81,5 +81,54 @@ class OTermoNaoExpoeAPastaDeOrigem(unittest.TestCase):
         self.assertNotIn(pasta, valores)
 
 
+class OArquivoExaminadoNaoDecideQuantaMemoriaSeGasta(unittest.TestCase):
+    """Documento de escritório é um .zip, e .zip pode ser armadilha."""
+
+    def pacote(self, pasta, membros):
+        import zipfile
+        alvo = Path(pasta) / "doc.docx"
+        with zipfile.ZipFile(alvo, "w", zipfile.ZIP_DEFLATED) as z:
+            for nome, dados in membros.items():
+                z.writestr(nome, dados)
+        return alvo
+
+    def test_membro_acima_do_teto_nao_e_lido(self):
+        import tempfile
+        import zipfile
+        from temis.tools.hash_core import MembroGrandeDemais, ler_membro
+        with tempfile.TemporaryDirectory() as pasta:
+            alvo = self.pacote(pasta, {"a.xml": b"0" * 500_000})
+            self.assertLess(alvo.stat().st_size, 5_000)   # comprime muito
+            with zipfile.ZipFile(alvo) as z:
+                with self.assertRaises(MembroGrandeDemais):
+                    ler_membro(z, "a.xml", 100_000)
+                self.assertEqual(len(ler_membro(z, "a.xml", 600_000)),
+                                 500_000)
+
+    def test_propriedades_gigantes_nao_derrubam_a_leitura(self):
+        import tempfile
+        original = mc.TETO_PROPRIEDADES
+        mc.TETO_PROPRIEDADES = 1000
+        self.addCleanup(setattr, mc, "TETO_PROPRIEDADES", original)
+        with tempfile.TemporaryDirectory() as pasta:
+            alvo = self.pacote(pasta, {
+                "docProps/core.xml": b"<dc:creator>X</dc:creator>" * 1000})
+            self.assertEqual(mc._de_office(alvo), [])
+
+    def test_xml_malformado_nao_trava_a_tela(self):
+        import time
+        inicio = time.monotonic()
+        mc._texto_xml(b"<a " * 100_000)
+        mc._texto_xml(b"<" * 300_000)
+        self.assertLess(time.monotonic() - inicio, 3.0)
+
+    def test_propriedades_normais_seguem_lidas(self):
+        dados = mc._texto_xml(
+            b"<cp:coreProperties><dc:creator>Fulano</dc:creator>"
+            b"<cp:revision>3</cp:revision></cp:coreProperties>")
+        self.assertEqual(dados["creator"], "Fulano")
+        self.assertEqual(dados["revision"], "3")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

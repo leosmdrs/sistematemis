@@ -49,6 +49,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import ocr_windows
+from .hash_core import ler_membro
+
+#: Teto de cada parte de texto lida de dentro de um documento.
+TETO_TEXTO_INTERNO = 64 * 1024 * 1024
 
 #: Versão do formato do índice. Índice de versão diferente é recusado em
 #: vez de lido torto.
@@ -332,8 +336,11 @@ def _de_office(caminho: Path) -> str:
     with zipfile.ZipFile(caminho) as z:
         for nome in sorted(n for n in z.namelist() if interessa(n)):
             try:
-                bruto = z.read(nome)
-            except (KeyError, zipfile.BadZipFile, OSError):
+                bruto = ler_membro(z, nome, TETO_TEXTO_INTERNO)
+            except (KeyError, zipfile.BadZipFile, OSError, ValueError):
+                # Inclui o que passa do teto: a parte fica sem texto no
+                # índice, em vez de a memória da estação ficar por conta
+                # do arquivo examinado.
                 continue
             texto = bruto.decode("utf-8", "replace")
             # Preserva a separação entre parágrafos e células.
@@ -348,8 +355,8 @@ def _de_odf(caminho: Path) -> str:
     import html as _html
     with zipfile.ZipFile(caminho) as z:
         try:
-            bruto = z.read("content.xml")
-        except KeyError:
+            bruto = ler_membro(z, "content.xml", TETO_TEXTO_INTERNO)
+        except (KeyError, ValueError):
             return ""
     texto = bruto.decode("utf-8", "replace")
     texto = re.sub(r"</(text:p|text:h|table:table-cell)>", " \n", texto)

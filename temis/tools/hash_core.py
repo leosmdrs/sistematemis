@@ -250,3 +250,46 @@ def validate(d: TermoData) -> list[str]:
     if not d.arquivos:
         faltando.append("Pelo menos um arquivo")
     return faltando
+
+
+# ─────────────────────────────────────────
+#  LEITURA DE ARQUIVO DENTRO DE PACOTE
+# ─────────────────────────────────────────
+
+class MembroGrandeDemais(ValueError):
+    """O arquivo interno passa do teto aceito para leitura em memória."""
+
+
+def ler_membro(pacote, nome: str, teto: int) -> bytes:
+    """Lê um arquivo de dentro de um .zip, até um teto.
+
+    Documento de escritório é um .zip, e o que vem de material examinado
+    não é confiável: 150 kB em disco podem descomprimir em centenas de
+    megabytes. Ler o membro inteiro, sem teto, deixava ao arquivo a
+    decisão de quanta memória a estação gastaria.
+
+    O tamanho declarado no índice do pacote é conferido antes, mas não
+    basta — é o próprio pacote quem o declara —, e por isso a leitura
+    também para no teto.
+    """
+    try:
+        if pacote.getinfo(nome).file_size > teto:
+            raise MembroGrandeDemais(nome)
+    except KeyError:
+        raise
+    with pacote.open(nome) as f:
+        dados = f.read(teto + 1)
+    if len(dados) > teto:
+        raise MembroGrandeDemais(nome)
+    return dados
+
+
+def sha256_de_membro(pacote, nome: str) -> str:
+    """SHA-256 de um arquivo de dentro de um .zip, lido em blocos."""
+    import hashlib
+    d = hashlib.sha256()
+    with pacote.open(nome) as f:
+        for bloco in iter(lambda: f.read(1 << 20), b""):
+            d.update(bloco)
+    return d.hexdigest()
+

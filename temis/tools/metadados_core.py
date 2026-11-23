@@ -511,12 +511,30 @@ _APP_OFFICE = {
 def _texto_xml(dados: bytes) -> dict[str, str]:
     """Pares etiqueta→texto de um XML simples, sem espaço de nomes."""
     achados: dict[str, str] = {}
-    for m in re.finditer(rb"<(?:[\w-]+:)?([\w-]+)[^>]*>([^<]*)</", dados):
+    # Repetições com limite: sem ele, um XML malformado — um "<" atrás
+    # do outro, sem fechar — fazia a expressão refazer o caminho a cada
+    # posição, e 256 kB custavam nove segundos de tela parada.
+    for m in re.finditer(
+            rb"<(?:[\w-]{1,64}:)?([\w-]{1,64})[^<>]{0,2000}>([^<]{0,8000})</",
+            dados):
         etiqueta = m.group(1).decode("ascii", "ignore")
         valor = m.group(2).decode("utf-8", "ignore").strip()
         if valor and etiqueta not in achados:
             achados[etiqueta] = valor
     return achados
+
+
+#: Os arquivos de propriedades de um documento têm poucos quilobytes.
+TETO_PROPRIEDADES = 2 * 1024 * 1024
+
+
+def _xml_do_pacote(z, nome: str) -> bytes:
+    """O arquivo de propriedades, ou vazio se passar do teto."""
+    from .hash_core import MembroGrandeDemais, ler_membro
+    try:
+        return ler_membro(z, nome, TETO_PROPRIEDADES)
+    except (MembroGrandeDemais, KeyError, OSError, zipfile.BadZipFile):
+        return b""
 
 
 def _de_office(caminho: Path) -> list[Campo]:
@@ -525,7 +543,7 @@ def _de_office(caminho: Path) -> list[Campo]:
         nomes = set(z.namelist())
 
         if "docProps/core.xml" in nomes:
-            dados = _texto_xml(z.read("docProps/core.xml"))
+            dados = _texto_xml(_xml_do_pacote(z, "docProps/core.xml"))
             for chave, (rotulo, relevante) in _CORE_OFFICE.items():
                 valor = dados.get(chave, "")
                 if not valor:
@@ -535,7 +553,7 @@ def _de_office(caminho: Path) -> list[Campo]:
                 campos.append(Campo(rotulo, valor, "Documento", relevante))
 
         if "docProps/app.xml" in nomes:
-            dados = _texto_xml(z.read("docProps/app.xml"))
+            dados = _texto_xml(_xml_do_pacote(z, "docProps/app.xml"))
             for chave, (rotulo, relevante) in _APP_OFFICE.items():
                 valor = dados.get(chave, "")
                 if valor:
@@ -545,7 +563,7 @@ def _de_office(caminho: Path) -> list[Campo]:
 
         # OpenDocument guarda o mesmo tipo de dado em outro arquivo.
         if "meta.xml" in nomes:
-            dados = _texto_xml(z.read("meta.xml"))
+            dados = _texto_xml(_xml_do_pacote(z, "meta.xml"))
             for chave, rotulo, grupo, relevante in (
                 ("creator", "Última alteração por", "Documento", True),
                 ("initial-creator", "Autor", "Documento", True),

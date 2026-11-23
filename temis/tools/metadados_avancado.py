@@ -359,13 +359,31 @@ _APP_XML = (
 )
 
 
+#: Teto de leitura de cada arquivo interno do documento examinado.
+TETO_INTERNO = 64 * 1024 * 1024
+
+
 def analisar_office(caminho: Path, a: Analise):
+    from .hash_core import MembroGrandeDemais, ler_membro
+
     try:
         with zipfile.ZipFile(caminho) as z:
             nomes = z.namelist()
 
+            def ler(nome: str) -> bytes:
+                # O que passa do teto não é examinado, e isso fica dito:
+                # exame que deixa de ser feito não pode parecer exame
+                # que nada achou.
+                try:
+                    return ler_membro(z, nome, TETO_INTERNO)
+                except MembroGrandeDemais:
+                    a.erros.append(
+                        f"{nome}: arquivo interno acima do limite de "
+                        "leitura — não examinado")
+                    return b""
+
             if "docProps/app.xml" in nomes:
-                app = z.read("docProps/app.xml").decode("utf-8", "replace")
+                app = ler("docProps/app.xml").decode("utf-8", "replace")
                 for campo, rotulo, peso in _APP_XML:
                     m = re.search(rf"<{campo}>(.*?)</{campo}>", app, re.S)
                     if m and m.group(1).strip():
@@ -382,7 +400,7 @@ def analisar_office(caminho: Path, a: Analise):
                         ATENCAO, "propriedades do documento")
 
             if "docProps/core.xml" in nomes:
-                core = z.read("docProps/core.xml").decode("utf-8", "replace")
+                core = ler("docProps/core.xml").decode("utf-8", "replace")
                 m = re.search(r"<cp:revision>(\d+)</cp:revision>", core)
                 if m and int(m.group(1)) > 1:
                     a.anotar(
@@ -395,7 +413,7 @@ def analisar_office(caminho: Path, a: Analise):
             if comentarios:
                 autores = set()
                 for n in comentarios:
-                    texto = z.read(n).decode("utf-8", "replace")
+                    texto = ler(n).decode("utf-8", "replace")
                     # XML admite aspas simples e duplas; arquivo de
                     # Office usa duplas, mas exigi-las deixava passar
                     # pacote gerado por outra ferramenta.
@@ -411,7 +429,7 @@ def analisar_office(caminho: Path, a: Analise):
             corpo = ""
             for n in ("word/document.xml", "ppt/presentation.xml"):
                 if n in nomes:
-                    corpo = z.read(n).decode("utf-8", "replace")
+                    corpo = ler(n).decode("utf-8", "replace")
                     break
             if corpo and ("<w:del " in corpo or "<w:ins " in corpo):
                 excluidos = corpo.count("<w:del ")
