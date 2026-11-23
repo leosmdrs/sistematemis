@@ -65,10 +65,45 @@ def test_mais_nova_compara_com_instalada_explicita():
 # ─────────────────────────────────────────
 
 def test_atualizacao_valida_exige_versao_url_e_hash_64():
-    completa = at.Atualizacao(versao="1.0.0", url="https://x", sha256="a" * 64)
+    oficial = at.url_do_instalador("1.0.0")
+    completa = at.Atualizacao(versao="1.0.0", url=oficial, sha256="a" * 64)
     assert completa.valida is True
     assert at.Atualizacao().valida is False
-    assert at.Atualizacao(versao="1.0.0", url="https://x", sha256="curto").valida is False
+    assert at.Atualizacao(versao="1.0.0", url=oficial, sha256="curto").valida is False
+    assert at.Atualizacao(versao="1.0.0", url=oficial, sha256="g" * 64).valida is False
+
+
+@pytest.mark.parametrize("url", [
+    "https://exemplo.com/setup.exe",
+    "https://github.com/outro/repositorio/releases/download/v1.0.0/"
+    "SistemaTemis-1.0.0-setup.exe",
+    "https://github.com/leosmdrs/sistematemis/releases/download/v2.0.0/"
+    "SistemaTemis-2.0.0-setup.exe",
+    "http://github.com/leosmdrs/sistematemis/releases/download/v1.0.0/"
+    "SistemaTemis-1.0.0-setup.exe",
+    "https://github.com/leosmdrs/sistematemis/releases/download/v1.0.0/"
+    "SistemaTemis-1.0.0-setup.exe?x=1",
+])
+def test_instalador_fora_da_release_oficial_e_recusado(url):
+    info = at.Atualizacao(versao="1.0.0", url=url, sha256="a" * 64)
+    assert info.valida is False
+
+
+@pytest.mark.parametrize("versao", [
+    "..\\..\\x", "1.0.0/../../x", "1.0", "1.0.0 ", "v1.0.0", "1.0.0<b>",
+    "1.0.0\n", "", "1.0.0.0.0",
+])
+def test_versao_do_manifesto_tem_de_ser_um_numero(versao):
+    info = at.Atualizacao(versao=versao, url=at.url_do_instalador(versao),
+                          sha256="a" * 64)
+    assert info.valida is False
+
+
+def test_tamanho_ilegivel_invalida_o_manifesto_sem_estourar():
+    info = at.de_dict({"versao": "1.0.0", "sha256": "a" * 64,
+                       "url": at.url_do_instalador("1.0.0"),
+                       "tamanho": "muito"})
+    assert info.valida is False
 
 
 @pytest.mark.parametrize("tamanho, esperado", [
@@ -110,7 +145,7 @@ def test_abrir_recusa_url_sem_https():
         at._abrir("http://exemplo.com/versao.json")
 
 
-def test_abrir_delega_para_urlopen(monkeypatch):
+def test_abrir_delega_para_o_abridor(monkeypatch):
     capturado = {}
 
     def falso_urlopen(pedido, timeout):
@@ -119,7 +154,7 @@ def test_abrir_delega_para_urlopen(monkeypatch):
         capturado["timeout"] = timeout
         return FalsaResposta(b"{}")
 
-    monkeypatch.setattr(at.urllib.request, "urlopen", falso_urlopen)
+    monkeypatch.setattr(at._ABRIDOR, "open", falso_urlopen)
     at._abrir("https://exemplo.com/versao.json", tempo=9)
     assert capturado["url"] == "https://exemplo.com/versao.json"
     assert capturado["agente"] == at.AGENTE
@@ -132,9 +167,15 @@ def test_abrir_delega_para_urlopen(monkeypatch):
 
 MANIFESTO_OK = json.dumps({
     "versao": "99.0.0",
-    "url": "https://exemplo.com/setup.exe",
+    "url": at.url_do_instalador("99.0.0"),
     "sha256": "a" * 64,
 }).encode("utf-8")
+
+
+@pytest.fixture(autouse=True)
+def _sem_politica(monkeypatch):
+    """Os testes não dependem da política da máquina em que rodam."""
+    monkeypatch.setattr(at, "_ler_registro", lambda: {})
 
 
 def test_consultar_devolve_atualizacao_quando_mais_nova(monkeypatch):
@@ -147,7 +188,7 @@ def test_consultar_devolve_atualizacao_quando_mais_nova(monkeypatch):
 def test_consultar_devolve_none_quando_nao_ha_versao_mais_nova(monkeypatch):
     manifesto = json.dumps({
         "versao": "0.0.1",
-        "url": "https://exemplo.com/setup.exe",
+        "url": at.url_do_instalador("0.0.1"),
         "sha256": "a" * 64,
     }).encode("utf-8")
     monkeypatch.setattr(at, "_abrir", lambda url: FalsaResposta(manifesto))
@@ -234,7 +275,7 @@ def test_pasta_download_cai_para_tmpdir_do_sistema(monkeypatch, tmp_path):
 def _info_para(conteudo: bytes) -> at.Atualizacao:
     return at.Atualizacao(
         versao="9.9.9",
-        url="https://exemplo.com/setup.exe",
+        url=at.url_do_instalador("9.9.9"),
         sha256=hashlib.sha256(conteudo).hexdigest(),
         tamanho=len(conteudo),
     )
@@ -271,7 +312,7 @@ def test_baixar_cancelado_remove_parcial(monkeypatch, tmp_path):
 def test_baixar_hash_divergente_descarta_arquivo(monkeypatch, tmp_path):
     conteudo = b"conteudo-real"
     info = at.Atualizacao(
-        versao="9.9.9", url="https://exemplo.com/setup.exe",
+        versao="9.9.9", url=at.url_do_instalador("9.9.9"),
         sha256="0" * 64, tamanho=len(conteudo),
     )
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
@@ -301,9 +342,12 @@ def test_baixar_falha_de_rede_descarta_parcial(monkeypatch, tmp_path):
 #  instalar / instalado_como_programa
 # ─────────────────────────────────────────
 
+RESUMO_X = hashlib.sha256(b"x").hexdigest()
+
+
 def test_instalar_arquivo_inexistente(tmp_path):
     with pytest.raises(at.ErroAtualizacao, match="não foi encontrado"):
-        at.instalar(tmp_path / "nao-existe.exe")
+        at.instalar(tmp_path / "nao-existe.exe", "a" * 64)
 
 
 def test_instalar_recusa_fora_do_windows(monkeypatch, tmp_path):
@@ -311,7 +355,7 @@ def test_instalar_recusa_fora_do_windows(monkeypatch, tmp_path):
     arquivo.write_bytes(b"x")
     monkeypatch.setattr(at.sys, "platform", "linux")
     with pytest.raises(at.ErroAtualizacao, match="Windows"):
-        at.instalar(arquivo)
+        at.instalar(arquivo, RESUMO_X)
 
 
 def test_instalar_chama_popen_no_windows(monkeypatch, tmp_path):
@@ -325,7 +369,7 @@ def test_instalar_chama_popen_no_windows(monkeypatch, tmp_path):
         capturado["close_fds"] = close_fds
 
     monkeypatch.setattr(at.subprocess, "Popen", falso_popen)
-    at.instalar(arquivo)
+    at.instalar(arquivo, RESUMO_X)
     assert capturado["args"][0] == str(arquivo)
     assert capturado["args"][1:] == at.ARGUMENTOS_INSTALADOR
     assert capturado["close_fds"] is True
@@ -341,7 +385,7 @@ def test_instalar_erro_ao_iniciar_processo(monkeypatch, tmp_path):
 
     monkeypatch.setattr(at.subprocess, "Popen", falso_popen)
     with pytest.raises(at.ErroAtualizacao, match="Não foi possível iniciar"):
-        at.instalar(arquivo)
+        at.instalar(arquivo, RESUMO_X)
 
 
 def test_instalado_como_programa(monkeypatch):
@@ -397,3 +441,148 @@ def test_ler_preferencias_json_invalido_devolve_padrao(monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     at.arquivo_config().write_text("{ nao e json", encoding="utf-8")
     assert at.ler_preferencias() == at.Preferencias()
+
+
+def test_instalar_recusa_arquivo_trocado_depois_do_download(monkeypatch, tmp_path):
+    """Entre conferir e executar, o arquivo fica em pasta do usuário."""
+    arquivo = tmp_path / "setup.exe"
+    arquivo.write_bytes(b"x")
+    monkeypatch.setattr(at.sys, "platform", "win32")
+    chamadas = []
+    monkeypatch.setattr(at.subprocess, "Popen",
+                        lambda args, close_fds: chamadas.append(args))
+
+    arquivo.write_bytes(b"outro programa")
+    with pytest.raises(at.ErroAtualizacao, match="mudou depois de conferido"):
+        at.instalar(arquivo, RESUMO_X)
+    assert chamadas == []
+
+
+def test_instalar_exige_o_resumo(monkeypatch, tmp_path):
+    arquivo = tmp_path / "setup.exe"
+    arquivo.write_bytes(b"x")
+    monkeypatch.setattr(at.sys, "platform", "win32")
+    monkeypatch.setattr(at.subprocess, "Popen",
+                        lambda args, close_fds: pytest.fail("executou"))
+    with pytest.raises(at.ErroAtualizacao):
+        at.instalar(arquivo, "")
+
+
+# ─────────────────────────────────────────
+#  origem, redirecionamento e limites
+# ─────────────────────────────────────────
+
+def test_consultar_recusa_manifesto_que_aponta_para_outro_servidor(monkeypatch):
+    manifesto = json.dumps({
+        "versao": "99.0.0",
+        "url": "https://servidor-de-terceiro.exemplo/setup.exe",
+        "sha256": "a" * 64,
+    }).encode("utf-8")
+    monkeypatch.setattr(at, "_abrir", lambda url: FalsaResposta(manifesto))
+    with pytest.raises(at.ErroAtualizacao, match="endereço oficial"):
+        at.consultar("https://exemplo.com/versao.json")
+
+
+def test_baixar_recusa_informacao_que_nao_passou_pela_validacao(monkeypatch, tmp_path):
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(at, "_abrir",
+                        lambda url, tempo=30: pytest.fail("baixou"))
+    info = at.Atualizacao(versao="..\\..\\x",
+                          url="https://exemplo.com/setup.exe",
+                          sha256="a" * 64)
+    with pytest.raises(at.ErroAtualizacao):
+        at.baixar(info)
+    assert list(tmp_path.rglob("*.exe")) == []
+
+
+def test_redirecionamento_para_http_e_recusado():
+    pedido = at.urllib.request.Request("https://github.com/x")
+    with pytest.raises(urllib.error.URLError, match="sem HTTPS"):
+        at._SoHTTPS().redirect_request(
+            pedido, None, 302, "Found", {}, "http://exemplo.com/setup.exe")
+
+
+def test_redirecionamento_para_https_e_seguido():
+    pedido = at.urllib.request.Request("https://github.com/x")
+    novo = at._SoHTTPS().redirect_request(
+        pedido, None, 302, "Found", {},
+        "https://objects.githubusercontent.com/arquivo")
+    assert novo.full_url == "https://objects.githubusercontent.com/arquivo"
+
+
+def test_o_abridor_usa_a_regra_de_redirecionamento():
+    assert any(isinstance(h, at._SoHTTPS) for h in at._ABRIDOR.handlers)
+
+
+def test_baixar_interrompe_arquivo_maior_que_o_declarado(monkeypatch, tmp_path):
+    conteudo = b"x" * 1000
+    info = at.Atualizacao(
+        versao="9.9.9", url=at.url_do_instalador("9.9.9"),
+        sha256=hashlib.sha256(conteudo).hexdigest(), tamanho=100)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(at, "_abrir", lambda url, tempo=30: FalsaResposta(conteudo))
+    with pytest.raises(at.ErroAtualizacao, match="maior que o publicado"):
+        at.baixar(info)
+    assert list(tmp_path.rglob("*.parcial")) == []
+
+
+def test_baixar_sem_tamanho_declarado_tem_teto(monkeypatch, tmp_path):
+    conteudo = b"x" * 1000
+    info = at.Atualizacao(
+        versao="9.9.9", url=at.url_do_instalador("9.9.9"),
+        sha256=hashlib.sha256(conteudo).hexdigest())
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(at, "LIMITE_INSTALADOR", 500)
+    monkeypatch.setattr(at, "_abrir", lambda url, tempo=30: FalsaResposta(conteudo))
+    with pytest.raises(at.ErroAtualizacao, match="maior que o publicado"):
+        at.baixar(info)
+
+
+def test_baixar_tem_prazo_total(monkeypatch, tmp_path):
+    conteudo = b"x" * 1000
+    info = _info_para(conteudo)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(at, "BLOCO", 100)
+    monkeypatch.setattr(at, "PRAZO_DOWNLOAD", 5)
+    relogio = iter(range(0, 1000, 3))
+    monkeypatch.setattr(at.time, "monotonic", lambda: next(relogio))
+    monkeypatch.setattr(at, "_abrir", lambda url, tempo=30: FalsaResposta(conteudo))
+    with pytest.raises(at.ErroAtualizacao, match="prazo"):
+        at.baixar(info)
+    assert list(tmp_path.rglob("*.parcial")) == []
+
+
+# ─────────────────────────────────────────
+#  política da estação
+# ─────────────────────────────────────────
+
+def test_sem_politica_a_atualizacao_segue_ligada():
+    regra = at.politica()
+    assert regra.atualizar is True and regra.versao_fixada == ""
+
+
+def test_politica_desliga_a_consulta(monkeypatch):
+    monkeypatch.setattr(at, "_ler_registro", lambda: {"Atualizar": 0})
+    monkeypatch.setattr(at, "_abrir", lambda url: pytest.fail("consultou"))
+    with pytest.raises(at.ErroAtualizacao, match="desligada nesta estação"):
+        at.consultar("https://exemplo.com/versao.json")
+
+
+def test_versao_fixada_nao_oferece_o_que_vem_depois(monkeypatch):
+    monkeypatch.setattr(at, "_ler_registro",
+                        lambda: {"VersaoFixada": "98.0.0"})
+    monkeypatch.setattr(at, "_abrir", lambda url: FalsaResposta(MANIFESTO_OK))
+    assert at.consultar("https://exemplo.com/versao.json") is None
+
+
+def test_versao_fixada_deixa_chegar_ate_ela(monkeypatch):
+    monkeypatch.setattr(at, "_ler_registro",
+                        lambda: {"VersaoFixada": "99.0.0"})
+    monkeypatch.setattr(at, "_abrir", lambda url: FalsaResposta(MANIFESTO_OK))
+    assert at.consultar("https://exemplo.com/versao.json").versao == "99.0.0"
+
+
+def test_versao_fixada_ilegivel_e_ignorada(monkeypatch):
+    monkeypatch.setattr(at, "_ler_registro",
+                        lambda: {"VersaoFixada": "a última"})
+    assert at.politica().versao_fixada == ""

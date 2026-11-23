@@ -19,9 +19,38 @@ arquivo `versao.json` num endereço fixo e compara com a versão instalada.
   consta do manifesto e só então executado. Se o arquivo não conferir, é
   descartado e a instalação não acontece.
 
+- O manifesto **não escolhe de onde vem o instalador**: o endereço tem
+  de ser o da release daquela versão, neste repositório
+  (`releases/download/vX.Y.Z/SistemaTemis-X.Y.Z-setup.exe`). Qualquer
+  outro é recusado, assim como versão que não seja um número e
+  redirecionamento que saia do HTTPS.
+- O resumo é **conferido de novo no instante de executar**: o arquivo
+  fica em pasta do usuário, e entre o download e a execução poderia ser
+  trocado.
+
 A verificação pode ser desligada em **Sobre → Verificar atualizações ao
 abrir o sistema**. Nada é enviado da máquina: é a leitura de um arquivo
 estático, sem identificação do usuário nem da estação.
+
+### Desligar ou fixar a versão pela administração da estação
+
+A caixa do **Sobre** é do usuário. Para a equipe que administra as
+estações há uma chave de política, em local que o usuário comum não
+grava e que a política de grupo distribui:
+
+```
+HKEY_LOCAL_MACHINE\SOFTWARE\Policies\SistemaTemis
+  Atualizar      DWORD   0 desliga a consulta e a instalação por este canal
+  VersaoFixada   texto   ex.: 1.15.2 — nada acima disso é oferecido
+```
+
+Com `Atualizar = 0` o programa não consulta o manifesto ao abrir, e a
+verificação pedida no **Sobre** responde que o canal está desligado
+naquela estação. Sem a chave, vale o comportamento descrito acima.
+
+O que isto **não** resolve: enquanto o instalador não for assinado, a
+autenticidade do que é publicado continua dependendo de quem tem escrita
+no repositório. Ver `ASSINATURA.md`.
 
 ---
 

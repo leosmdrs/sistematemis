@@ -182,7 +182,7 @@ class AtualizacaoDialog(QDialog):
             "Arquivo conferido pelo resumo SHA-256. O instalador vai abrir e "
             "o sistema será fechado para a troca dos arquivos.")
         try:
-            core.instalar(Path(caminho))
+            core.instalar(Path(caminho), self._info.sha256)
         except core.ErroAtualizacao as e:
             self._ao_falhar(str(e))
             return
@@ -226,7 +226,7 @@ def verificar_ao_abrir(janela: QWidget, atraso_ms: int = 2500):
     ruído. Falhas só aparecem na verificação pedida pelo usuário.
     """
     prefs = core.ler_preferencias()
-    if not prefs.verificar:
+    if not prefs.verificar or not core.politica().atualizar:
         return
 
     def consultar():
