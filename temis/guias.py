@@ -119,10 +119,10 @@ GUIAS: dict[str, Guia] = {
             "apagada no dia seguinte.\n\n"
             "Aqui a página é aberta num navegador embutido e, no momento da "
             "captura, guarda-se o que a torna verificável: o endereço, o "
-            "que o servidor respondeu, o certificado do site com quem o "
-            "emitiu e para quem, o endereço de rede consultado "
-            "independentemente, a imagem da página inteira, o texto e o "
-            "código-fonte — cada peça com seu SHA-256."),
+            "certificado do site com quem o emitiu e para quem, o endereço "
+            "de rede consultado independentemente, a imagem do que a "
+            "janela exibia, a página inteira em PDF e o código-fonte como "
+            "o navegador o exibia — cada peça com seu SHA-256."),
         quando=(
             "Uma publicação em rede social, notícia ou página oficial é "
             "objeto ou prova da apuração.",
@@ -133,12 +133,18 @@ GUIAS: dict[str, Guia] = {
         ),
         passos=(
             "Digite o endereço na barra e navegue até a página exata — "
-            "role até o trecho que interessa, aceite o que precisar "
-            "aceitar, entre na conta se o conteúdo exigir.",
+            "role até o trecho que interessa. Nos avisos de cookies, "
+            "recuse os que não forem essenciais. Se o conteúdo exigir "
+            "conta, use a conta institucional destinada a diligências, e "
+            "nunca a pessoal: o nome da conta vai para o termo e para o "
+            "pacote de peças, e a plataforma pode avisar o titular da "
+            "página de quem a visitou.",
             "Clique em <b>Capturar esta página</b>. A captura é do que "
             "está na tela naquele instante.",
-            "Marque a opção de conteúdo restrito se ele só era visível "
-            "após login — isso fica declarado no termo.",
+            "Marque a opção de conteúdo restrito sempre que tiver entrado "
+            "em conta, e informe qual — isso fica declarado no termo. A "
+            "ferramenta não detecta o login sozinha: a declaração depende "
+            "de você.",
             "Confira as peças capturadas na lista e clique em <b>Gerar "
             "termo</b>.",
             "Use <b>Salvar peças (ZIP)</b> para guardar os arquivos "
@@ -189,8 +195,10 @@ GUIAS: dict[str, Guia] = {
         ),
         passos=(
             "Clique em <b>Nova varredura…</b> e escolha a pasta ou a "
-            "unidade. Leia o aviso: se o material é objeto de apuração, "
-            "marque <b>Origem em somente leitura</b>.",
+            "unidade. Marque <b>Origem em somente leitura</b> apenas se a "
+            "leitura estiver sendo feita através de bloqueador de escrita "
+            "ou sobre uma cópia: a opção não protege o dispositivo, só faz "
+            "o termo declarar essa condição, sob a sua palavra.",
             "Escolha onde gravar o índice. Ele é um arquivo só, que você "
             "reabre depois em <b>Abrir índice existente…</b>.",
             "Espere a indexação. Ela lê tudo uma vez; a partir daí a busca "
@@ -454,9 +462,10 @@ GUIAS: dict[str, Guia] = {
         passos=(
             "Preencha o <b>Número do processo</b>, o <b>Operador</b> e o "
             "<b>Objeto da diligência</b>. Os três saem no vídeo e no termo.",
-            "Escolha a <b>Área</b> — a área de trabalho inteira é a opção "
-            "mais segura, porque não deixa de fora o que estava no outro "
-            "monitor.",
+            "Escolha a <b>Área</b>. Prefira a janela ou o monitor em que "
+            "a diligência acontece: a área de trabalho inteira grava "
+            "também o que estiver nos outros monitores — e-mail, mensagens, "
+            "outros processos — e o vídeo vai para os autos como saiu.",
             "Se for narrar o que está fazendo, escolha o microfone em "
             "<b>Narração pelo microfone</b>.",
             "Clique em <b>Iniciar gravação</b> e escolha onde gravar. A "
@@ -484,8 +493,9 @@ GUIAS: dict[str, Guia] = {
             "custa os últimos dez a quinze segundos em vez do registro "
             "inteiro — mas o arquivo fica cerca de três vezes maior.",
             "A tela pode exibir dados pessoais de terceiros. Confira o "
-            "vídeo antes de juntá-lo, e use a Tarja Preta no que precisar "
-            "ser preservado.",
+            "vídeo antes de juntá-lo. Este sistema não tarja vídeo — a "
+            "Tarja Preta trata só PDF e imagem —, e por isso o cuidado é "
+            "anterior: feche o que não é da diligência antes de gravar.",
         ),
     ),
 
@@ -516,16 +526,17 @@ GUIAS: dict[str, Guia] = {
             "<b>Pré-visualizar termos</b> mostra quantos são e "
             "<b>Tarjar conteúdo entre [ ]</b> marca todos.",
             "Confira página por página antes de salvar.",
-            "Clique em <b>Salvar PDF tarjado</b>. O original permanece "
-            "intacto.",
+            "Clique em <b>Salvar PDF tarjado</b> e dê outro nome ao "
+            "resultado: a ferramenta não grava sobre o arquivo de origem.",
         ),
         limites=(
             "A rasterização torna o documento gerado uma imagem: ele deixa "
             "de ser pesquisável. É o preço de a tarja ser irreversível.",
             "Confira o resultado antes de entregar. O que não foi marcado "
             "continua legível.",
-            "Metadados do PDF não são tarjados. Se houver dado sensível "
-            "neles, verifique em Gerador de Hash e Metadados.",
+            "O documento gerado não leva os metadados, os anexos nem as "
+            "anotações do original: a página vira imagem, e só a imagem "
+            "segue.",
         ),
     ),
 
@@ -682,8 +693,10 @@ GUIAS: dict[str, Guia] = {
         finalidade=(
             "Obtém vídeo publicado em plataforma da internet e emite o "
             "termo que o identifica: o endereço, os dados que a "
-            "plataforma publicava naquele instante, a hora qualificada da "
-            "captura e o resumo criptográfico do arquivo.\n\n"
+            "plataforma publicava naquele instante, a hora da captura "
+            "pelo relógio da estação — com o fuso e o estado de "
+            "sincronização declarados — e o resumo criptográfico do "
+            "arquivo.\n\n"
             "Serve ao material que some. Vídeo em rede social desaparece "
             "porque o autor apaga, porque a plataforma remove, porque a "
             "conta é encerrada. Quem precisa dele num procedimento tem de "

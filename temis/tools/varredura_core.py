@@ -1229,7 +1229,12 @@ def intro_varredura(t: TermoVarredura) -> str:
     mes = MESES[t.mes - 1]
     quando = (f"Ao 1º dia do mês de {mes} de {t.ano}" if t.dia == 1
               else f"Aos {t.dia} dias do mês de {mes} de {t.ano}")
-    condicao = ("por meio de acesso somente para leitura"
+    # A condição é a declarada por quem operou. O programa não tem como
+    # verificar se havia bloqueador de escrita, e a peça não finge que
+    # verificou.
+    condicao = ("por meio de acesso somente para leitura — bloqueador de "
+                "escrita ou cópia —, conforme por mim declarado ao "
+                "iniciar a varredura"
                 if t.somente_leitura
                 else "mediante acesso direto ao dispositivo")
     return (

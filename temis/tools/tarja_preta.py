@@ -124,6 +124,18 @@ class Palavra:
     ordem: int
 
 
+def mesmo_arquivo(a, b) -> bool:
+    """Os dois caminhos levam ao mesmo arquivo?"""
+    import os
+    if not a or not b:
+        return False
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return (os.path.normcase(os.path.abspath(str(a)))
+                == os.path.normcase(os.path.abspath(str(b))))
+
+
 def palavras_da_pagina(pagina) -> list[Palavra]:
     """As palavras em ordem de leitura, para a seleção com o mouse.
 
@@ -1079,6 +1091,16 @@ class TarjaPretaTool(ToolPage):
             return
         if not out_path.lower().endswith(".pdf"):
             out_path += ".pdf"
+        if mesmo_arquivo(out_path, getattr(self, "_caminho_origem", "")):
+            # O guia promete que o original fica intacto, e o diálogo de
+            # salvar aceitava o próprio original como destino: o texto
+            # sob a tarja deixava de existir em qualquer lugar.
+            QMessageBox.warning(
+                self, "Destino recusado",
+                "O arquivo escolhido é o próprio documento de origem.\n\n"
+                "A Tarja Preta não grava sobre o original: escolha outro "
+                "nome ou outra pasta para o documento tarjado.")
+            return
 
         progress = QProgressDialog("Processando páginas…", None, 0, len(self._doc), self)
         progress.setWindowTitle("Salvando")

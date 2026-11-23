@@ -400,5 +400,33 @@ class ATarjaAcompanhaAPaginaGirada(Base):
         self.assertEqual(len(f._tarjas_por_pagina[0]), 3)
 
 
+class OOriginalNaoEDestino(Base):
+
+    def test_salvar_sobre_a_origem_e_recusado(self):
+        from PyQt6.QtWidgets import QFileDialog, QMessageBox
+        entrada = self.pdf_com_texto()
+        antes = Path(entrada).read_bytes()
+        avisos = []
+        trocas = (
+            (QFileDialog, "getOpenFileName",
+             staticmethod(lambda *a, **k: (entrada, ""))),
+            (QFileDialog, "getSaveFileName",
+             staticmethod(lambda *a, **k: (entrada, ""))),
+            (QMessageBox, "warning",
+             staticmethod(lambda *a, **k: avisos.append(a[1]))),
+        )
+        for alvo, nome, valor in trocas:
+            original = getattr(alvo, nome)
+            setattr(alvo, nome, valor)
+            self.addCleanup(setattr, alvo, nome, original)
+        f = tp.TarjaPretaTool()
+        self.addCleanup(f.deleteLater)
+        f._open_file()
+        f._tarjas_por_pagina = {0: [(fitz.Rect(0, 0, 50, 50), "manual")]}
+        f._save_pdf()
+        self.assertEqual(avisos, ["Destino recusado"])
+        self.assertEqual(Path(entrada).read_bytes(), antes)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
