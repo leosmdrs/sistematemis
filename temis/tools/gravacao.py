@@ -40,6 +40,7 @@ from .. import perfil
 from ..icons import draw_icon
 from ..impressao import (documento_html, imprimir_documento,
                          limpar_para_sei, preparar_escritor)
+from ..impressao import copiar_reservado
 from ..theme import PALETTE
 from ..widgets import (preparar_procedimento, ler_procedimento,
     
@@ -348,7 +349,7 @@ class TermoDialog(QDialog):
         self._vista.setHtml(core.build_html(self._atualizado()))
 
     def _copiar(self):
-        QGuiApplication.clipboard().setText(core.build_text(self._atualizado()))
+        copiar_reservado(core.build_text(self._atualizado()))
         self._aviso.setText("✓ Texto copiado")
 
     def _salvar_html(self):
@@ -877,7 +878,7 @@ class GravacaoTool(ToolPage):
         r = self._selecionado()
         if r is None:
             return
-        QGuiApplication.clipboard().setText(r.sha256)
+        copiar_reservado(r.sha256)
         self.status_msg.emit("SHA-256 copiado.")
 
 

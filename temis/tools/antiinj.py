@@ -31,6 +31,7 @@ from ..icons import draw_icon
 from ..impressao import (documento_html, imprimir_documento,
                          limpar_para_sei, preparar_escritor)
 from ..pdfview import PaginaPDF, VisorPDFContinuo
+from ..impressao import copiar_reservado
 from ..theme import PALETTE
 from ..widgets import (
     SidebarPanel, ViewerToolbar, field_label, fit_to_screen, hsep,
@@ -342,7 +343,7 @@ class ReportDialog(QDialog):
             self._when, self._declarante()))
 
     def _copy(self):
-        QGuiApplication.clipboard().setText(self._view.toPlainText())
+        copiar_reservado(self._view.toPlainText())
         self._feedback.setText("✓ Texto copiado")
 
     def _save_html(self):

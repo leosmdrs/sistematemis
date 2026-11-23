@@ -143,7 +143,11 @@ def ressalva() -> str:
     if e["sincronizado"] is True:
         texto += "No momento da emissão, o relógio constava como sincronizado"
         texto += (f' com "{e["fonte"]}"' if e["fonte"] else "")
-        texto += ". "
+        # O que se apurou foi o estado que o Windows declara. O desvio
+        # em relação à hora legal não foi medido — não há consulta a
+        # servidor de tempo —, e a peça não deixa supor que foi.
+        texto += (", segundo o serviço de tempo do Windows; o desvio em "
+                  "relação à hora legal não foi medido. ")
     elif e["sincronizado"] is False:
         # Sem asterisco de ênfase: esta frase é escapada e impressa como
         # texto, e o asterisco sairia literal no meio da peça.

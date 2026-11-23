@@ -107,5 +107,42 @@ class OTermoEditadoTemOsResumosConferidos(unittest.TestCase):
                          [self.A])
 
 
+class OTermoCopiadoFicaForaDoHistorico(unittest.TestCase):
+
+    def test_o_texto_vai_com_os_tres_avisos_ao_windows(self):
+        from PyQt6.QtGui import QGuiApplication
+        impressao.copiar_reservado("termo com dado do caso")
+        dados = QGuiApplication.clipboard().mimeData()
+        self.assertEqual(dados.text(), "termo com dado do caso")
+        formatos = " ".join(dados.formats())
+        for nome in ("ExcludeClipboardContentFromMonitorProcessing",
+                     "CanIncludeInClipboardHistory",
+                     "CanUploadToCloudClipboard"):
+            self.assertIn(nome, formatos)
+
+    def test_nenhuma_ferramenta_copia_sem_o_aviso(self):
+        raiz = Path(__file__).resolve().parents[1] / "temis"
+        diretos = [str(arq.relative_to(raiz))
+                   for arq in raiz.rglob("*.py")
+                   if "clipboard().setText(" in arq.read_text(
+                       encoding="utf-8")]
+        self.assertEqual(diretos, [])
+
+
+class AIntroducaoConcordaComAOperacao(unittest.TestCase):
+
+    def test_ao_e_a_conforme_a_operacao(self):
+        from temis.tools import derivado_core as dc
+        for operacao, esperado in (
+                ("compactação audiovisual", "à"),
+                ("mesclagem audiovisual", "à"),
+                ("recorte audiovisual", "ao"),
+                ("exame analítico", "ao"),
+                ("tarjamento de dados e informações protegidas", "ao"),
+                ("captura de material audiovisual publicado", "à")):
+            with self.subTest(operacao):
+                self.assertEqual(dc._ao(operacao), esperado)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

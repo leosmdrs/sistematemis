@@ -181,6 +181,14 @@ def _com_cargo(t: TermoDerivado) -> str:
     return " ".join(p for p in partes if p)
 
 
+def _ao(operacao: str) -> str:
+    """"ao" ou "à", conforme a operação: ao recorte, à compactação."""
+    primeira = (operacao or "").split(" ")[0].lower()
+    feminina = primeira.endswith(("ção", "são", "gem", "ura", "ise")) \
+        or primeira in ("captura", "censura", "juntada", "análise")
+    return "à" if feminina else "ao"
+
+
 def intro(t: TermoDerivado) -> str:
     mes = MESES[t.mes - 1] if 1 <= t.mes <= 12 else ""
     quando = (f"Ao {t.dia}º dia do mês de {mes} de {t.ano}" if t.dia == 1
@@ -192,7 +200,8 @@ def intro(t: TermoDerivado) -> str:
         f"{quando}, eu, {_com_cargo(t)}, matrícula {t.matricula}, "
         f"lotado(a) no(a) {t.lotacao}, visando instruir os autos "
         f"{artigo} {t.tipo_processo} nº {t.numero_processo}, declaro que "
-        f"procedi ao {t.operacao} {quantos}, cujos resumos criptográficos "
+        f"procedi {_ao(t.operacao)} {t.operacao} {quantos}, cujos resumos "
+        f"criptográficos "
         f"antes e depois da operação ficam adiante consignados."
     )
 

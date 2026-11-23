@@ -270,6 +270,34 @@ def confirmar_resumos(pai, html_gerado: str, texto_atual: str) -> bool:
     return resposta == QMessageBox.StandardButton.Yes
 
 
+def copiar_reservado(texto: str) -> None:
+    """Põe o texto na área de transferência, fora do histórico do Windows.
+
+    O termo copiado traz conteúdo do caso. O Windows guarda o que passa
+    pela área de transferência num histórico (Win+V) e, se a pessoa
+    ligou a sincronização, envia para a conta dela na nuvem e para os
+    outros aparelhos. Os três formatos abaixo são o meio que o próprio
+    Windows dá para um programa dizer "isto não": o histórico e a
+    sincronização passam a ignorar o conteúdo. Colar continua
+    funcionando normalmente.
+
+    Fora do Windows os formatos não significam nada, e são ignorados.
+    """
+    from PyQt6.QtCore import QByteArray, QMimeData
+    from PyQt6.QtGui import QGuiApplication
+
+    dados = QMimeData()
+    dados.setText(texto or "")
+    zero = QByteArray(b"\x00\x00\x00\x00")
+    for formato, valor in (
+            ("ExcludeClipboardContentFromMonitorProcessing", zero),
+            ("CanIncludeInClipboardHistory", zero),
+            ("CanUploadToCloudClipboard", zero)):
+        dados.setData(
+            f'application/x-qt-windows-mime;value="{formato}"', valor)
+    QGuiApplication.clipboard().setMimeData(dados)
+
+
 def conferir_gravado(caminho) -> None:
     """Levanta `OSError` se o arquivo não existir ou estiver vazio.
 

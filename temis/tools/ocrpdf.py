@@ -30,6 +30,7 @@ from .. import perfil
 from ..icons import draw_icon
 from ..impressao import (documento_html, imprimir_documento,
                          limpar_para_sei, preparar_escritor)
+from ..impressao import copiar_reservado
 from ..theme import PALETTE
 from ..widgets import (preparar_procedimento, ler_procedimento,
     
@@ -134,7 +135,7 @@ class TextoDialog(QDialog):
         copiar = QPushButton("Copiar texto")
         copiar.setCursor(Qt.CursorShape.PointingHandCursor)
         copiar.clicked.connect(
-            lambda: QGuiApplication.clipboard().setText(vista.toPlainText()))
+            lambda: copiar_reservado(vista.toPlainText()))
         rodape.addWidget(copiar)
         rodape.addStretch()
         fechar = QPushButton("Fechar")
@@ -307,7 +308,7 @@ class TermoDialog(QDialog):
         self._vista.setHtml(core.build_html(self._atualizado()))
 
     def _copiar(self):
-        QGuiApplication.clipboard().setText(core.build_text(self._atualizado()))
+        copiar_reservado(core.build_text(self._atualizado()))
         self._aviso.setText("✓ Texto copiado")
 
     def _salvar_html(self):
@@ -783,7 +784,7 @@ class OCRPDFTool(ToolPage):
         d = self._selecionado()
         if d is None or not d.gerou:
             return
-        QGuiApplication.clipboard().setText(d.hash_saida)
+        copiar_reservado(d.hash_saida)
         self.status_msg.emit("SHA-256 do documento gerado copiado.")
 
     # ── termo ────────────────────────────────────

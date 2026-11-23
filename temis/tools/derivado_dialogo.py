@@ -28,6 +28,7 @@ from .. import perfil
 from ..icons import draw_icon
 from ..impressao import (documento_html, imprimir_documento,
                          limpar_para_sei, preparar_escritor)
+from ..impressao import copiar_reservado
 from ..theme import PALETTE
 from ..widgets import (preparar_procedimento, ler_procedimento,
     NoScrollComboBox, field_label, fit_to_screen, hsep,
@@ -243,7 +244,7 @@ class TermoDerivadoDialog(QDialog):
         self._anunciar(f"HTML salvo em {caminho}")
 
     def _copiar(self):
-        QGuiApplication.clipboard().setText(
+        copiar_reservado(
             self._core.build_texto(self._atualizado()))
         self._anunciar("Texto copiado")
 

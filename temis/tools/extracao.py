@@ -45,6 +45,7 @@ from .. import perfil
 from ..icons import draw_icon
 from ..impressao import (documento_html, imprimir_documento,
                          limpar_para_sei, preparar_escritor)
+from ..impressao import copiar_reservado
 from ..theme import PALETTE
 from ..widgets import (preparar_procedimento, ler_procedimento,
     
@@ -292,7 +293,7 @@ class TermoDialog(QDialog):
         self._vista.setHtml(core.build_html(self._atualizado()))
 
     def _copiar(self):
-        QGuiApplication.clipboard().setText(core.build_text(self._atualizado()))
+        copiar_reservado(core.build_text(self._atualizado()))
         self._aviso.setText("✓ Texto copiado")
 
     def _salvar_html(self):
@@ -954,7 +955,7 @@ class ExtracaoTool(ToolPage):
         if self._sessao is None or not self._sessao.bons:
             return
         texto = "\n".join(f"{b.sha256}  {b.nome}" for b in self._sessao.bons)
-        QGuiApplication.clipboard().setText(texto)
+        copiar_reservado(texto)
         self.status_msg.emit("Resumos criptográficos copiados.")
 
     # ── termo ────────────────────────────────────

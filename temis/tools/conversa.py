@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..icons import draw_icon
+from ..impressao import copiar_reservado
 from ..theme import PALETTE
 from ..widgets import (SidebarPanel, field_label, group_title, hsep,
                        ler_procedimento, output_button, preparar_procedimento,
@@ -267,7 +268,7 @@ class _TermoConversaDialog(QDialog):
     def _copiar(self):
         from ..impressao import limpar_para_sei
         from PyQt6.QtWidgets import QApplication
-        QApplication.clipboard().setText(limpar_para_sei(self._html))
+        copiar_reservado(limpar_para_sei(self._html))
         QMessageBox.information(
             self, "Copiado",
             "O termo foi copiado, pronto para colar no editor do SEI.")

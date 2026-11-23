@@ -173,6 +173,12 @@ def localizar(nome: str) -> Path | None:
     for caminho in _candidatos(nome):
         if caminho.is_file():
             return caminho
+    # O programa instalado usa o FFmpeg que veio com ele, e nenhum
+    # outro: o do PATH é um binário qualquer da estação, que a peça
+    # declararia como se fosse o empacotado. Rodando do código-fonte, em
+    # desenvolvimento, o do PATH serve.
+    if getattr(sys, "frozen", False):
+        return None
     from shutil import which
     achado = which(nome)
     return Path(achado) if achado else None

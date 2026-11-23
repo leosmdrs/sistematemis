@@ -503,7 +503,10 @@ ALTERACOES = (
     "dispositivo.",
     "A estação de trabalho foi autorizada no aparelho mediante confirmação "
     "na tela deste, procedimento que grava a chave pública do computador "
-    "na relação de máquinas confiáveis do dispositivo.",
+    "na relação de máquinas confiáveis do dispositivo. Essa autorização "
+    "permanece no aparelho depois de encerrada a diligência, e pode ser "
+    "retirada por quem o detém, em Opções do desenvolvedor, Revogar "
+    "autorizações de depuração USB.",
     "Para o espelhamento, um componente de software foi transferido ao "
     "aparelho e nele executado enquanto durou a sessão, sendo encerrado ao "
     "final.",

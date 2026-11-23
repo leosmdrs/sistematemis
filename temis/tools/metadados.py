@@ -30,6 +30,7 @@ from .. import perfil
 from ..icons import draw_icon
 from ..impressao import (documento_html, imprimir_documento,
                          limpar_para_sei, preparar_escritor)
+from ..impressao import copiar_reservado
 from ..theme import PALETTE
 from ..widgets import (preparar_procedimento, ler_procedimento,
     
@@ -300,7 +301,7 @@ class TermoDialog(QDialog):
                                  self._view.toPlainText())
 
     def _copiar(self):
-        QGuiApplication.clipboard().setText(self._view.toPlainText())
+        copiar_reservado(self._view.toPlainText())
         self._aviso.setText("✓ Texto copiado")
 
     def _salvar_html(self):
@@ -872,7 +873,7 @@ class MetadadosTool(ToolPage):
         a = self._atual()
         if a is None:
             return
-        QGuiApplication.clipboard().setText(self._view.toPlainText())
+        copiar_reservado(self._view.toPlainText())
         self.status_msg.emit("Metadados copiados.")
 
     # ── termo ────────────────────────────────────

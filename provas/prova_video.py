@@ -360,6 +360,28 @@ class OTermoDescreveOArquivoEntregue(ComFFmpeg):
         self.assertEqual(simples.trilhas_que_ficam_de_fora, "")
 
 
+class OProgramaInstaladoSoUsaOFFmpegQueVeioComEle(unittest.TestCase):
+
+    def test_empacotado_nao_recorre_ao_path(self):
+        import shutil
+        guardado = getattr(sys, "frozen", None)
+        original = vc._candidatos
+        vc._candidatos = lambda nome: []
+        sys.frozen = True
+
+        def repor():
+            vc._candidatos = original
+            if guardado is None:
+                del sys.frozen
+            else:
+                sys.frozen = guardado
+
+        self.addCleanup(repor)
+        if shutil.which("ffmpeg") is None:
+            self.skipTest("sem FFmpeg no PATH para tentar")
+        self.assertIsNone(vc.localizar("ffmpeg"))
+
+
 class APecaDizOQueAConferenciaSignifica(unittest.TestCase):
 
     def test_as_tres_situacoes_tem_redacao_propria(self):

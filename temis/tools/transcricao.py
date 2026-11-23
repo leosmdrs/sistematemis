@@ -26,6 +26,7 @@ from .. import perfil
 from ..icons import draw_icon
 from ..impressao import (documento_html, imprimir_documento,
                          limpar_para_sei, preparar_escritor)
+from ..impressao import copiar_reservado
 from ..theme import PALETTE
 from ..widgets import (preparar_procedimento, ler_procedimento,
     
@@ -798,7 +799,7 @@ class TranscricaoTool(ToolPage):
         for t in self._deg.trechos:
             quem = f"{t.locutor}: " if t.locutor else ""
             linhas.append(f"[{t.marca}] {quem}{t.texto.strip()}")
-        QGuiApplication.clipboard().setText("\n".join(linhas))
+        copiar_reservado("\n".join(linhas))
         self.status_msg.emit("Transcrição copiada.")
 
     def _gerar_termo(self):
