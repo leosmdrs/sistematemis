@@ -306,7 +306,25 @@ def _abrir_pacote(caminho: Path, conversa: Conversa) -> None:
             # que a citasse: um vídeo encaminhado dez vezes era lido dez
             # vezes, e a memória ia a três vezes e meia o tamanho dele.
             from .hash_core import sha256_de_membro
-            presentes = {Path(n).name: n for n in nomes if n != alvo}
+            # A mensagem cita a mídia só pelo nome. Havendo no pacote
+            # dois arquivos de mesmo nome, em pastas diferentes, não há
+            # como saber qual é o citado: um se sobrepunha ao outro, e a
+            # peça atribuía à mensagem o resumo de um deles como certo.
+            # Nome repetido fica sem resumo, e a peça avisa.
+            por_nome: dict = {}
+            for n in nomes:
+                if n != alvo and not n.endswith("/"):
+                    por_nome.setdefault(Path(n).name, []).append(n)
+            repetidos = sorted(k for k, v in por_nome.items() if len(v) > 1)
+            if repetidos:
+                conversa.avisos.append(
+                    "O pacote tem mais de um arquivo com o mesmo nome ("
+                    + ", ".join(repetidos[:5])
+                    + ("…" if len(repetidos) > 5 else "")
+                    + "). As mensagens que os citam ficaram sem resumo de "
+                    "mídia, por não ser possível saber a qual se referem.")
+            presentes = {k: v[0] for k, v in por_nome.items()
+                         if len(v) == 1}
             resumos: dict = {}
             for m in conversa.mensagens:
                 if m.midia and m.midia in presentes:

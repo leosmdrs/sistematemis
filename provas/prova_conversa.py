@@ -260,5 +260,25 @@ class AMidiaEResumidaUmaVezEmBlocos(unittest.TestCase):
         self.assertEqual(chamadas, ["IMG-1.jpg"])
 
 
+class MidiaDeNomeRepetidoNaoRecebeResumoAlheio(unittest.TestCase):
+
+    def test_homonimos_ficam_sem_resumo_e_a_peca_avisa(self):
+        texto = ("10/01/2025 09:00 - Fulano: IMG-1.jpg (arquivo anexado)\n"
+                 "10/01/2025 09:01 - Fulano: IMG-2.jpg (arquivo anexado)\n")
+        with tempfile.TemporaryDirectory() as pasta:
+            alvo = Path(pasta) / "conversa.zip"
+            with zipfile.ZipFile(alvo, "w") as z:
+                z.writestr("_chat.txt", texto)
+                z.writestr("a/IMG-1.jpg", b"uma imagem")
+                z.writestr("b/IMG-1.jpg", b"outra imagem")
+                z.writestr("IMG-2.jpg", b"terceira")
+            conversa = cc.abrir(str(alvo))
+        um, dois = conversa.mensagens
+        self.assertEqual(um.midia_sha256, "")
+        self.assertTrue(dois.midia_sha256)
+        self.assertTrue(any("mesmo nome" in a and "IMG-1.jpg" in a
+                            for a in conversa.avisos))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
