@@ -374,8 +374,16 @@ class TarjaPretaTool(ToolPage):
     meta = META
 
     PATTERNS = {
-        "CPF  (000.000.000-00)":     r"\d{3}\.?\d{3}\.?\d{3}-?\d{2}",
-        "CNPJ (00.000.000/0000-00)": r"\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}",
+        # Entre os grupos aceita-se o que aparece nas peças de verdade:
+        # ponto, espaço, quebra de linha, barra, hífen e os travessões
+        # que os editores de texto põem no lugar do hífen. Onze ou
+        # catorze algarismos soltos no meio de um número maior não contam.
+        "CPF  (000.000.000-00)": (
+            r"(?<!\d)\d{3}[\s.]{0,2}\d{3}[\s.]{0,2}\d{3}"
+            r"[\s./\-‐‑‒–—]{0,3}\d{2}(?!\d)"),
+        "CNPJ (00.000.000/0000-00)": (
+            r"(?<!\d)\d{2}[\s.]{0,2}\d{3}[\s.]{0,2}\d{3}"
+            r"[\s./\-‐‑‒–—]{0,3}\d{4}[\s./\-‐‑‒–—]{0,3}\d{2}(?!\d)"),
         "RG   (números)":            r"\b\d{1,2}\.?\d{3}\.?\d{3}-?[\dXx]\b",
         "Telefone":                  r"(?:\+55\s?)?(?:\(?\d{2}\)?\s?)(?:9\s?)?\d{4,5}-?\d{4}",
         "E-mail":                    r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}",
@@ -1035,27 +1043,41 @@ class TarjaPretaTool(ToolPage):
         for pi in self._pages_in_scope(self._scope_combo):
             page = self._doc[pi]
             if kind == "Texto livre":
-                achados = list(page.search_for(termo))
+                rects = [no_papel(page, r) for r in page.search_for(termo)]
             else:
                 pattern = termo if kind == "Regex personalizado" else self.PATTERNS[kind]
-                # Cada valor distinto é procurado uma vez: `search_for`
-                # já devolve todas as ocorrências dele na página, e
-                # procurá-lo a cada repetição contava n² tarjas para n
-                # ocorrências.
-                valores = dict.fromkeys(
-                    m.group()
-                    for m in re.finditer(pattern, page.get_text("text"),
-                                         flags) if m.group())
-                achados = []
-                for valor in valores:
-                    achados.extend(page.search_for(valor))
-            rects = [no_papel(page, r) for r in achados]
+                rects = tarja_core.localizar(page, pattern, flags)
 
             if rects:
                 self._tarjas_por_pagina.setdefault(pi, []).extend(
                     (r, "busca") for r in rects)
                 total_hits += len(rects)
 
+        self._visor.redesenhar()
+        self._update_tarja_count()
+        sem_texto = tarja_core.paginas_sem_texto(
+            self._doc, self._pages_in_scope(self._scope_combo))
+        if sem_texto:
+            # Dito na hora e com os números: a busca não leu estas
+            # páginas, e nada do que se afirma acima vale para elas.
+            quais = ", ".join(str(i + 1) for i in sem_texto[:30])
+            if len(sem_texto) > 30:
+                quais += "…"
+            self._lbl_hits.setText(
+                f"{total_hits} ocorrência(s) tarjada(s) — "
+                f"{len(sem_texto)} página(s) sem texto NÃO pesquisada(s)")
+            self.status_msg.emit(
+                f"Busca concluída — {total_hits} ocorrência(s); "
+                f"{len(sem_texto)} página(s) sem camada de texto ficaram "
+                "de fora")
+            QMessageBox.warning(
+                self, "Páginas não pesquisadas",
+                f"{len(sem_texto)} página(s) deste documento são imagem, "
+                "sem camada de texto, e a busca automática não as "
+                f"alcança:\n\n{quais}\n\nConfira essas páginas e tarje "
+                "à mão o que for preciso — ou passe o documento antes "
+                "pelo PDF Pesquisável.")
+            return
         self._visor.redesenhar()
         self._update_tarja_count()
         self._lbl_hits.setText(f"✓ {total_hits} ocorrência(s) tarjada(s)")

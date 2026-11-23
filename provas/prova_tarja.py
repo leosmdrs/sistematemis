@@ -428,5 +428,113 @@ class OOriginalNaoEDestino(Base):
         self.assertEqual(Path(entrada).read_bytes(), antes)
 
 
+class ABuscaAchaODadoComoEleVemEscrito(Base):
+    """O CPF das peças não vem sempre como 000.000.000-00.
+
+    Vem com espaço, com barra, com o travessão que o editor de texto põe
+    no lugar do hífen, e partido entre duas linhas. Cinco de sete
+    formatos comuns escapavam da busca automática, sem aviso.
+    """
+
+    FORMATOS = ("123.456.789-00", "12345678900", "123 456 789 00",
+                "123.456.789/00", "123.456.789–00", "123.456.789 - 00",
+                "123.456.789 00")
+
+    def padrao(self):
+        return next(v for k, v in tp.TarjaPretaTool.PATTERNS.items()
+                    if k.startswith("CPF"))
+
+    def pagina_com(self, linhas):
+        doc = fitz.open()
+        pagina = doc.new_page()
+        for i, linha in enumerate(linhas):
+            # Fonte que tem o travessão: a padrão o troca por outro
+            # sinal ao escrever, e a prova mediria a fonte, não a busca.
+            pagina.insert_text((72, 100 + 30 * i), linha, fontsize=12,
+                               fontname="china-s")
+        self.addCleanup(doc.close)
+        return pagina
+
+    def cobre(self, pagina, barras, trecho):
+        """Toda palavra do trecho está sob alguma barra?"""
+        for palavra in trecho.split():
+            for achado in pagina.search_for(palavra):
+                centro = fitz.Point((achado.x0 + achado.x1) / 2,
+                                    (achado.y0 + achado.y1) / 2)
+                if not any(b.contains(centro) for b in barras):
+                    return False
+        return True
+
+    def test_os_sete_formatos_sao_achados(self):
+        for formato in self.FORMATOS:
+            with self.subTest(formato):
+                pagina = self.pagina_com([f"Titular: {formato} ."])
+                barras = tc.localizar(pagina, self.padrao())
+                self.assertTrue(barras, "não achou")
+                self.assertTrue(self.cobre(pagina, barras, formato))
+
+    def test_cpf_partido_entre_duas_linhas_e_coberto_nas_duas(self):
+        pagina = self.pagina_com(["inscrito no CPF 123.456.", "789-00, residente"])
+        barras = tc.localizar(pagina, self.padrao())
+        self.assertEqual(len(barras), 2)
+        self.assertTrue(self.cobre(pagina, barras, "123.456. 789-00,"))
+
+    def test_numero_maior_nao_e_tomado_por_cpf(self):
+        pagina = self.pagina_com(["Protocolo 1234567890012345",
+                                  "Processo 08650.000123/2026-11"])
+        self.assertEqual(tc.localizar(pagina, self.padrao()), [])
+
+    def test_o_que_nao_e_o_dado_nao_e_coberto(self):
+        pagina = self.pagina_com(["Nome: Fulano", "CPF 123.456.789-00"])
+        barras = tc.localizar(pagina, self.padrao())
+        nome = pagina.search_for("Fulano")[0]
+        centro = fitz.Point((nome.x0 + nome.x1) / 2, (nome.y0 + nome.y1) / 2)
+        self.assertFalse(any(b.contains(centro) for b in barras))
+
+
+class PaginaSemTextoEAvisada(Base):
+
+    def misto(self):
+        doc = fitz.open()
+        doc.new_page().insert_text((72, 100), "CPF 123.456.789-00")
+        imagem = self.imagem("digitalizada.png")
+        folha = doc.new_page()
+        folha.insert_image(folha.rect, filename=imagem)
+        doc.new_page().insert_text((72, 100), "texto")
+        alvo = self.caminho("misto.pdf")
+        doc.save(alvo)
+        doc.close()
+        return alvo
+
+    def test_as_paginas_imagem_sao_listadas(self):
+        doc = fitz.open(self.misto())
+        self.assertEqual(tc.paginas_sem_texto(doc, range(3)), [1])
+        doc.close()
+
+    def test_a_busca_avisa_quais_paginas_nao_leu(self):
+        from PyQt6.QtWidgets import QFileDialog, QMessageBox
+        entrada = self.misto()
+        avisos = []
+        for alvo, nome, valor in (
+                (QFileDialog, "getOpenFileName",
+                 staticmethod(lambda *a, **k: (entrada, ""))),
+                (QMessageBox, "warning",
+                 staticmethod(lambda *a, **k: avisos.append(a[2])))):
+            original = getattr(alvo, nome)
+            setattr(alvo, nome, valor)
+            self.addCleanup(setattr, alvo, nome, original)
+        f = tp.TarjaPretaTool()
+        self.addCleanup(f.deleteLater)
+        f._open_file()
+        f._search_combo.setCurrentText(
+            next(k for k in f.PATTERNS if k.startswith("CPF")))
+        f._scope_combo.setCurrentText("Todas as páginas")
+        f._search_and_redact()
+        self.assertEqual(len(f._tarjas_por_pagina.get(0, [])), 1)
+        self.assertEqual(len(avisos), 1)
+        self.assertIn("\n\n2\n\n", avisos[0])
+        self.assertIn("NÃO pesquisada", f._lbl_hits.text())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

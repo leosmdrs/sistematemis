@@ -162,6 +162,78 @@ def no_papel(pagina, retangulo) -> "fitz.Rect":
     return r
 
 
+def localizar(pagina, padrao: str, flags: int = 0) -> list:
+    """Onde o padrão ocorre na página — retângulos na folha exibida.
+
+    A busca é feita sobre as palavras da página unidas por um espaço, e
+    não sobre o texto corrido: assim o dado partido entre duas linhas, ou
+    escrito com espaços entre os grupos, é achado como uma coisa só.
+    Cada ocorrência é coberta pelas palavras que a contêm, uma barra por
+    linha. Cobrir a palavra inteira pode levar junto um sinal de
+    pontuação colado ao dado; deixar de fora um pedaço dele, não.
+
+    Era feito de outro jeito: achava-se o trecho no texto corrido e
+    pedia-se à biblioteca a posição daquele trecho literal. Com quebra
+    de linha no meio, a posição não era encontrada, e a ocorrência
+    passava sem tarja e sem aviso.
+    """
+    import re
+
+    try:
+        cruas = pagina.get_text("words")
+    except Exception:                                       # noqa: BLE001
+        return []
+    palavras = sorted(cruas, key=lambda p: (int(p[5]), int(p[6]), int(p[7])))
+    texto, posicoes = "", []
+    for p in palavras:
+        if texto:
+            texto += " "
+        posicoes.append((len(texto), len(texto) + len(p[4]), p))
+        texto += p[4]
+
+    barras = []
+    for m in re.finditer(padrao, texto, flags):
+        if m.end() <= m.start():
+            continue
+        por_linha: dict = {}
+        for inicio, fim, p in posicoes:
+            if inicio < m.end() and fim > m.start():
+                chave = (int(p[5]), int(p[6]))
+                r = fitz.Rect(p[0], p[1], p[2], p[3])
+                por_linha[chave] = (por_linha[chave] | r
+                                    if chave in por_linha else r)
+        barras.extend(
+            no_papel(pagina, fitz.Rect(r.x0 - 1, r.y0 - 1, r.x1 + 1, r.y1 + 1))
+            for r in por_linha.values())
+    # A mesma palavra pode servir a duas ocorrências vizinhas.
+    unicas, vistas = [], set()
+    for r in barras:
+        chave = (round(r.x0, 1), round(r.y0, 1), round(r.x1, 1),
+                 round(r.y1, 1))
+        if chave not in vistas:
+            vistas.add(chave)
+            unicas.append(r)
+    return unicas
+
+
+def paginas_sem_texto(doc, indices) -> list:
+    """Das páginas dadas, as que não têm palavra alguma a pesquisar.
+
+    Num documento misto — parte digital, parte digitalizada — a busca
+    automática percorre só o que tem texto. As páginas-imagem ficavam
+    sem tarja e sem menção, e o "N ocorrências tarjadas" era lido como
+    "o documento está limpo".
+    """
+    vazias = []
+    for i in indices:
+        try:
+            if not doc[i].get_text("words"):
+                vazias.append(i)
+        except Exception:                                   # noqa: BLE001
+            vazias.append(i)
+    return vazias
+
+
 def compor(doc, tarjas_por_pagina: dict, escala: float = ESCALA,
            progresso=None, cancelado=None) -> tuple:
     """Rasteriza cada página, cobre as áreas e devolve (documento, resumo).
