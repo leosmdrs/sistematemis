@@ -23,7 +23,7 @@ sistema faz quanto a cada um:
 | Princípio | Como o sistema atende |
 |---|---|
 | **Auditabilidade** — um avaliador independente deve poder avaliar as atividades realizadas | Toda peça declara com o que foi produzida: versão do sistema, do sistema operacional e de cada componente que executou a operação, mais o resumo criptográfico do próprio executável. O código-fonte é público, sob AGPL-3.0. |
-| **Repetibilidade** — mesmo resultado, mesmo procedimento, mesmas condições | O Relatório de Atividades registra cada ação da sessão, encadeada por resumo. As operações da Análise de Planilha, da Tarja Preta e da Edição de Vídeo são determinísticas e declaradas. |
+| **Repetibilidade** — mesmo resultado, mesmo procedimento, mesmas condições | O Relatório de Atividades registra cada ação da sessão, encadeada por resumo; a corrente acusa alteração feita à mão no arquivo, e só vale contra quem o detém quando o resumo de fecho é citado em peça que circula. As operações da Análise de Planilha, da Tarja Preta e da Edição de Vídeo são determinísticas e declaradas. |
 | **Reprodutibilidade** — mesmo resultado, mesmo procedimento, **em outro ambiente** | Três ferramentas produzem roteiro re-executável, salvo em arquivo próprio: quem tiver o original e o roteiro obtém o mesmo resultado noutra estação. A peça informa se a re-execução reproduziu. |
 | **Justificabilidade** — demonstrar que o método escolhido era adequado | Cada termo traz suas ressalvas: o que a operação faz, o que não faz, e o que a peça não está afirmando. As escolhas que mudam resultado vão declaradas, e não implícitas. |
 
@@ -57,7 +57,7 @@ arquivamento.
 | Diretriz | Como o sistema atende |
 |---|---|
 | **Transparência do método** — os métodos devem poder ser examinados por peritos independentes | Código-fonte público, e cada peça nomeia as versões que executaram a operação. |
-| **Registrar o que se fez** — documentar cada passo, com horário | Relatório de Atividades, gravado enquanto a sessão corre e encadeado por resumo. Cada peça carimba o instante em que os resumos foram tomados, com fuso. |
+| **Registrar o que se fez** — documentar cada passo, com horário | Relatório de Atividades, gravado enquanto a sessão corre e encadeado por resumo — sem chave nem carimbo de terceiro: a âncora é a citação do resumo de fecho fora do arquivo. Cada peça carimba o instante em que os resumos foram tomados, com fuso. |
 | **Desvio do relógio** — a diretriz manda registrar o relógio e o seu desvio | As peças declaram o fuso e o **estado de sincronização** do relógio da estação, apurado junto ao sistema operacional, e advertem que não constituem carimbo de tempo certificado. |
 | **Cadeia de custódia** — descrever onde a evidência foi encontrada, como foi manuseada e tudo o que lhe aconteceu | O termo de juntada registra de quem, por que meio e quando o material foi recebido; os termos derivados identificam original e produzido pelos resumos; a conferência de integridade confronta o resumo declarado na entrega. |
 | **Arquivamento** — preservar a evidência de alteração e registrar quem teve acesso | O original nunca é alterado. Cada peça produzida é identificada por resumo criptográfico, o que torna qualquer alteração posterior detectável. |

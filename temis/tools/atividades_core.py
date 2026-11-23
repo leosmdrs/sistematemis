@@ -155,6 +155,10 @@ class Sessao:
     #: citação que vem a força do registro: publicado o resumo, qualquer
     #: alteração posterior no arquivo passa a ser detectável contra ele.
     elo_final: str = ""
+    #: De que o fecho é feito. O 1 não cobria as falhas do registrador;
+    #: o 2 cobre. Sessão gravada antes continua conferindo pelo 1 — sem
+    #: isto, toda sessão antiga passaria a constar como adulterada.
+    fecho_versao: int = 1
 
     # ── leitura ──────────────────────────────
     @property
@@ -234,6 +238,12 @@ class Registrador:
 
     def anotar(self, ferramenta: str, texto: str):
         """Guarda o que uma ferramenta relatou, se valer registro."""
+        if self.sessao.encerrada:
+            # O fecho já foi calculado e pode já estar citado numa peça.
+            # Relato que chega depois — uma tarefa que termina durante o
+            # fechamento — não entra: entrando, a sessão passaria a
+            # constar como adulterada na próxima conferência.
+            return
         texto = (texto or "").strip()
         simples = _sem_acento(texto)
         if simples in RUIDO or simples.startswith(RUIDO_INICIO):
@@ -259,6 +269,7 @@ class Registrador:
         self.sessao.fim = datetime.datetime.now().astimezone().isoformat(
             timespec="seconds")
         self.sessao.encerrada = True
+        self.sessao.fecho_versao = FECHO_ATUAL
         self.sessao.elo_final = fecho_de(self.sessao)
         self.gravar(forcar=True)
         try:
@@ -266,7 +277,11 @@ class Registrador:
             destino.write_text(relatorio_html(self.sessao), encoding="utf-8")
             return destino
         except OSError as e:
+            # A falha entra no registro, e o fecho cobre as falhas: é
+            # refeito. Não há relatório em circulação com o anterior —
+            # foi justamente ele que não se conseguiu escrever.
             self.sessao.erros.append(f"relatório: {type(e).__name__}: {e}")
+            self.sessao.elo_final = fecho_de(self.sessao)
             self.gravar(forcar=True)
             return None
 
@@ -339,12 +354,17 @@ class Registrador:
 #  LEITURA DAS SESSÕES GRAVADAS
 # ─────────────────────────────────────────
 
+#: A versão do fecho que as sessões novas recebem.
+FECHO_ATUAL = 2
+
+
 def fecho_de(s: Sessao) -> str:
     """O resumo da sessão inteira, para ser citado fora dela.
 
     Cobre a identificação, a máquina, quem operava, cada passagem por
-    ferramenta e cada anotação, na ordem em que estão. Não cobre a si
-    mesmo, evidentemente — por isso é calculado uma vez, no encerramento.
+    ferramenta, cada anotação e — da versão 2 em diante — cada falha do
+    próprio registrador, na ordem em que estão. Não cobre a si mesmo,
+    evidentemente — por isso é calculado no encerramento.
     """
     h = hashlib.sha256()
 
@@ -361,6 +381,8 @@ def fecho_de(s: Sessao) -> str:
         somar(u.chave, u.nome, u.abriu, u.fechou, round(u.segundos, 3))
     for a in s.anotacoes:
         somar(a.quando, a.ferramenta, a.texto, a.elo)
+    if s.fecho_versao >= 2:
+        somar("erros", len(s.erros), *s.erros)
     return h.hexdigest()
 
 
@@ -429,9 +451,15 @@ def ler_sessao(arquivo: Path) -> Sessao | None:
                   if isinstance(u, dict)],
             anotacoes=[Anotacao(**a) for a in dados.get("anotacoes", [])
                        if isinstance(a, dict)],
-            erros=list(dados.get("erros", [])),
+            erros=[str(x) for x in dados.get("erros", [])],
+            # O fecho é lido como foi gravado. Já ficou de fora daqui: a
+            # sessão encerrada voltava do disco sem ele, e o relatório
+            # refeito a dava por "não encerrada normalmente" — com a
+            # data de encerramento impressa logo acima.
+            elo_final=str(dados.get("elo_final", "")),
+            fecho_versao=int(dados.get("fecho_versao", 1) or 1),
         )
-    except TypeError:
+    except (TypeError, ValueError):
         return None
 
 
