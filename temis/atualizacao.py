@@ -14,6 +14,12 @@ o da release daquela versão, neste repositório, e a versão tem de ser um
 número. O resumo é conferido de novo no instante de executar. A estação
 pode desligar a atualização ou fixar uma versão por política (`politica`).
 
+E o manifesto é assinado. Quem publica guarda uma chave privada fora do
+repositório; a pública vai embutida aqui (`CHAVES_PUBLICAS`). Versão,
+resumo e tamanho do instalador só são aceitos com a assinatura dessa
+chave — de modo que escrever no repositório deixa de bastar para fazer
+chegar um instalador às estações.
+
 Sobre confiança, com franqueza: quem tiver poder de escrita no endereço
 de publicação pode fazer chegar código a todas as estações que usam o
 sistema. O hash protege contra um download corrompido ou adulterado no
@@ -81,6 +87,61 @@ _VERSAO = re.compile(r"\d{1,4}\.\d{1,4}\.\d{1,4}(\.\d{1,4})?")
 _HEX64 = re.compile(r"[0-9a-f]{64}")
 
 
+#: Chaves públicas de quem publica, em hexadecimal — 64 caracteres cada.
+#: Com ao menos uma aqui, o programa só aceita atualização cujo manifesto
+#: traga a assinatura de uma delas. Vazia, a assinatura não é exigida:
+#: é o estado de antes de a primeira chave ser gerada.
+#:
+#: Quem gera, registra e usa as chaves é o `build/assinatura.py`. Duas
+#: chaves são melhor que uma: a de uso e uma de reserva, guardada em
+#: outro lugar — perdida a única, nenhuma estação volta a se atualizar
+#: sem reinstalação manual.
+# <chaves-publicas>
+CHAVES_PUBLICAS: tuple = ()
+# </chaves-publicas>
+
+#: O que precede o conteúdo assinado. Amarra a assinatura a este uso:
+#: uma assinatura feita com a mesma chave para outra coisa não serve
+#: aqui, nem a daqui serve lá.
+_CONTEXTO_DA_ASSINATURA = "SistemaTemis atualizacao v1"
+
+
+def conteudo_assinado(versao: str, sha256: str, tamanho: int) -> bytes:
+    """O que a assinatura cobre: a versão, o resumo e o tamanho.
+
+    São os três dados que decidem o que a estação instala. O endereço
+    não entra porque não é escolha do manifesto — é função da versão. As
+    notas e a marca de versão crítica ficam de fora: quem alterasse o
+    manifesto poderia mudar o texto exibido, mas não o que é instalado.
+    """
+    return (f"{_CONTEXTO_DA_ASSINATURA}\n{versao}\n{sha256.lower()}\n"
+            f"{int(tamanho)}\n").encode("utf-8")
+
+
+def assinatura_confere(versao: str, sha256: str, tamanho: int,
+                       assinatura: str, chaves=None) -> bool:
+    """A assinatura é de uma das chaves de publicação? Nunca levanta."""
+    import base64
+    import binascii
+
+    from . import ed25519
+
+    chaves = CHAVES_PUBLICAS if chaves is None else chaves
+    try:
+        bruta = base64.b64decode((assinatura or "").strip(), validate=True)
+    except (binascii.Error, ValueError):
+        return False
+    mensagem = conteudo_assinado(versao, sha256, tamanho)
+    for chave in chaves:
+        try:
+            publica = bytes.fromhex(str(chave).strip())
+        except ValueError:
+            continue
+        if ed25519.confere(publica, mensagem, bruta):
+            return True
+    return False
+
+
 def versao_valida(versao: str) -> bool:
     return bool(_VERSAO.fullmatch(versao or ""))
 
@@ -125,6 +186,18 @@ class Atualizacao:
     publicado: str = ""
     #: Quando verdadeiro, a tela insiste; ainda assim não instala sozinha.
     critica: bool = False
+    #: Assinatura de quem publica sobre a versão, o resumo e o tamanho.
+    assinatura: str = ""
+
+    @property
+    def assinada(self) -> bool:
+        """A assinatura confere — ou não há chave que a exija."""
+        if not CHAVES_PUBLICAS:
+            return True
+        # Sem tamanho não há o que conferir: ele faz parte do assinado,
+        # e é o teto do download.
+        return self.tamanho > 0 and assinatura_confere(
+            self.versao, self.sha256, self.tamanho, self.assinatura)
 
     @property
     def valida(self) -> bool:
@@ -164,6 +237,7 @@ def de_dict(dados: dict) -> Atualizacao:
         notas=str(dados.get("notas", "")).strip(),
         publicado=str(dados.get("publicado", "")).strip(),
         critica=bool(dados.get("critica", False)),
+        assinatura=str(dados.get("assinatura", "")).strip(),
     )
 
 
@@ -173,6 +247,13 @@ def de_dict(dados: dict) -> Atualizacao:
 
 class ErroAtualizacao(Exception):
     """Falha ao consultar ou baixar — sempre com mensagem em português."""
+
+
+ERRO_ASSINATURA = (
+    "Há uma versão anunciada no endereço de atualização, mas o anúncio não "
+    "traz a assinatura de quem publica o sistema. Nada foi baixado nem "
+    "instalado. Se o aviso persistir, comunique o responsável pelo "
+    "sistema.")
 
 
 class _SoHTTPS(urllib.request.HTTPRedirectHandler):
@@ -240,6 +321,8 @@ def consultar(url: str = URL_MANIFESTO) -> Atualizacao | None:
     if regra.versao_fixada and comparar(nova.versao, regra.versao_fixada) > 0:
         # A estação foi fixada numa versão: a mais nova não é oferecida.
         return None
+    if not nova.assinada:
+        raise ErroAtualizacao(ERRO_ASSINATURA)
     return nova
 
 
@@ -267,6 +350,8 @@ def baixar(info: Atualizacao, progresso=None, cancelado=None) -> Path:
         raise ErroAtualizacao(
             "O manifesto de versão está incompleto ou aponta para fora "
             "do endereço oficial de publicação.")
+    if not info.assinada:
+        raise ErroAtualizacao(ERRO_ASSINATURA)
     destino = pasta_download() / f"SistemaTemis-{info.versao}-setup.exe"
     parcial = destino.with_suffix(".parcial")
     digestor = hashlib.sha256()

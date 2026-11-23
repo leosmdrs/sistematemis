@@ -165,9 +165,14 @@ jobs:
           | Commit | ``$env:GITHUB_SHA`` |
           | Instalador | ``$($instalador.Name)`` ($mb MB) |
           | SHA-256 | ``$hash`` |
+          | Tamanho | ``$($instalador.Length)`` bytes |
 
-          Para publicar: crie a release com a etiqueta ``v${{ inputs.versao }}``
-          apontando para o commit acima e anexe os dois arquivos do artefato.
+          Para publicar, assine o manifesto na sua máquina, com a chave de
+          publicação, e informe a assinatura ao rodar "Publicar release":
+
+          ``````
+          python build/assinatura.py assinar --chave CAMINHO-DA-CHAVE --versao ${{ inputs.versao }} --sha256 $hash --tamanho $($instalador.Length)
+          ``````
           "@ | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
       - uses: actions/upload-artifact@v4

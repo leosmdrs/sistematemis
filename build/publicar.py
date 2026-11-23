@@ -131,7 +131,7 @@ def compilar_instalador(versao: str) -> Path | None:
 
 
 def escrever_manifesto(instalador: Path, versao: str, notas: str,
-                       repositorio: str, critica: bool):
+                       repositorio: str, critica: bool, chave: str = ""):
     url = (f"https://github.com/{repositorio}/releases/download/"
            f"v{versao}/{instalador.name}")
     manifesto = {
@@ -152,6 +152,15 @@ def escrever_manifesto(instalador: Path, versao: str, notas: str,
             componentes[nome] = sha256(arquivo)
     if componentes:
         manifesto["componentes"] = componentes
+    if chave:
+        # Publicação feita à mão, com a chave à mão: o manifesto já sai
+        # assinado. Na compilação pelo GitHub a chave não está lá, e a
+        # assinatura é feita depois (build/assinatura.py assinar).
+        sys.path.insert(0, str(RAIZ / "build"))
+        import assinatura
+        manifesto["assinatura"] = assinatura.assinar(
+            assinatura.ler_chave(chave), versao, manifesto["sha256"],
+            manifesto["tamanho"])
     alvo = DIST / "versao.json"
     alvo.write_text(json.dumps(manifesto, ensure_ascii=False, indent=2),
                     encoding="utf-8")
@@ -169,6 +178,9 @@ def main() -> int:
                     help="Arquivo de texto com as novidades da versão")
     ap.add_argument("--repositorio", default=REPOSITORIO_PADRAO,
                     help="usuario/repositorio no GitHub")
+    ap.add_argument("--chave", default="",
+                    help="Arquivo da chave de publicação, para o manifesto "
+                         "já sair assinado (publicação feita à mão)")
     ap.add_argument("--critica", action="store_true",
                     help="Marca a atualização como importante")
     ap.add_argument("--so-manifesto", action="store_true",
@@ -198,7 +210,7 @@ def main() -> int:
         return 1
 
     escrever_manifesto(instalador, args.versao, notas, args.repositorio,
-                       args.critica)
+                       args.critica, args.chave)
     return 0
 
 

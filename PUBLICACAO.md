@@ -54,6 +54,69 @@ no repositório. Ver `ASSINATURA.md`.
 
 ---
 
+## Assinatura do manifesto
+
+Quem tem escrita no repositório publica um `versao.json`. Para que isso
+não baste para fazer um instalador chegar às estações, o anúncio de
+versão é **assinado** com uma chave que não está no repositório.
+
+- A **chave privada** fica só com quem publica, fora do computador de
+  uso diário — num pendrive. É um arquivo de texto pequeno.
+- A **chave pública** vai embutida no programa, em
+  `temis/atualizacao.py` (`CHAVES_PUBLICAS`).
+- A assinatura cobre a **versão**, o **SHA-256** e o **tamanho** do
+  instalador. A estação recusa a atualização se ela faltar ou não
+  conferir. As notas da versão não são assinadas: alterá-las muda o
+  texto exibido, não o que é instalado.
+
+Enquanto `CHAVES_PUBLICAS` estiver vazia, nada é exigido — é o estado
+de antes da primeira chave.
+
+### Uma vez: gerar as chaves
+
+Com o pendrive em `E:`, da raiz do projeto:
+
+```
+python build/assinatura.py gerar-chave E:\temis-publicacao.chave
+python build/assinatura.py gerar-chave F:\temis-reserva.chave
+```
+
+Cada comando grava a chave privada no arquivo indicado e registra a
+pública no programa. **Faça duas**, e guarde a de reserva em outro
+lugar: perdida a única chave, nenhuma estação volta a se atualizar sem
+reinstalação manual. Depois, faça o commit de `temis/atualizacao.py`.
+
+A exigência começa a valer **na estação** a partir da versão que levar
+a chave pública. Essa versão ainda chega pelo caminho antigo; as
+seguintes só chegam assinadas.
+
+### A cada versão: assinar
+
+O resumo da compilação ("Instalador") mostra o comando pronto, com a
+versão, o SHA-256 e o tamanho. Rode-o na sua máquina, com o pendrive:
+
+```
+python build/assinatura.py assinar --chave E:\temis-publicacao.chave --versao 1.16.0 --sha256 <resumo> --tamanho <bytes>
+```
+
+Ele imprime a assinatura. Cole-a no campo **assinatura** ao rodar
+"Publicar release". O fluxo a confere contra as chaves do programa antes
+de publicar, e a grava no `versao.json` da release.
+
+Antes de assinar, confira que o SHA-256 é o do instalador que você quer
+publicar: assinar é dizer às estações "podem instalar isto".
+
+### Se a chave vazar ou se perder
+
+- **Vazou:** gere outra, retire a antiga de `CHAVES_PUBLICAS` e publique
+  uma versão assinada com a de reserva. Enquanto essa versão não chegar
+  às estações, elas ainda aceitam a chave vazada.
+- **Perdeu-se a de uso:** assine com a de reserva, gere outra e
+  registre-a.
+- **Perderam-se as duas:** as estações precisam de reinstalação manual.
+
+---
+
 ## Dependências fixadas
 
 O `requirements.txt` diz o que o programa precisa, com versão mínima. O
