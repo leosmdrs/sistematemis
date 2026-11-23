@@ -178,6 +178,18 @@ def ferramentas_online() -> list[str]:
     return [m.name for m, _ in REGISTRY if m.online and m.available]
 
 
+def acessos_acessorios() -> list[tuple[str, str]]:
+    """(nome, o que faz na rede) das ferramentas que saem sem ser de rede.
+
+    A Degravação trabalha na máquina, mas na primeira vez busca os
+    modelos de fala fora dela. Não é ferramenta "de rede", e por isso
+    ficava fora de toda declaração — o que fazia o portal e o Sobre
+    afirmarem menos acessos do que o programa faz.
+    """
+    return [(m.name, m.rede_acessoria) for m, _ in REGISTRY
+            if m.rede_acessoria and m.available]
+
+
 def enumerar(nomes: list[str]) -> str:
     """Lista nomes em português: "A", "A e B", "A, B e C"."""
     if not nomes:
@@ -405,6 +417,8 @@ class PortalPage(QWidget):
             texto += enumerar(online)
             texto += (" acessa a rede." if len(online) == 1
                       else " acessam a rede.")
+        for nome, o_que in acessos_acessorios():
+            texto += f"  A {nome} {o_que}."
         # A verificação de atualização é acesso à rede, e a promessa acima
         # ficaria pela metade se ela não fosse dita no mesmo lugar.
         texto += ("  Ao abrir, o sistema consulta se há versão nova, sem "
@@ -811,7 +825,7 @@ class SobreDialog(QDialog):
         # partir do registro: concorda em número e nomeia quem sai.
         if online:
             abertura = (
-                "O sistema acessa a rede <b>apenas</b> nestas situações, "
+                "O sistema acessa a rede nestas situações, "
                 "todas visíveis: "
                 + ("a ferramenta " if len(online) == 1
                    else "as ferramentas ")
@@ -820,7 +834,7 @@ class SobreDialog(QDialog):
                 + "num navegador dedicado o endereço que o operador "
                   "indicar; e a ")
         else:
-            abertura = "O sistema acessa a rede <b>apenas</b> para a "
+            abertura = "O sistema acessa a rede para a "
         texto = QLabel(
             f"<p>Versão <b>{__version__}</b> — {disponiveis} de "
             f"{len(REGISTRY)} ferramentas disponíveis.</p>"
@@ -836,6 +850,9 @@ class SobreDialog(QDialog):
             "<p>" + abertura
             + "<b>verificação de atualização</b>, que lê um arquivo de "
             "versão e não envia identificação do usuário nem da estação.</p>"
+            + "".join(f"<p>A <b>{nome}</b> {o_que}.</p>"
+                      for nome, o_que in acessos_acessorios())
+            +
             f"<p style='margin-top:12px;color:{PALETTE['text2']}'>"
             f"Criado por <b style='color:{PALETTE['text']}'>{__author__}"
             "</b></p>")
@@ -1005,7 +1022,8 @@ class TemisWindow(QMainWindow):
         self._pages[self.PORTAL] = self._stack.addWidget(self._portal)
 
         bar = self.statusBar()
-        self._status_right = QLabel(f"v{__version__}   •   Processamento local")
+        self._status_right = QLabel(
+            f"v{__version__}   •   Os arquivos não saem desta máquina")
         self._status_right.setObjectName("muted")
         bar.addPermanentWidget(self._status_right)
 

@@ -145,8 +145,9 @@ GUIAS: dict[str, Guia] = {
             "originais da captura, com índice e hashes.",
         ),
         limites=(
-            "Esta é a única ferramenta do sistema que acessa a internet. "
-            "O endereço visitado sai desta máquina.",
+            "Esta ferramenta acessa a internet: o endereço visitado sai "
+            "desta máquina, e o nome do domínio é consultado junto ao "
+            "registro de domínios (RDAP) a cada captura.",
             "O registro prova o que estava publicado naquele endereço "
             "naquele momento, e não a veracidade do que ali se afirma.",
             "Conteúdo atrás de login é capturado como você o vê, com a sua "
@@ -711,9 +712,8 @@ GUIAS: dict[str, Guia] = {
             "resultado a este arquivo pelo resumo.",
         ),
         limites=(
-            "Esta é a única ferramenta do sistema que sai para a "
-            "internet, e a única cuja peça não promete "
-            "reprodutibilidade — nem poderia. Baixar o mesmo endereço "
+            "Esta ferramenta sai para a internet, e é a única cuja "
+            "peça não promete reprodutibilidade — nem poderia. Baixar o mesmo endereço "
             "noutro momento pode devolver arquivo diferente, ou nenhum: a "
             "plataforma recodifica o material e remove conteúdo. O que a "
             "peça afirma é que este arquivo, com este resumo, foi obtido "

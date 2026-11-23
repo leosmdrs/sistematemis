@@ -48,6 +48,9 @@ META = ToolMeta(
         "basta nomear cada voz uma vez. Emite termo de degravação com o "
         "resumo SHA-256 da mídia de origem."
     ),
+    rede_acessoria=(
+        "baixa de repositório público, uma única vez, os modelos de "
+        "reconhecimento de fala; a gravação não sai da máquina"),
 )
 
 FILTRO = (

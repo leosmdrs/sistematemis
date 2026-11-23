@@ -64,6 +64,14 @@ class OReadmeAcompanhaORegistro(unittest.TestCase):
             with self.subTest(nome):
                 self.assertEqual(MARCA_REDE in linha, nome in online)
 
+    def test_quem_baixa_algo_da_rede_diz_isso_na_propria_linha(self):
+        acessorios = {m.name for m, _ in REGISTRY if m.rede_acessoria}
+        self.assertIn("Degravação", acessorios)
+        for nome, linha in linhas_da_tabela():
+            if nome in acessorios:
+                with self.subTest(nome):
+                    self.assertIn("baixa", linha)
+
     def test_as_contagens_escritas_por_extenso_conferem(self):
         secao = secao_ferramentas().lower()
         total = len(REGISTRY)

@@ -30,6 +30,11 @@ class ToolMeta:
     #: uma ferramenta que sai da máquina precisa dizer isso ao usuário, e
     #: não ficar escondida atrás da promessa geral.
     online: bool = False
+    #: Acesso à rede que não é o propósito da ferramenta, mas acontece:
+    #: a frase que o descreve, pronta para ser lida depois do nome dela
+    #: ("A Degravação baixa…"). O portal, o Sobre e o README a repetem —
+    #: acesso que só o código conhece é acesso escondido.
+    rede_acessoria: str = ""
 
 
 class ToolPage(QWidget):

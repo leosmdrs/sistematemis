@@ -70,7 +70,11 @@ META = ToolMeta(
     online=True,
 )
 
-PAGINA_INICIAL = "https://www.gov.br/prf/pt-br"
+#: Em branco. Já foi a página do órgão: abrir a ferramenta fazia uma
+#: requisição que ninguém pediu, a um endereço que nenhum documento do
+#: sistema declarava. A ferramenta só sai à rede para onde o operador
+#: mandar.
+PAGINA_INICIAL = "about:blank"
 
 
 # ─────────────────────────────────────────
@@ -482,7 +486,9 @@ class ConstatacaoTool(ToolPage):
         self._btn_termo.setEnabled(False)
         painel.footer.addWidget(self._btn_termo)
         painel.add_note(
-            "Sessão anônima: nada fica gravado nesta máquina ao fechar.")
+            "Sessão anônima: o navegador não guarda cookies nem "
+            "histórico ao fechar. As peças capturadas ficam na pasta de "
+            "dados desta estação até serem apagadas.")
         return painel
 
     # ── navegação ────────────────────────────────
@@ -505,7 +511,7 @@ class ConstatacaoTool(ToolPage):
 
     def _ao_navegar(self, url: QUrl):
         endereco = url.toString()
-        self._in_url.setText(endereco)
+        self._in_url.setText("" if endereco == PAGINA_INICIAL else endereco)
         seguro = endereco.lower().startswith("https://")
         self._lbl_cadeado.setPixmap(
             draw_icon("check" if seguro else "info", 14,
@@ -573,7 +579,11 @@ class ConstatacaoTool(ToolPage):
     """
 
     def _ao_carregar(self, ok: bool):
-        self._btn_capturar.setEnabled(bool(ok) and not self._capturando)
+        # Só há o que constatar em endereço da rede: a página em branco
+        # do início não é captura.
+        na_rede = self._pagina.url().scheme() in ("http", "https")
+        self._btn_capturar.setEnabled(
+            bool(ok) and na_rede and not self._capturando)
         if not ok:
             self.status_msg.emit("Não foi possível carregar o endereço.")
             return
@@ -594,6 +604,8 @@ class ConstatacaoTool(ToolPage):
     # ── captura ──────────────────────────────────
     def _capturar(self):
         if not WEBVIEW_DISPONIVEL or self._capturando:
+            return
+        if self._pagina.url().scheme() not in ("http", "https"):
             return
         self._capturando = True
         self._btn_capturar.setEnabled(False)

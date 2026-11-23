@@ -7,11 +7,14 @@ conteúdo publicado na internet, degravação de oitivas, organização de
 evidências e montagem da Informação de juízo de admissibilidade.
 
 Os arquivos não saem da máquina: nenhum documento, hash ou metadado é
-enviado a servidor algum. Os acessos à rede são dois, ambos visíveis: a
+enviado a servidor algum. Os acessos à rede são poucos e declarados: a
 verificação de atualização ao abrir — que lê um arquivo de versão, sem
 enviar identificação do usuário ou da estação, e pode ser desligada em
-**Sobre** — e a Constatação Web, que por definição acessa a página que se
-quer constatar.
+**Sobre** —; as três ferramentas que existem para ir à rede (Constatação
+Web, Extração Registrada e Vídeo da Internet), que acessam o endereço
+que o operador indicar; e a Degravação, que na primeira vez baixa os
+modelos de reconhecimento de fala. O `REDE.md` relaciona cada um, com
+destino e conteúdo.
 
 ## Autoria e vínculo
 
@@ -92,15 +95,17 @@ registro do próprio trabalho.
 | **Vídeo da Internet** | **Acessa a rede.** Obtém vídeo publicado em plataforma da internet e emite o termo que o identifica: o endereço, os dados que a plataforma publicava naquele instante, a hora qualificada da captura e o resumo criptográfico do arquivo. Alcança somente o que está publicamente acessível, e a peça não promete reprodutibilidade — a plataforma pode servir outro arquivo amanhã, ou nenhum. |
 | **Quadro de Evidências** | Mural de vínculos da investigação: anotações, imagens e marcações conectadas, organizadas por caso. Serve para enxergar as relações entre pessoas, fatos e provas antes de redigir a peça. |
 | **Varredura** | Indexa um pendrive, um cartão ou uma pasta inteira: SHA-256 de cada arquivo e o texto que houver, inclusive o de páginas digitalizadas, por reconhecimento óptico. A busca passa a ser instantânea e não toca mais no dispositivo, que pode ser lacrado. Aponta os duplicados. |
-| **Degravação** | Transcreve áudio e vídeo com reconhecimento de fala executado na própria máquina; nenhum trecho é enviado a serviço externo. Separa automaticamente quem fala, na cronologia da gravação, e basta nomear cada voz uma vez. |
+| **Degravação** | Transcreve áudio e vídeo com reconhecimento de fala executado na própria máquina; nenhum trecho é enviado a serviço externo. Na primeira vez, baixa os modelos de fala de repositório público, conferidos por resumo — depois disso trabalha sem rede. Separa automaticamente quem fala, na cronologia da gravação, e basta nomear cada voz uma vez. |
 | **Reconstruir Conversa** | Reconstrói a conversa exportada de um aplicativo (texto ou pacote com mídias) num documento conferível, identificado pelo resumo criptográfico do arquivo de origem; as mídias do pacote são resumidas em SHA-256. Atesta que a reconstrução corresponde ao arquivo — não a autenticidade da conversa. |
 | **Edição de Vídeo** | Compactar, fatiar e mesclar gravações para a juntada aos autos. Trabalha com videomonitoramento, câmeras corporais e vídeos anexados pelas partes. |
 | **Relatório de Atividades** | Documenta cada execução do sistema, do abrir ao fechar, sem que ninguém precise ligá-la: ferramentas usadas e por quanto tempo, o que cada uma relatou ao concluir, e a identificação da estação e da rede. Grava enquanto a sessão corre. Fica só nesta máquina. |
 
 Três acessam a rede, e estão marcadas acima. As outras catorze leem e
-processam tudo na própria estação. Fora delas, o sistema só sai à rede
+processam tudo na própria estação; uma delas, a Degravação, busca os
+modelos de fala na primeira vez. Fora isso, o sistema só sai à rede
 para conferir se há versão nova, sem enviar identificação — e isso se
-desliga em **Sobre**.
+desliga em **Sobre**. A Constatação Web, além da página constatada,
+consulta o registro do domínio (RDAP) a cada captura.
 ### Heurísticas do Anti-Injection
 
 | Código | Detecta | Severidade base |
@@ -127,11 +132,10 @@ limitações que o navegador impunha:
 - **Termo editável com verificação de integridade.** O documento pode ser
   ajustado antes de exportar, e o PDF sai do que está na tela — o
   `QTextDocument` é clonado, não remontado a partir dos dados, senão as
-  edições seriam descartadas em silêncio. Como a coluna de hash também
-  fica editável, antes de exportar cada hash é reprocurado no texto
-  (ignorando espaços, porque a célula quebra o valor em várias linhas); se
-  algum não conferir, o usuário é avisado de que o termo não comprovará a
-  integridade daquele arquivo.
+  edições seriam descartadas em silêncio. A coluna de hash também fica
+  editável, e **o programa não reconfere os hashes do texto editado**
+  antes de exportar: quem ajusta a redação responde por não tocar nos
+  resumos, e deve conferi-los na peça exportada.
 - **PDF de verdade** via `QPdfWriter`, em vez de depender de
   “Imprimir → Salvar como PDF” do navegador.
 - **Arrastar e soltar** arquivos, ausente no original.

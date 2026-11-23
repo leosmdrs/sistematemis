@@ -50,10 +50,26 @@ class OSobreDizAVerdadeSobreARede(unittest.TestCase):
         # Nomear quem não sai gasta a marca de quem sai.
         online = set(ferramentas_online())
         for meta, _ in REGISTRY:
-            if meta.name in online:
+            if meta.name in online or meta.rede_acessoria:
                 continue
             with self.subTest(meta.name):
                 self.assertNotIn(meta.name, self.texto)
+
+    def test_nomeia_quem_sai_a_rede_sem_ser_ferramenta_de_rede(self):
+        # A Degravação trabalha na máquina, mas busca os modelos fora
+        # dela. Ficava de fora de toda declaração, e o Sobre afirmava
+        # menos acessos do que o programa faz.
+        from temis.shell import acessos_acessorios
+        declarados = acessos_acessorios()
+        self.assertTrue(any(nome == "Degravação" for nome, _ in declarados))
+        for nome, o_que in declarados:
+            with self.subTest(nome):
+                self.assertIn(nome, self.texto)
+                self.assertIn(o_que, self.texto)
+
+    def test_nao_promete_que_os_acessos_sao_apenas_estes(self):
+        self.assertNotIn("apenas", self.texto.split("Criado por")[0]
+                         .split("O sistema acessa a rede")[1])
 
     def test_concorda_em_numero_com_quantas_saem(self):
         quantas = len(ferramentas_online())
