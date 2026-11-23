@@ -393,7 +393,7 @@ class VideoTool(ToolPage):
         linha.addLayout(col_f)
         lay.addLayout(linha)
 
-        self._lbl_trecho = subtext("", wrap=True)
+        self._lbl_trecho = subtext("", wrap=True, formatado=True)
         lay.addWidget(self._lbl_trecho)
         for campo in (self._in_inicio, self._in_fim):
             campo.textChanged.connect(self._atualizar_trecho)

@@ -938,6 +938,8 @@ class PlanilhaTool(ToolPage):
         p.header.addWidget(abrir)
 
         self._lbl_arquivo = QLabel("Nenhuma planilha aberta")
+        # Mostra o nome do arquivo recebido: texto simples, sempre.
+        self._lbl_arquivo.setTextFormat(Qt.TextFormat.PlainText)
         self._lbl_arquivo.setObjectName("subtext")
         self._lbl_arquivo.setWordWrap(True)
         p.header.addWidget(self._lbl_arquivo)

@@ -15,6 +15,7 @@ existir arquivo não há bytes a resumir.
 
 from __future__ import annotations
 
+from html import escape as _escape_html
 from pathlib import Path
 
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
@@ -30,6 +31,11 @@ from ..widgets import (NoScrollComboBox, SidebarPanel, field_label,
 from . import videoweb_core as vc
 from .base import ToolMeta, ToolPage
 from .derivado_dialogo import TermoDerivadoDialog
+
+
+def _escapar(valor) -> str:
+    """Dado da plataforma, pronto para entrar em rótulo formatado."""
+    return _escape_html(str(valor))
 
 
 class Sondador(QThread):
@@ -153,7 +159,11 @@ class VideoWebTool(ToolPage):
         lay.setContentsMargins(20, 18, 20, 16)
         lay.setSpacing(10)
 
+        # Título, canal e descrição são preenchidos por quem publicou.
+        # Entram como texto simples, ou escapados onde o rótulo é
+        # formatado: nada do que vem da plataforma é lido como marcação.
         self._lbl_titulo = QLabel("Nenhum endereço consultado")
+        self._lbl_titulo.setTextFormat(Qt.TextFormat.PlainText)
         self._lbl_titulo.setWordWrap(True)
         self._lbl_titulo.setStyleSheet(
             "font-size: 17px; font-weight: 800;")
@@ -167,6 +177,7 @@ class VideoWebTool(ToolPage):
 
         lay.addWidget(hsep())
         self._lbl_descricao = QLabel("")
+        self._lbl_descricao.setTextFormat(Qt.TextFormat.PlainText)
         self._lbl_descricao.setWordWrap(True)
         self._lbl_descricao.setObjectName("subtext")
         self._lbl_descricao.setAlignment(
@@ -217,18 +228,20 @@ class VideoWebTool(ToolPage):
             "unlisted": "não listada",
         }.get(p.disponibilidade, p.disponibilidade or "—")
         cor = (PALETTE["text3"] if p.publica else PALETTE["warning"])
+        e = _escapar
         linhas = [
-            f"<b>Canal:</b> {p.canal or '—'}",
-            f"<b>Publicado em:</b> {p.publicado_em or '—'}",
-            f"<b>Duração:</b> {vc.formatar_duracao(p.duracao)}",
-            f"<b>Plataforma:</b> {p.extrator or '—'}",
+            f"<b>Canal:</b> {e(p.canal or '—')}",
+            f"<b>Publicado em:</b> {e(p.publicado_em or '—')}",
+            f"<b>Duração:</b> {e(vc.formatar_duracao(p.duracao))}",
+            f"<b>Plataforma:</b> {e(p.extrator or '—')}",
             f"<b>Disponibilidade:</b> "
-            f"<span style='color:{cor}'>{disponibilidade}</span>",
+            f"<span style='color:{cor}'>{e(disponibilidade)}</span>",
         ]
         if p.licenca:
-            linhas.append(f"<b>Licença declarada:</b> {p.licenca}")
+            linhas.append(f"<b>Licença declarada:</b> {e(p.licenca)}")
         if p.restricao_idade:
-            linhas.append(f"<b>Restrição de idade:</b> {p.restricao_idade} anos")
+            linhas.append(
+                f"<b>Restrição de idade:</b> {e(p.restricao_idade)} anos")
         self._lbl_dados.setText("<br/>".join(linhas))
         self._lbl_descricao.setText(p.descricao or "")
 

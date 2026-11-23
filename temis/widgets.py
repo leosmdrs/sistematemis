@@ -262,8 +262,23 @@ def vsep(height: int = 24) -> QFrame:
     return line
 
 
-def subtext(text: str = "", wrap: bool = False) -> QLabel:
+def subtext(text: str = "", wrap: bool = False,
+            formatado: bool = False) -> QLabel:
+    """Rótulo secundário, de texto simples.
+
+    Texto simples por construção, e não por acaso: o QLabel, deixado no
+    automático, decide sozinho se o que recebeu é marcação — e vários
+    destes rótulos mostram dado de terceiro, como o título da página sob
+    constatação. Uma página que se intitulasse `<img src="...">` fazia a
+    estação ler o arquivo apontado, e podia compor na tela da ferramenta
+    um aviso que não é dela.
+
+    `formatado=True` é para o rótulo que recebe marcação escrita aqui
+    dentro. Dado de fora, nele, entra por `html.escape`.
+    """
     lbl = QLabel(text)
+    lbl.setTextFormat(Qt.TextFormat.RichText if formatado
+                      else Qt.TextFormat.PlainText)
     lbl.setObjectName("subtext")
     lbl.setWordWrap(wrap)
     return lbl
