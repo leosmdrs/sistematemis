@@ -1465,7 +1465,7 @@ class QuadroTool(ToolPage):
             return
         self._gravar()
         self._abrir_caso(self._casos[idx])
-        self.status_msg.emit(f"Caso: {self._caso.nome}")
+        self.status_msg.emit(f"Caso: “{self._caso.nome}”")
 
     def _novo_caso(self):
         nome, ok = QInputDialog.getText(self, "Novo caso", "Nome do caso:")
@@ -1477,7 +1477,7 @@ class QuadroTool(ToolPage):
         self._abrir_caso(caso)
         self._recarregar_casos()
         self._gravar()
-        self.status_msg.emit(f"Caso criado: {caso.nome}")
+        self.status_msg.emit(f"Caso criado: “{caso.nome}”")
 
     def _abrir_gerenciador(self):
         self._gravar()
@@ -1497,7 +1497,7 @@ class QuadroTool(ToolPage):
         self._caso.nome = nome.strip()
         self._recarregar_casos()
         self._gravar()
-        self.status_msg.emit(f"Caso renomeado: {self._caso.nome}")
+        self.status_msg.emit(f"Caso renomeado: “{self._caso.nome}”")
 
     def _excluir_caso(self):
         if len(self._casos) <= 1:

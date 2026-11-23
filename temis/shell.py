@@ -166,6 +166,16 @@ class ToolTile(QFrame):
 #  PORTAL
 # ─────────────────────────────────────────
 
+#: O registro é de uma execução do programa, e não de um procedimento.
+#: Recomendar a juntada sem dizer isso levava o registro de um caso aos
+#: autos de outro.
+AVISO_REGISTRO_POR_EXECUCAO = (
+    "<b>O registro cobre tudo o que foi feito desde que o programa "
+    "abriu.</b> Se nesta sessão você trabalhou em mais de um "
+    "procedimento, não o junte a nenhum deles: feche e abra o programa "
+    "a cada procedimento, para que cada um tenha o seu registro.")
+
+
 def ferramentas_online() -> list[str]:
     """As ferramentas disponíveis que saem à rede.
 
@@ -1003,10 +1013,13 @@ class TemisWindow(QMainWindow):
             "tempo, e o que cada uma relatou ao concluir — em ordem "
             "cronológica e encadeada por resumo criptográfico.<br><br>"
             "<b>Nada é enviado a servidor algum.</b> Não se anota o "
-            "conteúdo dos arquivos examinados, o texto digitado, os "
-            "endereços visitados nem nomes de investigados. O registro "
-            "pode ser lido e apagado por quem opera, na ferramenta "
-            "Relatório de Atividades.")
+            "conteúdo dos arquivos examinados nem o texto digitado. Do "
+            "que as ferramentas relatam, saem antes de anotar os nomes "
+            "de arquivo, os endereços, os números com forma de documento "
+            "ou de processo e o que vier entre aspas — termo pesquisado, "
+            "nome de caso. É um filtro pela forma do texto: confira o "
+            "registro antes de juntá-lo. Ele pode ser lido e apagado por "
+            "quem opera, na ferramenta Relatório de Atividades.")
         caixa.setStandardButtons(QMessageBox.StandardButton.Ok)
         caixa.button(QMessageBox.StandardButton.Ok).setText("Entendi")
         caixa.exec()
@@ -1282,6 +1295,7 @@ class TemisWindow(QMainWindow):
                 corpo += (" Reunida assim, a diligência inteira fica pronta "
                           "para juntar aos autos, e cada peça carrega a "
                           "sessão em que nasceu.")
+            corpo += "<br><br>" + AVISO_REGISTRO_POR_EXECUCAO
             corpo += ("<br><br>A pasta será aberta a seguir:<br><code>"
                       + _html.escape(str(pasta_sessao)) + "</code>")
             return True, "<b>A sessão foi registrada.</b>", corpo
@@ -1292,6 +1306,7 @@ class TemisWindow(QMainWindow):
             "sido gerados durante ela. O registro documenta, em ordem "
             "cronológica e encadeada, o que foi feito, e é o que reforça a "
             "cadeia de custódia das peças produzidas.")
+        corpo += "<br><br>" + AVISO_REGISTRO_POR_EXECUCAO
         if destino:
             corpo += ("<br><br>O relatório foi gravado em:<br>"
                       f"<code>{_html.escape(str(destino))}</code>")

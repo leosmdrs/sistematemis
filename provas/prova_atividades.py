@@ -141,5 +141,65 @@ class RelatoDepoisDoFechoNaoEntra(Base):
         self.assertEqual(ac.conferir(self.do_disco(r))[0], "integro")
 
 
+class ORegistroNaoGuardaDadoDeCaso(Base):
+    """O ato fica; o que identifica o caso sai antes de ser anotado."""
+
+    CASOS = (
+        ("Pesquisa “123.456.789-00” registrada no termo (3 resultado(s)).",
+         ("123.456.789-00",)),
+        ("Caso: “Operação Exemplo”", ("Operação Exemplo",)),
+        ("Resultado salvo: oitiva-fulano-de-tal.xlsx",
+         ("oitiva-fulano-de-tal",)),
+        (r"Aberto: C:\Users\beltrano\Documentos\PAD 08650.000123-2026\a.pdf",
+         ("beltrano", "08650", "a.pdf")),
+        ("Acesso a endereço https://sistema.exemplo/consulta?cpf=1",
+         ("sistema.exemplo",)),
+        ("Enviado para fulano.silva@exemplo.gov.br", ("fulano.silva",)),
+        ("Processo 08650.000123/2026-11 conferido", ("000123",)),
+    )
+
+    def test_o_dado_sai_e_o_ato_fica(self):
+        for texto, proibidos in self.CASOS:
+            with self.subTest(texto[:30]):
+                limpo = ac.sem_dado_de_caso(texto)
+                for dado in proibidos:
+                    self.assertNotIn(dado, limpo)
+                self.assertEqual(limpo.split()[0], texto.split()[0])
+
+    def test_o_que_nao_e_dado_fica_como_esta(self):
+        for texto in ("Documento salvo", "3 ocorrência(s) tarjada(s)",
+                      "Gravação encerrada: 00:12:40, 35,2 MB.",
+                      "Captura 2 registrada · resumo ab12cd34ef56…"):
+            self.assertEqual(ac.sem_dado_de_caso(texto), texto)
+
+    def test_a_anotacao_gravada_ja_vem_limpa_e_a_corrente_confere(self):
+        r = ac.Registrador(self.pasta)
+        r.iniciar()
+        r.anotar("Varredura", "Pesquisa “123.456.789-00” registrada")
+        r.encerrar()
+        em_disco = r.caminho_dados().read_text(encoding="utf-8")
+        self.assertNotIn("123.456.789-00", em_disco)
+        self.assertEqual(ac.conferir(self.do_disco(r))[0], "integro")
+
+
+class ORegistroNaoDescreveARedeInterna(Base):
+
+    def test_dominio_serie_mac_e_enderecos_nao_sao_guardados(self):
+        r = ac.Registrador(self.pasta)
+        r.iniciar()
+        for chave in ("dominio", "serie", "mac", "enderecos"):
+            self.assertNotIn(chave, r.sessao.maquina)
+
+    def test_sessao_antiga_que_os_tinha_nao_os_imprime(self):
+        r = self.sessao_encerrada()
+        r.sessao.maquina.update(
+            mac="AA-BB-CC-DD-EE-FF", serie="SN123456",
+            enderecos=["10.20.30.40"], dominio="INTRANET")
+        peca = ac.relatorio_html(r.sessao)
+        for dado in ("AA-BB-CC-DD-EE-FF", "SN123456", "10.20.30.40",
+                     "INTRANET"):
+            self.assertNotIn(dado, peca)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

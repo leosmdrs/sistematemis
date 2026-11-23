@@ -41,6 +41,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import socket
 import sys
 from dataclasses import asdict, dataclass, field
@@ -79,6 +80,44 @@ RUIDO_INICIO = (
     "abra ", "selecione ", "escolha ", "arraste ", "clique ",
     "informe ", "digite ", "adicione ", "aguarde",
 )
+
+
+#: Dados da estação que o levantamento da Gravação de Tela traz e o
+#: registro de atividades não guarda.
+FORA_DO_REGISTRO = ("dominio", "serie", "mac", "enderecos")
+
+_ENTRE_ASPAS = re.compile(r"“[^”]*”|\"[^\"]*\"|‘[^’]*’|«[^»]*»")
+_EMAIL = re.compile(r"[\w.+\-]+@[\w\-]+(?:\.[\w\-]+)+")
+_ENDERECO = re.compile(r"\b(?:https?|ftp|file)://\S+", re.IGNORECASE)
+_CAMINHO = re.compile(r"(?:[A-Za-z]:[\\/]|\\\\|/)(?:[^\s\\/:*?\"<>|]+[\\/])+"
+                      r"[^\s\\/:*?\"<>|]*")
+_ARQUIVO = re.compile(r"[^\s/\\:“”\"]+\.[A-Za-z0-9]{2,5}(?=$|[\s,;:)\]])")
+#: Sequência com cara de documento ou de processo: sete algarismos ou
+#: mais, com os separadores usuais no meio.
+_NUMERO = re.compile(r"(?<![\dA-Fa-f])\d(?:[\s./\-‐‑‒–—]?\d){6,}(?![\dA-Fa-f])")
+
+
+def sem_dado_de_caso(texto: str) -> str:
+    """O relato da ferramenta, sem o que identifica o caso.
+
+    As ferramentas falam com quem opera pela barra de estado — "Pesquisa
+    “123.456.789-00” registrada", "Caso: Operação X", "Salvo:
+    oitiva-fulano.pdf" —, e o registro guardava essas frases inteiras. O
+    aviso de abertura dizia que conteúdo e nomes não eram anotados; eram.
+    E como o registro é da execução, e não do procedimento, o termo de
+    busca de um caso podia chegar aos autos de outro.
+
+    Fica o ato, sai o dado: o que estava entre aspas, nomes de arquivo,
+    caminhos, endereços, e-mails e números com cara de documento ou de
+    processo. É filtro por forma, e erra para o lado de suprimir demais.
+    """
+    texto = _ENTRE_ASPAS.sub("[suprimido]", texto or "")
+    texto = _ENDERECO.sub("[endereço]", texto)
+    texto = _EMAIL.sub("[e-mail]", texto)
+    texto = _CAMINHO.sub("[arquivo]", texto)
+    texto = _ARQUIVO.sub("[arquivo]", texto)
+    texto = _NUMERO.sub("[número]", texto)
+    return texto
 
 
 def _sem_acento(texto: str) -> str:
@@ -244,7 +283,7 @@ class Registrador:
             # fechamento — não entra: entrando, a sessão passaria a
             # constar como adulterada na próxima conferência.
             return
-        texto = (texto or "").strip()
+        texto = sem_dado_de_caso((texto or "").strip())
         simples = _sem_acento(texto)
         if simples in RUIDO or simples.startswith(RUIDO_INICIO):
             return
@@ -344,6 +383,12 @@ class Registrador:
             dados = {"usuario": getpass.getuser(),
                      "estacao": socket.gethostname(),
                      "sistema": platform.platform()}
+        # O registro acompanha peças que vão aos autos e ficam à vista
+        # das partes. Domínio, número de série, endereço físico e
+        # endereços de rede descrevem a infraestrutura interna, e nada
+        # acrescentam ao que o registro demonstra — não são guardados.
+        for chave in FORA_DO_REGISTRO:
+            dados.pop(chave, None)
         dados["python"] = sys.version.split()[0]
         dados["processadores"] = os.cpu_count() or 0
         dados["arquitetura"] = platform.machine()
@@ -498,15 +543,12 @@ def data_br(iso: str) -> str:
 #: solta numa peça que alguém vai ler daqui a um ano.
 CAMPOS_MAQUINA = (
     ("usuario", "Usuário do Windows"),
-    ("dominio", "Domínio"),
     ("estacao", "Nome da estação"),
     ("sistema", "Sistema operacional"),
     ("arquitetura", "Arquitetura"),
     ("processadores", "Núcleos de processamento"),
     ("fabricante", "Fabricante"),
     ("modelo", "Modelo"),
-    ("serie", "Número de série"),
-    ("mac", "Endereço físico (MAC)"),
     ("fuso", "Fuso horário"),
     ("python", "Interpretador"),
 )
@@ -615,9 +657,6 @@ def relatorio_html(s: Sessao) -> str:
         valor = s.maquina.get(chave)
         if valor not in (None, "", 0, []):
             partes.append(linha(rotulo, valor))
-    enderecos = s.maquina.get("enderecos") or []
-    if enderecos:
-        partes.append(linha("Endereços de rede", ", ".join(enderecos)))
     partes.append("</table>")
 
     resumo = s.por_ferramenta()
