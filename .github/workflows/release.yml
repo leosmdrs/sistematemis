@@ -71,7 +71,11 @@ jobs:
           fi
 
           jq -r .notas versao.json > notas.md
-          gh release create "v$versao" "$instalador" versao.json \
+          # A relação de componentes acompanha a release, quando a
+          # compilação a produziu.
+          anexos=("$instalador" versao.json)
+          [ -f componentes.txt ] && anexos+=(componentes.txt)
+          gh release create "v$versao" "${anexos[@]}" \
             --repo "${{ github.repository }}" \
             --target "$SHA" \
             --title "Sistema Têmis $versao" \

@@ -54,6 +54,26 @@ no repositório. Ver `ASSINATURA.md`.
 
 ---
 
+## Dependências fixadas
+
+O `requirements.txt` diz o que o programa precisa, com versão mínima. O
+que entra no instalador é o `requirements.lock`: cada pacote com a versão
+exata e o resumo SHA-256 dos arquivos dele, para Windows x64 e Python
+3.12. A compilação instala com `--require-hashes` — pacote de versão ou
+de conteúdo diferente do relacionado é recusado.
+
+Atualizar uma biblioteca é ato deliberado: regenera-se o
+`requirements.lock` (o comando está no cabeçalho dele), confere-se o que
+mudou e testa-se antes de publicar. Sem isso, cada compilação pegava o
+que fosse mais novo naquele dia, e duas compilações do mesmo commit
+saíam diferentes.
+
+Cada release leva um `componentes.txt` com o que de fato entrou no
+instalador: a versão do Python e do OpenSSL, a origem do FFmpeg e do
+scrcpy, e todos os pacotes com as versões.
+
+---
+
 ## Preparar uma versão
 
 Um comando só, da raiz do projeto:
