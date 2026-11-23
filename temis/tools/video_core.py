@@ -218,10 +218,35 @@ class VideoInfo:
     codec_audio: str = ""
     bitrate: int = 0              # bits/s
     tamanho: int = 0              # bytes
+    taxa_audio: int = 0           # amostras por segundo da 1ª trilha
+    canais: int = 0               # canais da 1ª trilha de áudio
+    formato_pixel: str = ""
+    trilhas_audio: int = 0
+    legendas: int = 0
+    outras_trilhas: int = 0       # dados, anexos, segunda imagem
 
     @property
     def nome(self) -> str:
         return Path(self.caminho).name
+
+    @property
+    def trilhas_que_ficam_de_fora(self) -> str:
+        """O que as operações não levam para o arquivo produzido.
+
+        As quatro operações carregam a primeira trilha de imagem e a
+        primeira de som, e mais nada. Num vídeo com segunda trilha de
+        áudio — a narração de quem filmou, por exemplo — ou com legenda,
+        isso é conteúdo que some do resultado, e a peça tem de dizê-lo.
+        """
+        partes = []
+        if self.trilhas_audio > 1:
+            n = self.trilhas_audio - 1
+            partes.append(f"{n} trilha(s) de áudio além da primeira")
+        if self.legendas:
+            partes.append(f"{self.legendas} trilha(s) de legenda")
+        if self.outras_trilhas:
+            partes.append(f"{self.outras_trilhas} outra(s) trilha(s)")
+        return "; ".join(partes)
 
     @property
     def resolucao(self) -> str:
@@ -233,10 +258,18 @@ class VideoInfo:
         O demuxer `concat` só junta fluxos com os mesmos parâmetros; se
         divergirem, o arquivo resultante fica corrompido ou perde trechos.
         """
+        # A taxa de amostragem e os canais do som entram na conta: dois
+        # arquivos de mesmo codec e taxas diferentes eram "copiados sem
+        # recodificação", e o som do segundo saía fora do tom — um sinal
+        # de 1000 Hz virava 918 —, sob um termo que dizia cópia.
         return (self.codec == outro.codec
                 and self.codec_audio == outro.codec_audio
                 and self.largura == outro.largura
-                and self.altura == outro.altura)
+                and self.altura == outro.altura
+                and self.taxa_audio == outro.taxa_audio
+                and self.canais == outro.canais
+                and self.formato_pixel == outro.formato_pixel
+                and abs(self.fps - outro.fps) < 0.01)
 
 
 def _fracao(txt: str) -> float:
@@ -281,7 +314,52 @@ def sondar(caminho: str | Path) -> VideoInfo:
         codec_audio=audio.get("codec_name", ""),
         bitrate=int(fmt.get("bit_rate") or 0),
         tamanho=int(fmt.get("size") or Path(caminho).stat().st_size),
+        taxa_audio=int(audio.get("sample_rate") or 0),
+        canais=int(audio.get("channels") or 0),
+        formato_pixel=video.get("pix_fmt", ""),
+        trilhas_audio=sum(1 for t in streams
+                          if t.get("codec_type") == "audio"),
+        legendas=sum(1 for t in streams
+                     if t.get("codec_type") == "subtitle"),
+        outras_trilhas=sum(
+            1 for t in streams
+            if t.get("codec_type") not in ("video", "audio", "subtitle")
+            or (t.get("codec_type") == "video" and t is not video
+                and not (t.get("disposition") or {}).get("attached_pic"))),
     )
+
+
+def medidas_do_produzido(saida, operacao: str = "",
+                         duracao_pedida: float = 0.0) -> list:
+    """O que o arquivo produzido é, medido nele — para o termo.
+
+    O termo descrevia o que foi **pedido**: o intervalo, a duração. No
+    corte sem recodificar o arquivo começa no quadro-chave anterior ao
+    instante pedido, e por isso é mais longo: pedidos dois segundos,
+    saíam três, e a peça dizia dois. Aqui a duração é a do arquivo.
+    """
+    try:
+        info = sondar(saida)
+    except Exception as e:                                  # noqa: BLE001
+        return [("Medição do arquivo produzido", f"não foi possível: {e}")]
+    linhas = [
+        ("Duração do arquivo produzido", formatar_tempo(info.duracao)),
+        ("Imagem do arquivo produzido",
+         f"{info.codec}, {info.resolucao}"),
+        ("Som do arquivo produzido",
+         f"{info.codec_audio}, {info.taxa_audio} Hz, {info.canais} canal(is)"
+         if info.codec_audio else "sem trilha de áudio"),
+    ]
+    if operacao == "fatiar" and duracao_pedida > 0:
+        sobra = info.duracao - duracao_pedida
+        if abs(sobra) >= 0.2:
+            linhas.append((
+                "Diferença para o trecho pedido",
+                f"o arquivo tem {abs(sobra):.1f} s a "
+                f"{'mais' if sobra > 0 else 'menos'} que o intervalo "
+                "pedido — sem recodificar, o corte só pode começar num "
+                "quadro-chave, e começa no anterior ao instante indicado"))
+    return linhas
 
 
 # ─────────────────────────────────────────

@@ -808,7 +808,8 @@ class VideoTool(ToolPage):
              ("Duração do original", core.formatar_tempo(v.duracao)),
              ("Corte", "no quadro exato (recodificado)"
               if self._chk_preciso.isChecked()
-              else "no quadro-chave mais próximo (sem recodificar)")])]
+              else "no quadro-chave anterior ao início pedido "
+                   "(sem recodificar)")])]
         return [(cmd, fim - inicio, f"{v.nome} ({core.formatar_tempo(inicio)}"
                  f"–{core.formatar_tempo(fim)})", saida)]
 
@@ -1027,11 +1028,31 @@ class VideoTool(ToolPage):
 
         # Só as derivações cujo arquivo de fato saiu: uma etapa que
         # falhou não pode virar linha de termo dizendo que produziu algo.
-        self._produzidas = [
-            (origens, saida, detalhes)
-            for origens, saida, detalhes in getattr(self, "_derivacoes", [])
-            if saida in saidas
-        ]
+        # A cada uma se acrescenta o que o arquivo é, medido nele, e o
+        # que das origens não foi levado: o termo descreve o entregue,
+        # e não o pedido.
+        pedidos = {saida: (operacao, parametros) for operacao, _e,
+                   parametros, saida in getattr(self, "_parametros", [])}
+        por_caminho = {v.caminho: v for v in self._videos}
+        self._produzidas = []
+        for origens, saida, detalhes in getattr(self, "_derivacoes", []):
+            if saida not in saidas:
+                continue
+            operacao, parametros = pedidos.get(saida, ("", {}))
+            pedida = (float(parametros.get("fim", 0))
+                      - float(parametros.get("inicio", 0))
+                      if operacao == "fatiar" else 0.0)
+            medidos = core.medidas_do_produzido(saida, operacao, pedida)
+            fora = "; ".join(dict.fromkeys(
+                f"{por_caminho[o].nome}: "
+                f"{por_caminho[o].trilhas_que_ficam_de_fora}"
+                for o in origens if o in por_caminho
+                and por_caminho[o].trilhas_que_ficam_de_fora))
+            if fora:
+                medidos.append(
+                    ("Trilhas do original não levadas ao resultado", fora))
+            self._produzidas.append(
+                (origens, saida, list(detalhes) + medidos))
         # O roteiro só pode nascer aqui: o resumo do arquivo produzido é
         # dos bytes finais, e antes de existir arquivo não há bytes a
         # resumir. Operação que falhou não vira roteiro — roteiro que não

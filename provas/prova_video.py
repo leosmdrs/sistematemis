@@ -304,6 +304,62 @@ class AFilaDeOperacoes(ComFFmpeg):
         self.assertEqual(erros, [])
 
 
+class OTermoDescreveOArquivoEntregue(ComFFmpeg):
+    """A peça mede o arquivo produzido, em vez de repetir o pedido."""
+
+    def com_som(self, nome, taxa, trilhas=1, legenda=False):
+        alvo = self.caminho(nome)
+        cmd = [str(vc.ffmpeg_path()), "-y", "-loglevel", "error",
+               "-f", "lavfi", "-i",
+               "testsrc=size=160x120:rate=10:duration=2"]
+        for _ in range(trilhas):
+            cmd += ["-f", "lavfi", "-i",
+                    f"sine=frequency=1000:sample_rate={taxa}:duration=2"]
+        cmd += ["-map", "0:v"]
+        for i in range(trilhas):
+            cmd += ["-map", f"{i + 1}:a"]
+        cmd += ["-c:v", "libx264", "-g", "50", "-pix_fmt", "yuv420p",
+                "-c:a", "aac", alvo]
+        subprocess.run(cmd, check=True)
+        return alvo
+
+    def test_taxas_de_audio_diferentes_exigem_recodificar(self):
+        a = vc.sondar(self.com_som("a.mp4", 44100))
+        b = vc.sondar(self.com_som("b.mp4", 48000))
+        self.assertEqual((a.taxa_audio, b.taxa_audio), (44100, 48000))
+        self.assertFalse(a.compativel_com(b))
+        self.assertTrue(vc.precisa_recodificar([a, b]))
+
+    def test_arquivos_iguais_seguem_sendo_copiados(self):
+        a = vc.sondar(self.com_som("a.mp4", 44100))
+        b = vc.sondar(self.com_som("b.mp4", 44100))
+        self.assertTrue(a.compativel_com(b))
+
+    def test_o_corte_rapido_declara_a_duracao_que_saiu(self):
+        # Um quadro-chave só, no início: pedir de 1,0 a 1,5 s entrega
+        # mais do que meio segundo.
+        entrada = self.com_som("longo.mp4", 44100)
+        saida = self.caminho("trecho.mp4")
+        deu, erro = vc.executar(vc.cmd_fatiar(entrada, saida, 1.0, 1.5))
+        self.assertTrue(deu, erro)
+        linhas = dict(vc.medidas_do_produzido(saida, "fatiar", 0.5))
+        real = vc.sondar(saida).duracao
+        self.assertEqual(linhas["Duração do arquivo produzido"],
+                         vc.formatar_tempo(real))
+        if abs(real - 0.5) >= 0.2:
+            self.assertIn("Diferença para o trecho pedido", linhas)
+            self.assertIn("quadro-chave", linhas[
+                "Diferença para o trecho pedido"])
+
+    def test_trilha_que_nao_segue_e_nomeada(self):
+        info = vc.sondar(self.com_som("duas.mp4", 44100, trilhas=2))
+        self.assertEqual(info.trilhas_audio, 2)
+        self.assertIn("1 trilha(s) de áudio além da primeira",
+                      info.trilhas_que_ficam_de_fora)
+        simples = vc.sondar(self.com_som("uma.mp4", 44100))
+        self.assertEqual(simples.trilhas_que_ficam_de_fora, "")
+
+
 class APecaDizOQueAConferenciaSignifica(unittest.TestCase):
 
     def test_as_tres_situacoes_tem_redacao_propria(self):
