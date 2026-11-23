@@ -336,7 +336,9 @@ GUIAS: dict[str, Guia] = {
             "registrado, e você vê na linha do tempo à direita o que está "
             "sendo anotado a seu respeito.",
             "Digite o endereço do sistema e clique em <b>Abrir</b>. "
-            "Autentique-se normalmente — campo de senha nunca é registrado.",
+            "Autentique-se sem usar “mostrar senha”: o valor da senha e "
+            "do código de uso único não entra no registro, mas a gravação "
+            "de tela mostra o que estiver na janela.",
             "Faça a consulta. O clique, o formulário submetido e seus "
             "parâmetros entram na linha do tempo sozinhos.",
             "Baixe o arquivo pelo próprio sistema. Ele é gravado na pasta "
@@ -353,10 +355,12 @@ GUIAS: dict[str, Guia] = {
             "O resumo criptográfico atesta que o arquivo juntado é o mesmo "
             "que foi recebido — não atesta que o conteúdo extraído esteja "
             "correto ou completo.",
-            "Campo de senha não é registrado, e valor de parâmetro de "
-            "endereço cujo nome indique credencial sai como “[suprimido]”. "
-            "Os demais campos, inclusive os ocultos, constam por serem os "
-            "parâmetros da consulta.",
+            "Valor de senha, de código de uso único e de campo ou "
+            "parâmetro cujo nome indique credencial sai como “[suprimido]”, "
+            "e de formulário de login só constam os nomes dos campos. Os "
+            "demais campos, inclusive os ocultos, constam por serem os "
+            "parâmetros da consulta. A supressão se guia pelo tipo e pelo "
+            "nome do campo — confira o termo antes de juntá-lo.",
             "O navegador embutido é um Chromium sem extensões. Sistema que "
             "exija componente próprio, certificado em máquina ou navegador "
             "homologado pode não abrir aqui — nesse caso, use a Gravação "

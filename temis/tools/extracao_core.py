@@ -31,9 +31,13 @@ página. Injeta-se então um trecho de código na página que escuta cliques
 e envios de formulário e os anuncia pelo console do navegador, com um
 prefixo próprio; o programa lê essas mensagens e descarta o resto.
 
-Campo de senha nunca é registrado. Campo oculto é — porque é neles que
-os sistemas costumam guardar os parâmetros de verdade da consulta, e é
-justamente o parâmetro que se quer demonstrar depois.
+O que se digita num campo nunca serve de rótulo de clique, e o valor de
+campo de senha, de código de uso único ou de nome que indique credencial
+não é registrado — nem depois de o campo ser trocado para texto pelo
+"mostrar senha". Em formulário de autenticação só entram os nomes dos
+campos. Campo oculto de consulta é registrado — porque é neles que os
+sistemas costumam guardar os parâmetros de verdade, e é justamente o
+parâmetro que se quer demonstrar depois.
 """
 
 from __future__ import annotations
@@ -83,21 +87,80 @@ ROTULO_EVENTO = {
 #: que o usuário vê. Escuta na fase de captura (`true` no terceiro
 #: argumento) para que um `stopPropagation` da própria página não o
 #: silencie.
-ESPIA_JS = r"""
+_ESPIA_MODELO = r"""
 (function () {
   if (window.__temis_espia) { return; }
   window.__temis_espia = true;
 
+  var SIGILO = new RegExp(__SIGILO__, 'i');
+  var EXATOS = __EXATOS__;
+  var SUPRIMIDO = __SUPRIMIDO__;
+  // Campo que já foi de senha continua sigiloso depois que o "mostrar
+  // senha" da página o troca para texto.
+  var foiSenha = new WeakSet();
+
+  function tipo(el) { return String((el && el.type) || '').toLowerCase(); }
+
+  // Elemento em que a pessoa digita ou escolhe. O conteúdo dele é dado
+  // do operador, e não nome de coisa clicada.
+  function editavel(el) {
+    if (!el || !el.tagName) { return false; }
+    if (el.isContentEditable) { return true; }
+    var t = el.tagName;
+    if (t === 'TEXTAREA' || t === 'SELECT' || t === 'OPTION') { return true; }
+    if (t === 'INPUT') {
+      var k = tipo(el);
+      return !(k === 'submit' || k === 'button' || k === 'reset' ||
+               k === 'image');
+    }
+    return false;
+  }
+
   function rotulo(el) {
     if (!el) { return ''; }
-    var t = el.innerText || el.value || el.getAttribute('aria-label') ||
-            el.getAttribute('title') || el.name || el.id || '';
+    var t;
+    if (editavel(el)) {
+      t = el.getAttribute('aria-label') || el.name || el.id ||
+          'campo ' + el.tagName.toLowerCase();
+    } else {
+      t = el.innerText || el.value || el.getAttribute('aria-label') ||
+          el.getAttribute('title') || el.name || el.id || '';
+    }
     return String(t).replace(/\s+/g, ' ').trim().slice(0, 90);
   }
+
+  function marcar(el) {
+    if (el && el.tagName === 'INPUT' && tipo(el) === 'password') {
+      foiSenha.add(el);
+    }
+  }
+
+  function deSenha(el) {
+    if (tipo(el) === 'password' || foiSenha.has(el)) { return true; }
+    var ac = String(el.getAttribute('autocomplete') || '').toLowerCase();
+    return ac.indexOf('password') >= 0 || ac.indexOf('one-time-code') >= 0;
+  }
+
+  function sigiloso(el) {
+    if (deSenha(el)) { return true; }
+    var nomes = [el.name, el.id], i, n;
+    for (i = 0; i < nomes.length; i++) {
+      n = String(nomes[i] || '').toLowerCase();
+      if (n && (SIGILO.test(n) || EXATOS.indexOf(n) >= 0)) { return true; }
+    }
+    return false;
+  }
+
+  ['focusin', 'input', 'change', 'keydown'].forEach(function (nome) {
+    document.addEventListener(nome, function (ev) {
+      try { marcar(ev.target); } catch (e) { }
+    }, true);
+  });
 
   document.addEventListener('click', function (ev) {
     try {
       var el = ev.target;
+      marcar(el);
       var alvo = (el && el.closest)
         ? (el.closest('a,button,input[type=submit],input[type=button],' +
                       '[role=button],[onclick]') || el)
@@ -109,15 +172,24 @@ ESPIA_JS = r"""
 
   document.addEventListener('submit', function (ev) {
     try {
-      var f = ev.target, campos = [], i, c;
+      var f = ev.target, campos = [], i, c, autenticacao = false;
+      for (i = 0; i < f.elements.length; i++) {
+        marcar(f.elements[i]);
+        if (deSenha(f.elements[i])) { autenticacao = true; }
+      }
       for (i = 0; i < f.elements.length; i++) {
         c = f.elements[i];
         if (!c.name) { continue; }
-        if (c.type === 'password') { continue; }
         if (c.type === 'checkbox' || c.type === 'radio') {
           if (!c.checked) { continue; }
         }
-        campos.push(c.name + '=' + String(c.value || '').slice(0, 140));
+        // Formulário de autenticação não é a consulta que se quer
+        // demonstrar: dele só entram os nomes dos campos.
+        if (autenticacao || sigiloso(c)) {
+          campos.push(c.name + '=' + SUPRIMIDO);
+        } else {
+          campos.push(c.name + '=' + String(c.value || '').slice(0, 140));
+        }
       }
       console.log('TEMIS::formulario::' + (f.getAttribute('action') || '') +
                   '::' + (f.method || 'get') + '::' + campos.join(' | '));
@@ -125,6 +197,47 @@ ESPIA_JS = r"""
   }, true);
 })();
 """
+
+
+#: Nomes de campo e de parâmetro cujo valor nunca entra no registro.
+#:
+#: Isto não é zelo excessivo. O código injetado já pula campo de senha,
+#: mas quando o formulário é submetido por GET o próprio navegador põe
+#: **todos** os campos na barra de endereço — inclusive a senha —, e o
+#: endereço é registrado. Descobriu-se assim: um sistema de teste com
+#: formulário GET e campo de senha, e a senha em claro no termo.
+#:
+#: Vale por trecho do nome: `csrf_token`, `nova_senha`, `otp_code`.
+SIGILOSOS = ("senha", "password", "passwd", "pwd", "secret", "segredo",
+             "token", "credential", "credencial", "authorization", "auth",
+             "apikey", "api_key", "access_key", "chave_acesso",
+             "otp", "2fa", "mfa", "csrf", "xsrf", "jwt", "nonce",
+             "session", "saml", "assertion", "signature", "captcha",
+             "verifier",
+             "codigo_verificacao", "codigo_seguranca", "codigo_acesso",
+             "verification_code", "security_code", "one_time", "onetime",
+             "passcode")
+
+#: Nomes curtos demais para valer por trecho (`code` está em `barcode`,
+#: `pin` em `shipping`), mas que, sozinhos, são o código de autorização
+#: e o estado que os provedores de login único põem no endereço.
+SIGILOSOS_EXATOS = ("code", "state", "sid", "pin", "ticket", "sig")
+
+SUPRIMIDO = "[suprimido]"
+
+
+def _montar_espia() -> str:
+    import json
+    padrao = "|".join(re.escape(s) for s in SIGILOSOS)
+    return (_ESPIA_MODELO
+            .replace("__SIGILO__", json.dumps(padrao))
+            .replace("__EXATOS__", json.dumps(list(SIGILOSOS_EXATOS)))
+            .replace("__SUPRIMIDO__", json.dumps(SUPRIMIDO)))
+
+
+#: O código pronto para injetar, com a lista de nomes sigilosos embutida:
+#: a página e o programa aplicam a mesma regra, cada um do seu lado.
+ESPIA_JS = _montar_espia()
 
 
 # ─────────────────────────────────────────
@@ -239,49 +352,73 @@ class Sessao:
         return [b for b in self.baixados if b.ok]
 
 
-#: Nomes de parâmetro cujo valor nunca entra no registro.
-#:
-#: Isto não é zelo excessivo. O código injetado já pula campo de senha,
-#: mas quando o formulário é submetido por GET o próprio navegador põe
-#: **todos** os campos na barra de endereço — inclusive a senha —, e o
-#: endereço é registrado. Descobriu-se assim: um sistema de teste com
-#: formulário GET e campo de senha, e a senha em claro no termo.
-SIGILOSOS = ("senha", "password", "passwd", "pwd", "secret", "token",
-             "credential", "credencial", "authorization", "auth",
-             "apikey", "api_key", "access_key", "chave_acesso")
+def _nome_sigiloso(nome: str) -> bool:
+    achatado = (nome or "").strip().lower()
+    return bool(achatado) and (achatado in SIGILOSOS_EXATOS
+                               or any(s in achatado for s in SIGILOSOS))
 
-SUPRIMIDO = "[suprimido]"
+
+def _limpar_pares(trecho: str) -> str:
+    """Troca por “[suprimido]” o valor dos pares `nome=valor` sigilosos.
+
+    Substituição cirúrgica, e não reconstrução com `urlencode`: o
+    endereço vai impresso no termo e refazê-lo reescrevia o que não
+    precisava — uma data virava `01%2F01%2F2026` e ficava ilegível
+    justamente para quem tem de conferir.
+    """
+    def trocar(m):
+        nome, valor = m.group(1), m.group(2)
+        if valor and _nome_sigiloso(nome):
+            return f"{nome}={SUPRIMIDO}"
+        return m.group(0)
+
+    return re.sub(r"([^&=?#]+)=([^&#]*)", trocar, trecho)
 
 
 def limpar_url(url: str) -> str:
     """Suprime, no endereço, o valor de parâmetro que pareça credencial.
 
     O nome do parâmetro permanece — ele é parte do que se quer
-    demonstrar; some apenas o valor.
+    demonstrar; some apenas o valor. Vale para a consulta (`?a=b`) e
+    para o fragmento (`#a=b`), que é onde o login único costuma devolver
+    o token de acesso. Usuário e senha embutidos no endereço
+    (`https://fulano:senha@servidor`) saem também.
     """
-    if not url or "?" not in url:
+    if not url:
         return url
     try:
-        base, _, resto = url.partition("?")
-        consulta, marca, fragmento = resto.partition("#")
-
-        def trocar(m):
-            nome, valor = m.group(1), m.group(2)
-            achatado = nome.lower()
-            if valor and any(s in achatado for s in SIGILOSOS):
-                return f"{nome}={SUPRIMIDO}"
-            return m.group(0)
-
-        # Substituição cirúrgica, e não reconstrução com `urlencode`: o
-        # endereço vai impresso no termo e refazê-lo reescrevia o que não
-        # precisava — uma data virava `01%2F01%2F2026` e ficava ilegível
-        # justamente para quem tem de conferir.
-        limpa = re.sub(r"([^&=?]+)=([^&#]*)", trocar, consulta)
-        return base + "?" + limpa + (marca + fragmento if marca else "")
+        url = re.sub(r"^([a-zA-Z][a-zA-Z0-9+.\-]*://)[^/@?#]*@",
+                     lambda m: m.group(1) + SUPRIMIDO + "@", url)
+        if "?" not in url and "#" not in url:
+            return url
+        resto, marca, fragmento = url.partition("#")
+        base, interrogacao, consulta = resto.partition("?")
+        saida = base
+        if interrogacao:
+            saida += "?" + _limpar_pares(consulta)
+        if marca:
+            saida += "#" + (_limpar_pares(fragmento) if "=" in fragmento
+                            else fragmento)
+        return saida
     except Exception:                                   # noqa: BLE001
         # Endereço estranho não pode impedir o registro — mas também não
         # pode entrar sem passar por aqui.
-        return url.split("?", 1)[0] + "?" + SUPRIMIDO
+        return re.split(r"[?#]", url, maxsplit=1)[0] + "?" + SUPRIMIDO
+
+
+def limpar_campos(campos: str) -> str:
+    """A mesma supressão, sobre a relação `nome=valor | nome=valor`.
+
+    O código injetado já suprime; isto repete a regra do lado de cá,
+    porque o que chega pelo console vem de dentro da página.
+    """
+    saida = []
+    for par in (campos or "").split(" | "):
+        nome, igual, valor = par.partition("=")
+        if igual and valor and valor != SUPRIMIDO and _nome_sigiloso(nome):
+            par = f"{nome}={SUPRIMIDO}"
+        saida.append(par)
+    return " | ".join(saida)
 
 
 def ler_console(mensagem: str) -> tuple[str, str, str] | None:
@@ -306,9 +443,9 @@ def ler_console(mensagem: str) -> tuple[str, str, str] | None:
         return (CLIQUE, descricao, destino)
 
     if genero == "formulario":
-        destino = partes[1] if len(partes) > 1 else ""
+        destino = limpar_url(partes[1] if len(partes) > 1 else "")
         metodo = (partes[2] if len(partes) > 2 else "").upper()
-        campos = partes[3] if len(partes) > 3 else ""
+        campos = limpar_campos("::".join(partes[3:]))
         descricao = "Consulta submetida"
         if destino:
             descricao += f" a {destino}"
@@ -380,10 +517,13 @@ RESSALVAS = (
     "As datas e horas são as do relógio desta estação e não foram "
     "atestadas por terceiro. Onde a precisão temporal for controvertida, "
     "cabe carimbo do tempo emitido por autoridade credenciada.",
-    "Os campos de senha não são registrados, e o valor de parâmetro de "
-    "endereço cujo nome indique credencial é substituído por “[suprimido]”. "
-    "Os demais campos submetidos, inclusive os ocultos, constam do registro "
-    "por serem os parâmetros da consulta.",
+    "O valor de campo de senha, de código de uso único e de campo ou "
+    "parâmetro de endereço cujo nome indique credencial é substituído por "
+    "“[suprimido]”; de formulário de autenticação constam apenas os nomes "
+    "dos campos. Os demais campos submetidos, inclusive os ocultos, constam "
+    "do registro por serem os parâmetros da consulta. A supressão se guia "
+    "pelo tipo e pelo nome do campo: credencial digitada em campo comum, "
+    "de nome que não a indique, não é reconhecida.",
 )
 
 

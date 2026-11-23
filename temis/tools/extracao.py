@@ -640,9 +640,13 @@ class ExtracaoTool(ToolPage):
             "A Extração Registrada documenta cada passo desta diligência: "
             "os endereços visitados, os cliques, os formulários submetidos "
             "com seus parâmetros e os arquivos recebidos, cada um resumido "
-            "em SHA-256.\n\nCampo de senha nunca é registrado. Tudo fica "
-            "apenas nesta máquina, e a relação sai no termo. Iniciar a "
-            "diligência assim?",
+            "em SHA-256.\n\nO valor de campo de senha e de código de uso "
+            "único não entra no registro, e de formulário de login só "
+            "entram os nomes dos campos. A gravação de tela, se ligada, "
+            "mostra o que estiver na janela: não use “mostrar senha” "
+            "durante a diligência, e confira o termo antes de juntá-lo.\n\n"
+            "Tudo fica apenas nesta máquina, e a relação sai no termo. "
+            "Iniciar a diligência assim?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.Yes)
         if resposta != QMessageBox.StandardButton.Yes:
