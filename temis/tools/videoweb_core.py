@@ -312,6 +312,24 @@ def explicar_falha(erro: str) -> str:
     return (limpo or "a captura falhou, e a biblioteca não disse por quê") + sufixo
 
 
+def marca_da_captura(pasta, agora=None) -> str:
+    """Data e hora para o nome do arquivo, sem repetir na pasta.
+
+    Duas capturas no mesmo segundo são improváveis, não impossíveis: se
+    já houver arquivo com a marca, ela ganha um sufixo.
+    """
+    import datetime
+    import glob as _glob
+
+    agora = agora or datetime.datetime.now()
+    base = agora.strftime("%Y-%m-%d_%H%M%S")
+    marca, n = base, 1
+    while any(Path(pasta).glob("*" + _glob.escape(marca) + ".*")):
+        n += 1
+        marca = f"{base}-{n}"
+    return marca
+
+
 def baixar(url: str, pasta, qualidade: str = "melhor",
            progresso=None) -> Captura:
     """Obtém o vídeo e mede tudo o que a peça vai afirmar.
@@ -329,6 +347,7 @@ def baixar(url: str, pasta, qualidade: str = "melhor",
     pasta = Path(pasta)
     pasta.mkdir(parents=True, exist_ok=True)
     captura = Captura(qualidade=qualidade, yt_dlp=versao())
+    marca = marca_da_captura(pasta)
 
     def gancho(d):
         if progresso is None:
@@ -347,13 +366,20 @@ def baixar(url: str, pasta, qualidade: str = "melhor",
         "quiet": True, "no_warnings": True, "noprogress": True,
         "noplaylist": True, "logger": _Mudo(),
         "format": seletor(qualidade),
-        "outtmpl": str(pasta / "%(title).120B [%(id)s].%(ext)s"),
+        # A marca de data e hora torna o nome único: capturar de novo
+        # o mesmo vídeo produz outro arquivo, ao lado do primeiro.
+        "outtmpl": str(pasta / f"%(title).120B [%(id)s] {marca}.%(ext)s"),
         "progress_hooks": [gancho],
         "restrictfilenames": True,
         # Sem isto, uma falha no meio deixa fragmento com cara de arquivo
         # bom, e a peça poderia acabar citando o resumo de um pedaço.
         "continuedl": False,
-        "overwrites": True,
+        # Nunca apagar o que já está na pasta. Com sobrescrita ligada a
+        # biblioteca removia o arquivo de mesmo nome **antes** de baixar:
+        # repetida a captura de um vídeo que tivesse saído do ar, a
+        # cópia preservada sumia e o download falhava — e o termo da
+        # primeira captura passava a citar arquivo que não existe mais.
+        "overwrites": False,
     }
     pasta_ffmpeg = _ffmpeg()
     if pasta_ffmpeg:
@@ -369,6 +395,13 @@ def baixar(url: str, pasta, qualidade: str = "melhor",
                     return captura
                 info = entradas[0]
             caminho = Path(y.prepare_filename(info))
+            # O caminho final, dito pela própria biblioteca depois de
+            # juntar as faixas — quando ela o informa.
+            for baixado in info.get("requested_downloads") or []:
+                final = baixado.get("filepath")
+                if final and Path(final).is_file():
+                    caminho = Path(final)
+                    break
     except Exception as e:                                  # noqa: BLE001
         captura.erro = explicar_falha(str(e))
         return captura
@@ -376,8 +409,15 @@ def baixar(url: str, pasta, qualidade: str = "melhor",
     # O nome muda quando houve junção de faixas: o arquivo final vira
     # .mp4 ou .mkv, e o que `prepare_filename` devolve é o do fluxo.
     if not caminho.is_file():
+        import glob as _glob
+
+        # O nome traz o identificador entre colchetes, que num padrão de
+        # busca seriam classe de caracteres: sem o escape, o arquivo
+        # certo não era achado e outro da pasta podia ser tomado por ele.
+        # A marca da captura restringe a busca aos arquivos desta.
         candidatos = sorted(
-            pasta.glob(caminho.stem + ".*"),
+            (p for p in pasta.glob(_glob.escape(caminho.stem) + ".*")
+             if marca in p.name),
             key=lambda p: p.stat().st_mtime, reverse=True)
         if not candidatos:
             captura.erro = ("a captura terminou sem deixar arquivo em "

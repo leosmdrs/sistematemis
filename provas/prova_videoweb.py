@@ -267,6 +267,105 @@ class ComRede(unittest.TestCase):
             self.assertEqual(c.sha256, sha256_file(str(arquivo)))
 
 
+class CapturarDeNovoNaoApagaACapturaAnterior(unittest.TestCase):
+    """A ferramenta existe para preservar o que pode sair do ar.
+
+    Repetir a captura do mesmo endereço, na mesma pasta, caía no mesmo
+    nome de arquivo — e a biblioteca, com a sobrescrita ligada, apagava
+    o existente antes de baixar. Se a publicação já tivesse sido
+    retirada, o segundo download falhava e a cópia preservada na
+    primeira deixava de existir.
+
+    A biblioteca é a real; a "plataforma" é um servidor nesta máquina.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        try:
+            import yt_dlp                                   # noqa: F401
+        except ImportError:
+            raise unittest.SkipTest("yt-dlp não está instalado")
+        import http.server
+        import os
+        import threading
+
+        cls.no_ar = True
+
+        class Servidor(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                if not cls.no_ar:
+                    self.send_error(404)
+                    return
+                corpo = b"\x00\x00\x00\x18ftypmp42" + b"video" * 4000
+                self.send_response(200)
+                self.send_header("Content-Type", "video/mp4")
+                self.send_header("Content-Length", str(len(corpo)))
+                self.end_headers()
+                if self.command == "GET":
+                    self.wfile.write(corpo)
+
+            do_HEAD = do_GET
+
+            def log_message(self, *a):
+                pass
+
+        cls.servidor = http.server.ThreadingHTTPServer(("127.0.0.1", 0),
+                                                       Servidor)
+        threading.Thread(target=cls.servidor.serve_forever,
+                         daemon=True).start()
+        cls.url = (f"http://127.0.0.1:{cls.servidor.server_address[1]}"
+                   "/publicacao.mp4")
+        cls._proxy = {k: os.environ.get(k) for k in ("no_proxy", "NO_PROXY")}
+        os.environ["no_proxy"] = os.environ["NO_PROXY"] = "127.0.0.1"
+
+    @classmethod
+    def tearDownClass(cls):
+        import os
+        cls.servidor.shutdown()
+        cls.servidor.server_close()
+        for k, v in cls._proxy.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+    def setUp(self):
+        type(self).no_ar = True
+
+    def test_a_segunda_captura_fica_ao_lado_da_primeira(self):
+        from temis.tools.hash_core import sha256_file
+        with tempfile.TemporaryDirectory() as pasta:
+            primeira = vc.baixar(self.url, pasta)
+            self.assertEqual(primeira.erro, "")
+            segunda = vc.baixar(self.url, pasta)
+            self.assertEqual(segunda.erro, "")
+            self.assertNotEqual(primeira.arquivo, segunda.arquivo)
+            self.assertTrue(Path(primeira.arquivo).is_file())
+            self.assertEqual(sha256_file(primeira.arquivo), primeira.sha256)
+
+    def test_publicacao_retirada_nao_leva_junto_a_copia_preservada(self):
+        from temis.tools.hash_core import sha256_file
+        with tempfile.TemporaryDirectory() as pasta:
+            primeira = vc.baixar(self.url, pasta)
+            self.assertEqual(primeira.erro, "")
+            type(self).no_ar = False
+            segunda = vc.baixar(self.url, pasta)
+            self.assertTrue(segunda.erro)
+            self.assertTrue(Path(primeira.arquivo).is_file(),
+                            "a captura anterior foi apagada")
+            self.assertEqual(sha256_file(primeira.arquivo), primeira.sha256)
+
+    def test_a_marca_nao_se_repete_na_pasta(self):
+        import datetime
+        agora = datetime.datetime(2026, 11, 23, 10, 0, 0)
+        with tempfile.TemporaryDirectory() as pasta:
+            um = vc.marca_da_captura(pasta, agora)
+            (Path(pasta) / f"Titulo [abc] {um}.mp4").write_bytes(b"x")
+            dois = vc.marca_da_captura(pasta, agora)
+            self.assertNotEqual(um, dois)
+            self.assertTrue(dois.startswith(um))
+
+
 class ATela(unittest.TestCase):
     """A tela, sem monitor e sem rede: o que ela habilita e quando."""
 
