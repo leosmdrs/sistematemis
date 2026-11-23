@@ -8,6 +8,7 @@ juntada, recorta o trecho de interesse e junta gravações fragmentadas.
 
 from __future__ import annotations
 
+import os
 import tempfile
 from pathlib import Path
 
@@ -71,31 +72,71 @@ class VideoThread(QThread):
     progresso = pyqtSignal(float)          # 0..1 da etapa corrente
     concluido = pyqtSignal(list, list)     # saídas, erros
 
-    def __init__(self, tarefas: list[tuple[list[str], float, str, str]]):
-        """`tarefas` = [(comando, duração, rótulo, arquivo_de_saída)]"""
+    def __init__(self, tarefas: list[tuple[list[str], float, str, str]],
+                 originais=()):
+        """`tarefas` = [(comando, duração, rótulo, arquivo_de_saída)]
+
+        O comando grava em `core.provisorio(saída)`; o nome definitivo só
+        é ocupado por resultado inteiro. `originais` são os arquivos de
+        entrada, resumidos antes e depois: a peça afirma que eles não
+        foram alterados, e isto é o que sustenta a afirmação.
+        """
         super().__init__()
         self._tarefas = tarefas
+        self._originais = list(dict.fromkeys(originais))
         self._parar = False
 
     def parar(self):
         self._parar = True
 
+    def _resumir(self) -> dict:
+        from .hash_core import sha256_file
+        resumos = {}
+        for caminho in self._originais:
+            if self._parar:
+                break
+            try:
+                resumos[caminho] = sha256_file(
+                    caminho, should_stop=lambda: self._parar)
+            except OSError as e:
+                resumos[caminho] = f"ilegível: {e}"
+        return resumos
+
     def run(self):
         saidas, erros = [], []
         total = len(self._tarefas)
+        if self._originais:
+            self.etapa.emit(0, total, "Resumindo os originais")
+        antes = self._resumir()
         for i, (cmd, duracao, rotulo, saida) in enumerate(self._tarefas, 1):
             if self._parar:
                 break
             self.etapa.emit(i, total, rotulo)
+            parcial = Path(core.provisorio(saida))
+            parcial.unlink(missing_ok=True)
             ok, msg = core.executar(
                 cmd, duracao,
                 progresso=lambda f: self.progresso.emit(f),
                 cancelado=lambda: self._parar,
             )
             if ok:
-                saidas.append(saida)
+                try:
+                    os.replace(parcial, saida)
+                    saidas.append(saida)
+                except OSError as e:
+                    erros.append(f"{rotulo}: não foi possível gravar "
+                                 f"em {Path(saida).name}: {e}")
             elif msg != "cancelado":
                 erros.append(f"{rotulo}: {msg.splitlines()[-1] if msg else 'falhou'}")
+            parcial.unlink(missing_ok=True)       # sobra de falha
+        if not self._parar:
+            depois = self._resumir()
+            for caminho, resumo in antes.items():
+                if depois.get(caminho) != resumo:
+                    erros.append(
+                        f"ATENÇÃO — o original {Path(caminho).name} não é "
+                        "mais o mesmo arquivo que era antes da operação. "
+                        "Não emita termo sobre este resultado.")
         self.concluido.emit(saidas, erros)
 
 
@@ -661,13 +702,31 @@ class VideoTool(ToolPage):
         self._progresso.setValue(0)
         self._progresso.canceled.connect(self._cancelar)
 
-        self._thread = VideoThread(tarefas)
+        self._thread = VideoThread(
+            tarefas, originais=[v.caminho for v in self._videos])
         self._thread.etapa.connect(self._ao_iniciar_etapa)
         self._thread.progresso.connect(
             lambda f: self._progresso.setValue(int(f * 100)))
         self._thread.concluido.connect(self._ao_concluir)
         self._thread.start()
         self._atualizar_estado()
+
+    def _destino_aceito(self, saida: str) -> bool:
+        """O destino não pode ser nenhum dos vídeos da lista.
+
+        Vale para a lista inteira, e não só para o vídeo da operação: o
+        resultado do recorte gravado sobre outro vídeo aberto destrói um
+        original do mesmo jeito.
+        """
+        if core.coincide_com_entrada(saida,
+                                     [v.caminho for v in self._videos]):
+            QMessageBox.warning(
+                self, "Destino recusado",
+                "O arquivo escolhido é um dos vídeos de origem.\n\n"
+                "A edição nunca grava sobre o original: escolha outro "
+                "nome ou outra pasta para o resultado.")
+            return False
+        return True
 
     def _tarefas_compactar(self) -> list:
         pasta = QFileDialog.getExistingDirectory(
@@ -683,10 +742,17 @@ class VideoTool(ToolPage):
         tarefas = []
         self._derivacoes = []
         self._parametros = []
+        prometidos = [v.caminho for v in self._videos]
         for v in self._videos:
-            saida = str(Path(pasta) / f"{Path(v.nome).stem}-compactado.mp4")
+            # Nome que ninguém ocupa: nem arquivo já na pasta, nem outro
+            # vídeo da lista, nem a saída de um homônimo desta rodada.
+            saida = core.nome_livre(
+                Path(pasta) / f"{Path(v.nome).stem}-compactado.mp4",
+                prometidos)
+            prometidos.append(saida)
             tarefas.append((
-                core.cmd_compactar(v.caminho, saida, preset, altura,
+                core.cmd_compactar(v.caminho, core.provisorio(saida),
+                                   preset, altura,
                                    sem_audio, v.codec_audio),
                 v.duracao, v.nome, saida))
             self._parametros.append((
@@ -724,7 +790,9 @@ class VideoTool(ToolPage):
             return []
         if not saida.lower().endswith(".mp4"):
             saida += ".mp4"
-        cmd = core.cmd_fatiar(v.caminho, saida, inicio, fim,
+        if not self._destino_aceito(saida):
+            return []
+        cmd = core.cmd_fatiar(v.caminho, core.provisorio(saida), inicio, fim,
                               self._chk_preciso.isChecked())
         self._parametros = [(
             "fatiar", [v.caminho],
@@ -756,6 +824,8 @@ class VideoTool(ToolPage):
             return []
         if not saida.lower().endswith(".mp4"):
             saida += ".mp4"
+        if not self._destino_aceito(saida):
+            return []
 
         lista = core.escrever_lista_concat(
             [v.caminho for v in self._videos],
@@ -773,7 +843,8 @@ class VideoTool(ToolPage):
              ("Duração somada", core.formatar_tempo(duracao)),
              ("Fluxos", "recodificados para compatibilizar"
               if recodificar else "copiados sem recodificação")])]
-        return [(core.cmd_mesclar(lista, saida, recodificar), duracao,
+        return [(core.cmd_mesclar(lista, core.provisorio(saida),
+                                  recodificar), duracao,
                  f"{len(self._videos)} vídeos", saida)]
 
     #: O que a edição faz ao material, dito na peça. Vídeo editado é
@@ -931,7 +1002,8 @@ class VideoTool(ToolPage):
 
     def _ao_iniciar_etapa(self, atual: int, total: int, rotulo: str):
         self._progresso.setLabelText(
-            f"{rotulo}\n\nEtapa {atual} de {total}"
+            f"{rotulo}…" if atual == 0
+            else f"{rotulo}\n\nEtapa {atual} de {total}"
             if total > 1 else f"Processando {rotulo}…")
         self._progresso.setValue(0)
 

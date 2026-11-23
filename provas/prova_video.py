@@ -58,8 +58,11 @@ class AsOperacoesReproduzemByteAByte(ComFFmpeg):
 
     def rodar(self, monta):
         resumos = set()
+        # Nome novo a cada rodada: a edição não grava sobre arquivo que
+        # já existe, e a prova não pode depender de que gravasse.
+        self._rodadas = getattr(self, "_rodadas", 0) + 1
         for n in range(2):
-            destino = self.caminho(f"s{n}.mp4")
+            destino = self.caminho(f"s{self._rodadas}-{n}.mp4")
             deu, erro = vc.executar(monta(destino))
             self.assertTrue(deu, erro)
             resumos.add(sha256_file(destino))
@@ -180,6 +183,125 @@ class ORoteiroGuardaOQuePrecisa(ComFFmpeg):
         invertido = vc.montar_roteiro("mesclar", [b, a],
                                       {"recodificar": True}, saida)
         self.assertEqual(vc.reproduzir(invertido)[0], "nao")
+
+
+class OOriginalNuncaEDestino(ComFFmpeg):
+    """A edição produz arquivo novo; o original é a prova.
+
+    O FFmpeg era chamado com a ordem de gravar por cima, e nada conferia
+    se o destino era um arquivo de entrada: no Windows bastava escolher o
+    próprio original com outra caixa de letras. Na compactação em lote,
+    dois vídeos de mesmo nome caíam na mesma saída.
+    """
+
+    def test_o_mesmo_arquivo_e_reconhecido_por_outro_caminho(self):
+        entrada = self.clipe()
+        outro = str(Path(self.pasta.name) / "sub" / ".." / "a.mp4")
+        Path(self.pasta.name, "sub").mkdir()
+        self.assertTrue(vc.mesmo_arquivo(entrada, outro))
+        self.assertTrue(vc.coincide_com_entrada(outro, [entrada]))
+        self.assertFalse(vc.coincide_com_entrada(self.caminho("b.mp4"),
+                                                 [entrada]))
+
+    def test_caixa_diferente_e_o_mesmo_arquivo_onde_o_sistema_assim_trata(self):
+        import os
+        original = os.path.normcase
+        os.path.normcase = lambda p: str(p).lower()   # como no Windows
+        self.addCleanup(setattr, os.path, "normcase", original)
+        self.assertTrue(vc.mesmo_arquivo(self.caminho("Video.MP4"),
+                                         self.caminho("video.mp4")))
+
+    def test_o_ffmpeg_nao_grava_sobre_arquivo_existente(self):
+        entrada = self.clipe()
+        antes = sha256_file(entrada)
+        for cmd in (vc.cmd_fatiar(entrada, entrada, 0, 0.5),
+                    vc.cmd_compactar(entrada, entrada, vc.PRESETS[1])):
+            self.assertNotIn("-y", cmd)
+            deu, _erro = vc.executar(cmd)
+            self.assertFalse(deu)
+            self.assertEqual(sha256_file(entrada), antes)
+
+    def test_homonimos_nao_caem_na_mesma_saida(self):
+        pasta = Path(self.pasta.name)
+        primeira = vc.nome_livre(pasta / "X-compactado.mp4")
+        segunda = vc.nome_livre(pasta / "X-compactado.mp4", [primeira])
+        self.assertNotEqual(primeira, segunda)
+        Path(primeira).write_bytes(b"x")
+        self.assertNotEqual(vc.nome_livre(pasta / "X-compactado.mp4"),
+                            primeira)
+
+    def test_o_nome_livre_nao_e_um_original_da_lista(self):
+        # A lista tem "X.mp4" e "X-compactado.mp4": a saída do primeiro
+        # não pode ser o segundo.
+        pasta = Path(self.pasta.name)
+        outro_original = self.clipe("X-compactado.mp4")
+        livre = vc.nome_livre(pasta / "X-compactado.mp4", [outro_original])
+        self.assertFalse(vc.mesmo_arquivo(livre, outro_original))
+
+
+class AFilaDeOperacoes(ComFFmpeg):
+    """A fila real da ferramenta, rodada no fio da prova."""
+
+    def setUp(self):
+        super().setUp()
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PyQt6.QtWidgets import QApplication
+        self.app = QApplication.instance() or QApplication([])
+        from temis.tools import video as tela
+        self.tela = tela
+
+    def rodar(self, tarefas, originais):
+        desfecho = []
+        fio = self.tela.VideoThread(tarefas, originais=originais)
+        fio.concluido.connect(lambda s, e: desfecho.append((s, e)))
+        fio.run()
+        return desfecho[0]
+
+    def test_o_resultado_so_ocupa_o_nome_depois_de_pronto(self):
+        entrada = self.clipe()
+        saida = self.caminho("trecho.mp4")
+        cmd = vc.cmd_fatiar(entrada, vc.provisorio(saida), 0, 0.5)
+        saidas, erros = self.rodar([(cmd, 0.5, "trecho", saida)], [entrada])
+        self.assertEqual(erros, [])
+        self.assertEqual(saidas, [saida])
+        self.assertTrue(Path(saida).is_file())
+        self.assertFalse(Path(vc.provisorio(saida)).exists())
+
+    def test_operacao_que_falha_nao_destroi_o_arquivo_que_ia_substituir(self):
+        entrada = self.clipe()
+        saida = self.caminho("existente.mp4")
+        Path(saida).write_bytes(b"arquivo anterior")
+        cmd = vc.cmd_fatiar(self.caminho("nao-existe.mp4"),
+                            vc.provisorio(saida), 0, 0.5)
+        saidas, erros = self.rodar([(cmd, 0.5, "trecho", saida)], [entrada])
+        self.assertEqual(saidas, [])
+        self.assertTrue(erros)
+        self.assertEqual(Path(saida).read_bytes(), b"arquivo anterior")
+
+    def test_original_alterado_durante_a_operacao_e_acusado(self):
+        entrada = self.clipe()
+        saida = self.caminho("trecho.mp4")
+        cmd = vc.cmd_fatiar(entrada, vc.provisorio(saida), 0, 0.5)
+        original = vc.executar
+
+        def executar_e_estragar(*a, **k):
+            resultado = original(*a, **k)
+            with open(entrada, "ab") as f:
+                f.write(b"alterado")
+            return resultado
+
+        vc.executar = executar_e_estragar
+        self.addCleanup(setattr, vc, "executar", original)
+        _saidas, erros = self.rodar([(cmd, 0.5, "trecho", saida)], [entrada])
+        self.assertTrue(any("não é mais o mesmo" in e for e in erros))
+
+    def test_original_intacto_nao_gera_acusacao(self):
+        entrada = self.clipe()
+        saida = self.caminho("c.mp4")
+        cmd = vc.cmd_compactar(entrada, vc.provisorio(saida), vc.PRESETS[1])
+        _saidas, erros = self.rodar([(cmd, 1.0, "c", saida)], [entrada])
+        self.assertEqual(erros, [])
 
 
 class APecaDizOQueAConferenciaSignifica(unittest.TestCase):

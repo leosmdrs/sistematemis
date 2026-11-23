@@ -13,6 +13,7 @@ caso das máquinas onde ele vai rodar.
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -361,10 +362,67 @@ def preset_por_chave(chave: str) -> Preset:
 AUDIO_COPIAVEL = {"aac", "mp3", "ac3", "alac"}
 
 
+# ─────────────────────────────────────────
+#  ONDE GRAVAR
+# ─────────────────────────────────────────
+#
+# O original é a prova; a edição produz arquivo novo, ao lado. Três
+# coisas garantem isso, e as três faltavam: o destino nunca é um arquivo
+# de entrada, duas saídas da mesma rodada nunca têm o mesmo nome, e o
+# FFmpeg é chamado com `-n` — a ordem de nunca gravar por cima. Com `-y`
+# bastava escolher como destino o próprio original, com outra caixa de
+# letras no nome, para ele ser destruído pela operação que o preservaria.
+
+def mesmo_arquivo(a, b) -> bool:
+    """Os dois caminhos levam ao mesmo arquivo?
+
+    Pelo sistema de arquivos quando os dois existem — é o que enxerga
+    atalho, nome curto e diferença de caixa no Windows. Senão, pelo
+    caminho normalizado.
+    """
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return (os.path.normcase(os.path.abspath(str(a)))
+                == os.path.normcase(os.path.abspath(str(b))))
+
+
+def coincide_com_entrada(destino, entradas) -> bool:
+    return any(mesmo_arquivo(destino, e) for e in entradas)
+
+
+def nome_livre(caminho, ocupados=()) -> str:
+    """O caminho, ou o mesmo com `-2`, `-3`… se já houver quem o ocupe.
+
+    Ocupa quem está em disco e quem já foi prometido nesta rodada: dois
+    vídeos de mesmo nome, vindos de pastas diferentes, caíam na mesma
+    saída, e a segunda apagava a primeira.
+    """
+    caminho = Path(caminho)
+    candidato, n = caminho, 1
+    while candidato.exists() or any(mesmo_arquivo(candidato, o)
+                                    for o in ocupados):
+        n += 1
+        candidato = caminho.with_name(f"{caminho.stem}-{n}{caminho.suffix}")
+    return str(candidato)
+
+
+def provisorio(saida) -> str:
+    """Nome em que a operação grava antes de o resultado ser aceito.
+
+    Na mesma pasta, para a troca final ser uma renomeação. Assim o
+    arquivo escolhido só é substituído — quando o operador confirmou a
+    substituição — por um resultado inteiro, e nunca por meio arquivo.
+    """
+    saida = Path(saida)
+    return str(saida.with_name(f"{saida.stem}.parcial-{os.getpid()}"
+                               f"{saida.suffix}"))
+
+
 def cmd_compactar(entrada: str, saida: str, preset: Preset,
                   altura_alvo: int = 0, sem_audio: bool = False,
                   codec_audio: str = "") -> list[str]:
-    cmd = [str(ffmpeg_path()), "-y", "-i", str(entrada)]
+    cmd = [str(ffmpeg_path()), "-n", "-i", str(entrada)]
     if altura_alvo:
         # -2 mantém a proporção e garante largura par, exigida pelo H.264.
         cmd += ["-vf", f"scale=-2:{altura_alvo}"]
@@ -390,7 +448,7 @@ def cmd_fatiar(entrada: str, saida: str, inicio: float, fim: float,
     exe = str(ffmpeg_path())
     if recodificar:
         # -ss depois de -i: o corte cai no ponto exato pedido.
-        cmd = [exe, "-y", "-i", str(entrada), "-ss", f"{inicio:.3f}"]
+        cmd = [exe, "-n", "-i", str(entrada), "-ss", f"{inicio:.3f}"]
         if fim > inicio:
             cmd += ["-to", f"{fim:.3f}"]
         cmd += ["-c:v", "libx264", "-crf", "20", "-preset", "medium",
@@ -398,7 +456,7 @@ def cmd_fatiar(entrada: str, saida: str, inicio: float, fim: float,
     else:
         # -ss antes de -i: busca rápida, mas o corte encosta no keyframe
         # anterior; sem recodificar não há como cair no quadro exato.
-        cmd = [exe, "-y", "-ss", f"{inicio:.3f}", "-i", str(entrada)]
+        cmd = [exe, "-n", "-ss", f"{inicio:.3f}", "-i", str(entrada)]
         if fim > inicio:
             cmd += ["-t", f"{fim - inicio:.3f}"]
         cmd += ["-c", "copy", "-avoid_negative_ts", "make_zero"]
@@ -417,7 +475,7 @@ def escrever_lista_concat(entradas: list[str], destino: Path) -> Path:
 
 
 def cmd_mesclar(lista: Path, saida: str, recodificar: bool) -> list[str]:
-    cmd = [str(ffmpeg_path()), "-y", "-f", "concat", "-safe", "0",
+    cmd = [str(ffmpeg_path()), "-n", "-f", "concat", "-safe", "0",
            "-i", str(lista)]
     if recodificar:
         cmd += ["-c:v", "libx264", "-crf", "22", "-preset", "medium",
@@ -481,6 +539,12 @@ def executar(cmd: list[str], duracao: float = 0.0,
 
     if proc.returncode != 0:
         return False, (erro.strip() or f"FFmpeg encerrou com código {proc.returncode}")
+    if "already exists" in erro:
+        # Com `-n` o FFmpeg se recusa a gravar por cima — e, em algumas
+        # versões, sai com código de sucesso mesmo assim. Sem conferir
+        # a mensagem, a recusa passava por operação concluída.
+        return False, ("o arquivo de destino já existe, e a edição não "
+                       "grava sobre arquivo existente")
     if progresso:
         progresso(1.0)
     return True, ""
