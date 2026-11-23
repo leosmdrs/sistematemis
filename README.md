@@ -42,7 +42,7 @@ cada um estão em [TERCEIROS.md](TERCEIROS.md).
 ## Instalação
 
 Baixe o instalador mais recente em
-[Releases](https://github.com/leosmdrs/sistematemis/releases).
+[Releases](https://git.prf.gov.br/sistemas-nacionais/temis/-/releases).
 
 O instalador ainda não é assinado, então o Windows avisa: em **“O Windows
 protegeu o seu PC”**, clique em *Mais informações* → *Executar assim

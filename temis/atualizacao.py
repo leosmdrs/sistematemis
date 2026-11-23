@@ -50,16 +50,22 @@ from pathlib import Path
 
 from . import __version__
 
-#: Endereço do manifesto. O formato `releases/latest/download/` do GitHub
-#: sempre aponta para o arquivo da versão mais recente publicada, então o
-#: endereço nunca muda a cada lançamento.
-#: AJUSTAR antes de publicar: troque `usuario/repositorio` pelo endereço
-#: real. Enquanto apontar para um repositório inexistente, a consulta
-#: falha em silêncio e o sistema abre normalmente.
-REPOSITORIO = "leosmdrs/sistematemis"
+#: Onde o sistema é publicado: o GitLab da PRF. Até a 1.15.2 era o GitHub
+#: (`leosmdrs/sistematemis`); a 1.15.3 é a versão que muda o endereço, e
+#: por isso ela ainda precisa sair também lá — é de lá que as estações
+#: antigas a recebem.
+SERVIDOR = "https://git.prf.gov.br"
+REPOSITORIO = "sistemas-nacionais/temis"
 
-URL_MANIFESTO = (f"https://github.com/{REPOSITORIO}"
-                 "/releases/latest/download/versao.json")
+#: Endereço do manifesto. O formato `releases/permalink/latest/downloads/`
+#: do GitLab sempre aponta para o anexo da versão mais recente publicada,
+#: então o endereço nunca muda a cada lançamento. Só funciona se o anexo
+#: tiver sido cadastrado na release com o caminho `/versao.json` — o
+#: `build/publicar_gitlab.py` faz isso.
+#: A consulta vai sem credencial: enquanto o projeto exigir login, ela
+#: falha em silêncio e o sistema abre normalmente.
+URL_MANIFESTO = (f"{SERVIDOR}/{REPOSITORIO}"
+                 "/-/releases/permalink/latest/downloads/versao.json")
 
 #: Segundos de espera. Curto de propósito: se a rede não responder, o
 #: sistema abre normalmente — atualizar é acessório, trabalhar não é.
@@ -148,8 +154,8 @@ def versao_valida(versao: str) -> bool:
 
 def url_do_instalador(versao: str) -> str:
     """O único endereço de que o instalador de uma versão pode vir."""
-    return (f"https://github.com/{REPOSITORIO}/releases/download/"
-            f"v{versao}/SistemaTemis-{versao}-setup.exe")
+    return (f"{SERVIDOR}/{REPOSITORIO}/-/releases/"
+            f"v{versao}/downloads/SistemaTemis-{versao}-setup.exe")
 
 
 # ─────────────────────────────────────────
@@ -259,8 +265,8 @@ ERRO_ASSINATURA = (
 class _SoHTTPS(urllib.request.HTTPRedirectHandler):
     """Segue redirecionamento, desde que continue em HTTPS.
 
-    O GitHub entrega os arquivos de release por redirecionamento para
-    outro servidor, então proibir não é opção. O que não se aceita é o
+    O GitLab entrega os anexos de release por redirecionamento para o
+    registro de pacotes, então proibir não é opção. O que não se aceita é o
     caminho descer para HTTP no meio: conferir o esquema só do primeiro
     endereço deixava essa porta aberta.
     """

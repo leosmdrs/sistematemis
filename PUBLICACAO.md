@@ -160,6 +160,10 @@ Ficam prontos dois arquivos em `dist/`:
 
 ### Sem uma máquina montada: compilar no GitHub
 
+> Vale só para a cópia do código que ficou no GitHub. No GitLab da PRF
+> estes dois workflows não rodam, e o instalador que eles compilam sai
+> com o endereço de atualização que estiver no código daquele commit.
+
 O workflow **Instalador** (`.github/workflows/instalador.yml`) faz o mesmo
 que o `publicar.py` num Windows do próprio GitHub. Ele baixa o FFmpeg e o
 scrcpy das versões declaradas no `TERCEIROS.md` e confere cada um pelo
@@ -187,33 +191,60 @@ Publicar faz **todas** as estações receberem o aviso de atualização.
 
 ---
 
-## Publicar no GitHub
+## Publicar no GitLab da PRF
 
-**Uma vez, na primeira publicação:**
-
-1. Crie o repositório que vai hospedar os arquivos.
-2. Em `temis/atualizacao.py`, ajuste `URL_MANIFESTO` para o seu
-   `usuario/repositorio`.
-3. Passe o mesmo `usuario/repositorio` ao `publicar.py` pela opção
-   `--repositorio`, ou mude o padrão no próprio script.
+A distribuição fica em `git.prf.gov.br/sistemas-nacionais/temis`. O
+endereço está em três lugares, que um teste mantém de acordo:
+`temis/atualizacao.py`, `build/publicar.py` e `build/publicar_gitlab.py`.
 
 **A cada versão:**
 
 1. Rode o `publicar.py`.
-2. Crie uma *release* com a tag `v1.1.0` — o "v" importa, é o que o
-   manifesto monta na URL.
-3. Anexe os **dois** arquivos: o instalador e o `versao.json`.
-4. Publique.
+2. Envie ao `main` o commit com a versão nova.
+3. Com um token pessoal de escopo `api` na variável `GITLAB_TOKEN`:
 
-O endereço `releases/latest/download/versao.json` passa a apontar sozinho
-para a versão nova. Não há nada a mexer no código a cada lançamento.
+   ```bash
+   python build/publicar_gitlab.py 1.1.0
+   ```
 
-### O repositório precisa ser público
+   Com `--conferir`, ele só mostra o que faria.
 
-O download sem credencial só funciona em repositório público. Se o código
-não puder ser aberto, a saída é manter **dois** repositórios: o código em
-um privado e apenas os artefatos — instalador e manifesto — em um público
-de distribuição.
+O script confere o SHA-256 do instalador contra o `versao.json`, envia os
+dois arquivos ao registro de pacotes do projeto e cria a release `v1.1.0`
+com os dois anexos. No GitLab a release não guarda binário, só aponta
+para endereços; por isso o envio ao registro vem antes.
+
+O que faz a atualização funcionar é o **caminho** de cada anexo
+(`/versao.json` e `/SistemaTemis-1.1.0-setup.exe`). É por ele que o
+endereço `releases/permalink/latest/downloads/versao.json` responde, e é
+nele que o manifesto aponta o instalador. Release criada à mão, pelo
+navegador, sem preencher esse campo, aparece na página e não é achada por
+estação nenhuma.
+
+Não há nada a mexer no código a cada lançamento.
+
+### A versão da mudança sai nos dois lugares
+
+Até a 1.15.2 as estações liam o manifesto no GitHub
+(`leosmdrs/sistematemis`). A primeira versão com o endereço novo precisa
+ser publicada **também lá**, com o `versao.json` apontando o instalador
+para o GitHub: é a única forma de quem tem a versão antiga recebê-la.
+Depois dela, o GitHub deixa de ser consultado.
+
+### O projeto precisa responder sem login
+
+A estação consulta sem credencial, e é de propósito: nada identifica o
+usuário nem a máquina. Enquanto o projeto exigir login, a consulta recebe
+a página de entrada no lugar do manifesto e o sistema abre sem avisar de
+versão nova, em silêncio.
+
+Para funcionar, a visibilidade do projeto e a do registro de pacotes
+precisam permitir leitura anônima. Se o código não puder ficar aberto, a
+saída é manter **dois** projetos: o código em um restrito e apenas os
+artefatos — instalador e manifesto — em um de distribuição, aberto.
+
+O `git.prf.gov.br` responde em endereço da rede interna. Estação fora
+dela, sem VPN, também não recebe o aviso.
 
 ### Quem pode escrever ali, pode instalar código nas estações
 

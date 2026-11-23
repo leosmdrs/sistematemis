@@ -75,14 +75,17 @@ def test_atualizacao_valida_exige_versao_url_e_hash_64():
 
 @pytest.mark.parametrize("url", [
     "https://exemplo.com/setup.exe",
-    "https://github.com/outro/repositorio/releases/download/v1.0.0/"
-    "SistemaTemis-1.0.0-setup.exe",
-    "https://github.com/leosmdrs/sistematemis/releases/download/v2.0.0/"
-    "SistemaTemis-2.0.0-setup.exe",
-    "http://github.com/leosmdrs/sistematemis/releases/download/v1.0.0/"
-    "SistemaTemis-1.0.0-setup.exe",
+    # O endereço de antes da mudança para o GitLab da PRF.
     "https://github.com/leosmdrs/sistematemis/releases/download/v1.0.0/"
-    "SistemaTemis-1.0.0-setup.exe?x=1",
+    "SistemaTemis-1.0.0-setup.exe",
+    "https://git.prf.gov.br/outro-grupo/temis/-/releases/v1.0.0/downloads/"
+    "SistemaTemis-1.0.0-setup.exe",
+    "https://git.prf.gov.br/sistemas-nacionais/temis/-/releases/v2.0.0/"
+    "downloads/SistemaTemis-2.0.0-setup.exe",
+    "http://git.prf.gov.br/sistemas-nacionais/temis/-/releases/v1.0.0/"
+    "downloads/SistemaTemis-1.0.0-setup.exe",
+    "https://git.prf.gov.br/sistemas-nacionais/temis/-/releases/v1.0.0/"
+    "downloads/SistemaTemis-1.0.0-setup.exe?x=1",
 ])
 def test_instalador_fora_da_release_oficial_e_recusado(url):
     info = at.Atualizacao(versao="1.0.0", url=url, sha256="a" * 64)

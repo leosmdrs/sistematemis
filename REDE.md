@@ -61,8 +61,8 @@ upload, de API externa, de envio de relatório ou de coleta de uso.
 
 | | |
 |---|---|
-| **Endereço** | `https://github.com/leosmdrs/sistematemis/releases/latest/download/versao.json` |
-| **Host** | `github.com` (pode redirecionar para `objects.githubusercontent.com`) |
+| **Endereço** | `https://git.prf.gov.br/sistemas-nacionais/temis/-/releases/permalink/latest/downloads/versao.json` |
+| **Host** | `git.prf.gov.br` (redireciona para o registro de pacotes do mesmo host). Até a 1.15.2 era `github.com` |
 | **Quando** | uma vez, na abertura do programa |
 | **Método** | GET |
 | **O que é enviado** | apenas o cabeçalho `User-Agent: SistemaTemis-atualizador` |
@@ -256,8 +256,9 @@ Caso a DTIC opte por restringir a saída das estações, estes são os
 
 | Host | Para quê | Bloqueando, o que acontece |
 |---|---|---|
-| `github.com` | verificação de atualização e modelos de locutor | o programa abre e funciona; não avisa de versão nova, e a separação de locutores fica indisponível |
-| `objects.githubusercontent.com` | entrega dos arquivos acima | idem |
+| `git.prf.gov.br` | verificação de atualização | o programa abre e funciona; não avisa de versão nova |
+| `github.com` | modelos de locutor | a separação de locutores fica indisponível |
+| `objects.githubusercontent.com` | entrega dos modelos de locutor | idem |
 | `huggingface.co`, `cdn-lfs.huggingface.co` | modelos de reconhecimento de fala | a Degravação fica indisponível até que os modelos sejam instalados por outro meio |
 | `data.iana.org` | descoberta do servidor RDAP | a Constatação Web funciona; a peça registra que o dado do domínio não foi obtido |
 

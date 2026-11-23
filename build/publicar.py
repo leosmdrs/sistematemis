@@ -34,7 +34,8 @@ import sys
 from pathlib import Path
 
 #: Mesmo endereço configurado em `temis/atualizacao.py`.
-REPOSITORIO_PADRAO = "leosmdrs/sistematemis"
+SERVIDOR = "https://git.prf.gov.br"
+REPOSITORIO_PADRAO = "sistemas-nacionais/temis"
 
 RAIZ = Path(__file__).resolve().parents[1]
 DIST = RAIZ / "dist"
@@ -132,8 +133,12 @@ def compilar_instalador(versao: str) -> Path | None:
 
 def escrever_manifesto(instalador: Path, versao: str, notas: str,
                        repositorio: str, critica: bool, chave: str = ""):
-    url = (f"https://github.com/{repositorio}/releases/download/"
-           f"v{versao}/{instalador.name}")
+    # Endereço do anexo na release do GitLab. Existe porque o
+    # `publicar_gitlab.py` cadastra o instalador com este mesmo caminho, e
+    # tem de ser letra por letra o de `atualizacao.url_do_instalador`: a
+    # estação recusa manifesto que aponte para outro lugar.
+    url = (f"{SERVIDOR}/{repositorio}/-/releases/"
+           f"v{versao}/downloads/{instalador.name}")
     manifesto = {
         "versao": versao,
         "publicado": datetime.date.today().strftime("%d/%m/%Y"),
@@ -169,6 +174,7 @@ def escrever_manifesto(instalador: Path, versao: str, notas: str,
     print(f"\nPublique estes dois arquivos na versão v{versao}:")
     print(f"  {instalador}")
     print(f"  {alvo}")
+    print(f"\n  python build/publicar_gitlab.py {versao}")
 
 
 def main() -> int:
@@ -177,7 +183,7 @@ def main() -> int:
     ap.add_argument("--notas", default="",
                     help="Arquivo de texto com as novidades da versão")
     ap.add_argument("--repositorio", default=REPOSITORIO_PADRAO,
-                    help="usuario/repositorio no GitHub")
+                    help="grupo/projeto no GitLab da PRF")
     ap.add_argument("--chave", default="",
                     help="Arquivo da chave de publicação, para o manifesto "
                          "já sair assinado (publicação feita à mão)")
