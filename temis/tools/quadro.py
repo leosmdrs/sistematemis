@@ -1067,6 +1067,10 @@ class QuadroTool(ToolPage):
         self._acervo = core.Acervo()
         self._casos, atual = self._acervo.carregar()
         self._caso = next(c for c in self._casos if c.id == atual)
+        if self._acervo.falha_de_leitura:
+            # Depois de a janela existir, e não durante a montagem.
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(0, self._avisar_falha_de_leitura)
 
         self._historico: list[dict] = []
         self._futuro: list[dict] = []
@@ -1512,6 +1516,19 @@ class QuadroTool(ToolPage):
         self._gravar()
         self._acervo.limpar_imagens_orfas(self._casos)
         self.status_msg.emit("Caso excluído")
+
+    def _avisar_falha_de_leitura(self):
+        copia = self._acervo.copia_preservada
+        onde = (f"Uma cópia dele foi guardada em:\n{copia}\n\n"
+                if copia else
+                "Não foi possível guardar uma cópia dele, e por isso "
+                "nada será gravado nesta sessão.\n\n")
+        QMessageBox.warning(
+            self, "Os casos gravados não puderam ser lidos",
+            "O arquivo de casos do Quadro de Evidências está ilegível "
+            f"({self._acervo.falha_de_leitura}).\n\n{onde}"
+            "O quadro abriu vazio. As imagens dos casos anteriores "
+            "continuam na pasta e não serão apagadas.")
 
     def _limpar_quadro(self):
         if not self._caso.nodes:

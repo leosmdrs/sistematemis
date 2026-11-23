@@ -243,31 +243,74 @@ class Acervo:
         self.raiz = Path(raiz) if raiz else pasta_dados()
         self.raiz.mkdir(parents=True, exist_ok=True)
         (self.raiz / self.IMAGENS).mkdir(exist_ok=True)
+        #: Por que o arquivo de casos não pôde ser lido, se não pôde; e
+        #: onde ficou a cópia dele. A tela avisa, e enquanto houver
+        #: falha nenhuma imagem é apagada.
+        self.falha_de_leitura = ""
+        self.copia_preservada: Path | None = None
 
     # ── casos ────────────────────────────────────
     def carregar(self) -> tuple[list[Caso], str]:
+        """Os casos gravados. Arquivo ilegível é preservado, não trocado.
+
+        Arquivo truncado por sincronizador, salvo com marca de ordem de
+        bytes por um editor, ou de formato inesperado, virava aqui um
+        quadro vazio sem aviso — e o primeiro salvamento gravava o quadro
+        vazio por cima do que ainda podia ser recuperado. Agora o arquivo
+        é copiado para o lado antes de qualquer coisa, e a razão fica
+        registrada para a tela dizer.
+        """
+        self.falha_de_leitura = ""
+        self.copia_preservada = None
         arq = self.raiz / self.ARQUIVO
         if not arq.exists():
             caso = Caso(nome="Dê um nome ao caso")
             return [caso], caso.id
+        dados = None
         try:
-            dados = json.loads(arq.read_text(encoding="utf-8"))
+            # `utf-8-sig` aceita o arquivo com e sem a marca de ordem.
+            dados = json.loads(arq.read_text(encoding="utf-8-sig"))
+            if not isinstance(dados, dict) \
+                    or not isinstance(dados.get("casos", []), list):
+                raise ValueError("o conteúdo não é um arquivo de casos")
             casos = [Caso.from_dict(c) for c in dados.get("casos", [])]
-        except (json.JSONDecodeError, OSError, TypeError):
-            casos = []
+        except Exception as e:                              # noqa: BLE001
+            self._preservar(arq, f"{type(e).__name__}: {e}")
+            caso = Caso(nome="Dê um nome ao caso")
+            return [caso], caso.id
         if not casos:
             caso = Caso(nome="Dê um nome ao caso")
             return [caso], caso.id
-        atual = dados.get("atual") if isinstance(dados, dict) else None
+        atual = dados.get("atual")
         if atual not in [c.id for c in casos]:
             atual = casos[0].id
         return casos, atual
+
+    def _preservar(self, arq: Path, motivo: str):
+        self.falha_de_leitura = motivo
+        marca = time.strftime("%Y%m%d-%H%M%S")
+        copia = arq.with_name(f"{arq.name}.ilegivel-{marca}")
+        n = 1
+        while copia.exists():
+            n += 1
+            copia = arq.with_name(f"{arq.name}.ilegivel-{marca}-{n}")
+        try:
+            shutil.copy2(arq, copia)
+            self.copia_preservada = copia
+        except OSError:
+            self.copia_preservada = None
 
     def gravar(self, casos: list[Caso], atual: str):
         # Grava num temporário e só então substitui: um desligamento no
         # meio da escrita deixaria o arquivo truncado e perderia todos os
         # casos, não apenas o que estava sendo salvo.
         alvo = self.raiz / self.ARQUIVO
+        if self.falha_de_leitura and self.copia_preservada is None:
+            # O arquivo não foi lido **e** não se conseguiu copiá-lo:
+            # gravar agora seria apagar a única via do que havia.
+            raise OSError(
+                "o arquivo de casos está ilegível e não pôde ser "
+                "preservado; nada foi gravado por cima dele")
         tmp = alvo.with_suffix(".tmp")
         payload = {"casos": [c.to_dict() for c in casos], "atual": atual}
         tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=1),
@@ -288,10 +331,20 @@ class Acervo:
         return nome
 
     def caminho_imagem(self, nome: str) -> Path:
-        return self.raiz / self.IMAGENS / nome
+        # Só o nome, nunca um caminho: o valor vem do arquivo de casos,
+        # e com `..\..\x` ou caminho absoluto apontaria para fora da
+        # pasta de imagens.
+        return self.raiz / self.IMAGENS / Path(str(nome)).name
 
     def limpar_imagens_orfas(self, casos: list[Caso]) -> int:
-        """Apaga imagens que nenhum caso referencia mais."""
+        """Apaga imagens que nenhum caso referencia mais.
+
+        Não apaga nada se o arquivo de casos não foi lido: as imagens
+        pertencem a casos que estão na cópia preservada, e seriam todas
+        tomadas por órfãs.
+        """
+        if self.falha_de_leitura:
+            return 0
         usadas = {n.imagem for c in casos for n in c.nodes if n.imagem}
         removidas = 0
         for arq in (self.raiz / self.IMAGENS).iterdir():
