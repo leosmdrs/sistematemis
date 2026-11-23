@@ -158,7 +158,10 @@ class AtualizacaoDialog(QDialog):
         self._barra.setVisible(True)
         self._barra.setRange(0, 100)
         self._barra.setValue(0)
-        self._estado.setText("Baixando a atualização…")
+        self._estado.setText(
+            "Baixando a atualização… Para instalar, o sistema será "
+            "fechado: gravação, diligência ou captura em andamento "
+            "precisará ser encerrada, e você será consultado antes.")
 
         self._download = DownloadThread(self._info, self)
         self._download.progresso.connect(self._ao_progredir)
@@ -178,13 +181,28 @@ class AtualizacaoDialog(QDialog):
     def _ao_baixar(self, caminho: str):
         self._caminho = caminho
         self._barra.setValue(100)
+        # Primeiro o programa fecha o que está em curso — e só então o
+        # instalador é iniciado. Na ordem inversa, recusar o fechamento
+        # deixava o programa aberto com os arquivos sendo trocados.
+        janela = self.parent()
+        fechar = getattr(janela, "fechar_para_atualizar", None)
+        if callable(fechar) and not fechar():
+            self._ao_falhar(
+                "A atualização não foi instalada: há atividade em curso, e "
+                "você preferiu não encerrá-la. Nada foi alterado. Conclua "
+                "o que está em andamento e verifique a atualização de novo "
+                "em Sobre.")
+            self._btn_atualizar.setEnabled(True)
+            return
         self._estado.setText(
             "Arquivo conferido pelo resumo SHA-256. O instalador vai abrir e "
             "o sistema será fechado para a troca dos arquivos.")
         try:
             core.instalar(Path(caminho), self._info.sha256)
         except core.ErroAtualizacao as e:
-            self._ao_falhar(str(e))
+            self._ao_falhar(
+                str(e) + "\n\nAs ferramentas já foram encerradas para a "
+                "atualização: feche e abra o Sistema Têmis para continuar.")
             return
         # Encerra por completo: o instalador precisa substituir arquivos
         # que estão em uso enquanto a janela existir.

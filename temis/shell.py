@@ -1147,11 +1147,20 @@ class TemisWindow(QMainWindow):
     #  ENCERRAMENTO
     # ─────────────────────────────────────
 
-    def closeEvent(self, ev):
-        for tool in self._tools.values():
-            if not tool.can_close():
-                ev.ignore()
-                return
+    def _pode_fechar(self) -> bool:
+        """Consulta todas as ferramentas. Nenhuma é encerrada aqui."""
+        return all(tool.can_close() for tool in self._tools.values())
+
+    def _encerrar_tudo(self, avisar: bool = True):
+        """Encerra as ferramentas e fecha o registro da sessão.
+
+        `avisar=False` é o fechamento para atualizar: o instalador vai
+        trocar os arquivos do programa, e uma janela à espera de clique —
+        ou o Explorer aberto na pasta da sessão — ficaria no caminho.
+        """
+        if getattr(self, "_ja_encerrado", False):
+            return
+        self._ja_encerrado = True
         for tool in self._tools.values():
             tool.shutdown()
 
@@ -1174,12 +1183,33 @@ class TemisWindow(QMainWindow):
         except Exception:                                   # noqa: BLE001
             pass
 
-        if self._registrador is not None:
+        if avisar and self._registrador is not None:
             try:
                 self._recomendar_juntar_registro(destino, pasta_sessao)
             except Exception:                               # noqa: BLE001
                 pass
 
+    def fechar_para_atualizar(self) -> bool:
+        """Fecha tudo antes de o instalador ser iniciado. False = recusado.
+
+        O instalador era iniciado primeiro, e o programa pedia para
+        fechar depois: se o operador recusasse encerrar uma gravação ou
+        uma diligência, o programa seguia aberto com o instalador já
+        rodando, a trocar os arquivos por baixo dele.
+        """
+        if not self._pode_fechar():
+            return False
+        self._encerrar_tudo(avisar=False)
+        return True
+
+    def closeEvent(self, ev):
+        if getattr(self, "_ja_encerrado", False):
+            ev.accept()
+            return
+        if not self._pode_fechar():
+            ev.ignore()
+            return
+        self._encerrar_tudo()
         ev.accept()
 
     def _abrir_no_explorador(self, caminho):
