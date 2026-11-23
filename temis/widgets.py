@@ -486,7 +486,9 @@ class ViewerToolbar(QFrame):
 
     def _ao_digitar_pagina(self):
         texto = self._campo_page.text().strip()
-        if not texto.isdigit():
+        # `isdigit` aceita "²" e algarismos de outras escritas, que o
+        # `int` recusa ou lê como outro número: só os dez de sempre.
+        if not (texto.isascii() and texto.isdigit()):
             self.set_page(self._pagina_atual, self._total)
             return
         numero = max(1, min(self._total, int(texto)))

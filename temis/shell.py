@@ -754,8 +754,14 @@ class PerfilDialog(QDialog):
             campo.clear()
 
     def _guardar(self):
-        perfil.gravar(perfil.Perfil(
-            **{c: w.text().strip() for c, w in self._campos.items()}))
+        try:
+            perfil.gravar(perfil.Perfil(
+                **{c: w.text().strip() for c, w in self._campos.items()}))
+        except OSError as e:
+            QMessageBox.warning(
+                self, "A identificação não foi guardada",
+                f"Não foi possível gravar nesta máquina:\n{e}")
+            return
         self.accept()
 
 
@@ -867,7 +873,10 @@ class SobreDialog(QDialog):
     def _alternar_verificacao(self, ligado: bool):
         prefs = atualizacao.ler_preferencias()
         prefs.verificar = ligado
-        atualizacao.gravar_preferencias(prefs)
+        try:
+            atualizacao.gravar_preferencias(prefs)
+        except OSError as e:
+            self._estado.setText(f"A preferência não pôde ser gravada: {e}")
 
     def _verificar(self):
         from .atualizacao_ui import verificar_agora

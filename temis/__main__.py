@@ -97,6 +97,11 @@ def main() -> int:
     app.setOrganizationName(__author__)
     app.setWindowIcon(app_icon())
 
+    # Antes de montar a janela: daqui em diante, erro que nenhuma tela
+    # tratou é registrado e avisado, em vez de fechar o programa.
+    from . import falhas
+    falhas.instalar()
+
     win = TemisWindow()
     win.show()
 
