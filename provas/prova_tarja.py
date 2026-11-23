@@ -264,5 +264,141 @@ class ACensuraViraRoteiroConferivel(Base):
                 self.assertIn(marca, tc.frase_reproducao(situacao))
 
 
+class ATarjaAcompanhaAPaginaGirada(Base):
+    """Em página girada, a tarja automática cai sobre o dado.
+
+    Páginas em paisagem são comuns em peças do SEI e em digitalizações.
+    O PDF guarda o texto na folha sem rotação e gira só ao exibir; a
+    tarja é desenhada sobre a folha já girada. Usado como veio, o
+    retângulo da busca caía em outro ponto: o CPF seguia legível no
+    arquivo de saída, e a tela informava a ocorrência como tarjada.
+    """
+
+    DADO = "123.456.789-00"
+
+    def pdf_girado(self, graus, texto=None, nome=None):
+        doc = fitz.open()
+        pagina = doc.new_page()
+        pagina.insert_text((100, 200), texto or f"CPF {self.DADO}",
+                           fontsize=14)
+        pagina.set_rotation(graus)
+        alvo = self.caminho(nome or f"girado-{graus}.pdf")
+        doc.save(alvo)
+        doc.close()
+        return alvo
+
+    @staticmethod
+    def rotulo_cpf():
+        return next(k for k in tp.TarjaPretaTool.PATTERNS
+                    if k.startswith("CPF"))
+
+    def onde_esta(self, caminho, trecho):
+        """A área do trecho na folha exibida, e quantos pixels de tinta
+        ela tem — medidos na imagem, e não deduzidos de coordenada."""
+        doc = fitz.open(caminho)
+        pagina = doc[0]
+        area = fitz.IRect(tc.no_papel(pagina, pagina.search_for(trecho)[0]))
+        pix = pagina.get_pixmap()
+        tinta = sum(1 for y in range(area.y0, area.y1)
+                    for x in range(area.x0, area.x1)
+                    if pix.pixel(x, y)[0] < 128)
+        doc.close()
+        return area, tinta
+
+    def legiveis(self, caminho, area):
+        """Pixels da área que não ficaram escuros no arquivo produzido.
+
+        Sob a tarja tudo é preto; onde ela não chegou, sobra o papel
+        claro em volta das letras. A borda fica de fora da medida: a
+        imagem é reamostrada, e o contorno da tarja sai esfumado.
+        """
+        doc = fitz.open(caminho)
+        pix = doc[0].get_pixmap()
+        sobra = sum(1 for y in range(area.y0 + 2, area.y1 - 2)
+                    for x in range(area.x0 + 2, area.x1 - 2)
+                    if max(pix.pixel(x, y)) > 60)
+        doc.close()
+        return sobra
+
+    def ferramenta(self, caminho):
+        from PyQt6.QtWidgets import QFileDialog
+        original = QFileDialog.getOpenFileName
+        QFileDialog.getOpenFileName = staticmethod(
+            lambda *a, **k: (caminho, ""))
+        self.addCleanup(setattr, QFileDialog, "getOpenFileName", original)
+        f = tp.TarjaPretaTool()
+        self.addCleanup(f.deleteLater)
+        f._open_file()
+        return f
+
+    def test_a_busca_por_cpf_cobre_o_dado_nas_quatro_rotacoes(self):
+        for graus in (0, 90, 180, 270):
+            with self.subTest(rotacao=graus):
+                entrada = self.pdf_girado(graus)
+                area, tinta = self.onde_esta(entrada, self.DADO)
+                self.assertGreater(tinta, 100, "a prova não achou o dado")
+
+                f = self.ferramenta(entrada)
+                f._search_combo.setCurrentText(self.rotulo_cpf())
+                f._search_and_redact()
+                self.assertEqual(len(f._tarjas_por_pagina.get(0, [])), 1)
+
+                saida = self.censurar(entrada, f._tarjas_por_pagina,
+                                      f"saida-{graus}.pdf")
+                self.assertEqual(self.legiveis(saida, area), 0,
+                                 "sobrou dado legível fora da tarja")
+
+    def test_o_texto_livre_tambem(self):
+        for graus in (90, 180, 270):
+            with self.subTest(rotacao=graus):
+                entrada = self.pdf_girado(graus)
+                area, _ = self.onde_esta(entrada, self.DADO)
+                f = self.ferramenta(entrada)
+                f._search_combo.setCurrentText("Texto livre")
+                f._search_input.setText(self.DADO)
+                f._search_and_redact()
+                saida = self.censurar(entrada, f._tarjas_por_pagina,
+                                      f"livre-{graus}.pdf")
+                self.assertEqual(self.legiveis(saida, area), 0)
+
+    def test_a_marcacao_por_colchetes_tambem(self):
+        for graus in (90, 180, 270):
+            with self.subTest(rotacao=graus):
+                entrada = self.pdf_girado(
+                    graus, "Nome: [Fulano de Tal]", f"colchete-{graus}.pdf")
+                area, tinta = self.onde_esta(entrada, "Fulano de Tal")
+                self.assertGreater(tinta, 100)
+                f = self.ferramenta(entrada)
+                f._redact_brackets()
+                saida = self.censurar(entrada, f._tarjas_por_pagina,
+                                      f"colchete-saida-{graus}.pdf")
+                self.assertEqual(self.legiveis(saida, area), 0)
+
+    def test_a_selecao_de_palavras_aponta_para_a_folha_exibida(self):
+        for graus in (0, 90, 180, 270):
+            with self.subTest(rotacao=graus):
+                entrada = self.pdf_girado(graus)
+                area, _ = self.onde_esta(entrada, self.DADO)
+                doc = fitz.open(entrada)
+                palavra = next(p for p in tp.palavras_da_pagina(doc[0])
+                               if p.texto == self.DADO)
+                doc.close()
+                self.assertEqual(fitz.IRect(palavra.retangulo), area)
+
+    def test_valor_repetido_e_contado_uma_vez_por_ocorrencia(self):
+        doc = fitz.open()
+        pagina = doc.new_page()
+        for i in range(3):
+            pagina.insert_text((100, 200 + 40 * i), f"CPF {self.DADO}",
+                               fontsize=14)
+        entrada = self.caminho("repetido.pdf")
+        doc.save(entrada)
+        doc.close()
+        f = self.ferramenta(entrada)
+        f._search_combo.setCurrentText(self.rotulo_cpf())
+        f._search_and_redact()
+        self.assertEqual(len(f._tarjas_por_pagina[0]), 3)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

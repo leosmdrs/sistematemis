@@ -33,6 +33,7 @@ from ..widgets import (
 )
 from . import derivado_core as derivado
 from . import tarja_core
+from .tarja_core import no_papel
 from .derivado_dialogo import TermoDerivadoDialog
 from .base import ToolPage, ToolMeta
 
@@ -135,8 +136,12 @@ def palavras_da_pagina(pagina) -> list[Palavra]:
         cruas = pagina.get_text("words")
     except Exception:                                       # noqa: BLE001
         return []
+    # No espaço da folha exibida: é nele que o mouse aponta e que a
+    # tarja é desenhada. Ver `tarja_core.no_papel`.
     palavras = [
-        Palavra(retangulo=fitz.Rect(p[0], p[1], p[2], p[3]), texto=p[4],
+        Palavra(retangulo=no_papel(pagina,
+                                   fitz.Rect(p[0], p[1], p[2], p[3])),
+                texto=p[4],
                 bloco=int(p[5]), linha=int(p[6]), ordem=int(p[7]))
         for p in cruas
     ]
@@ -961,10 +966,11 @@ class TarjaPretaTool(ToolPage):
                 abre, fecha = self._par_escolhido()
                 full = page.search_for(f"{abre}{termo}{fecha}")
                 if full:
-                    rects.extend(full)
+                    rects.extend(no_papel(page, r) for r in full)
                 else:
                     rects.extend(
-                        fitz.Rect(h.x0 - 4, h.y0 - 1, h.x1 + 4, h.y1 + 1)
+                        no_papel(page, fitz.Rect(h.x0 - 4, h.y0 - 1,
+                                                 h.x1 + 4, h.y1 + 1))
                         for h in page.search_for(termo)
                     )
             if rects:
@@ -1017,12 +1023,21 @@ class TarjaPretaTool(ToolPage):
         for pi in self._pages_in_scope(self._scope_combo):
             page = self._doc[pi]
             if kind == "Texto livre":
-                rects = list(page.search_for(termo))
+                achados = list(page.search_for(termo))
             else:
                 pattern = termo if kind == "Regex personalizado" else self.PATTERNS[kind]
-                rects = []
-                for m in re.finditer(pattern, page.get_text("text"), flags):
-                    rects.extend(page.search_for(m.group()))
+                # Cada valor distinto é procurado uma vez: `search_for`
+                # já devolve todas as ocorrências dele na página, e
+                # procurá-lo a cada repetição contava n² tarjas para n
+                # ocorrências.
+                valores = dict.fromkeys(
+                    m.group()
+                    for m in re.finditer(pattern, page.get_text("text"),
+                                         flags) if m.group())
+                achados = []
+                for valor in valores:
+                    achados.extend(page.search_for(valor))
+            rects = [no_papel(page, r) for r in achados]
 
             if rects:
                 self._tarjas_por_pagina.setdefault(pi, []).extend(

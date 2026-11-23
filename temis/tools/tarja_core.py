@@ -142,6 +142,26 @@ def montar(caminho: str, tarjas_por_pagina: dict, escala: float = ESCALA):
                    criado_em=carimbo(), tarjas=tarjas)
 
 
+def no_papel(pagina, retangulo) -> "fitz.Rect":
+    """Leva um retângulo do texto para a folha como ela é exibida.
+
+    O PDF guarda as posições do texto na folha **sem** rotação, e a
+    rotação (`/Rotate`) é aplicada só na hora de exibir. A tarja é
+    desenhada sobre a imagem já girada — a mesma que a tela mostra e a
+    mesma que `compor` rasteriza. Retângulo vindo da busca de texto,
+    usado como veio, caía em outro ponto da folha em toda página girada
+    a 90, 180 ou 270 graus: o dado continuava legível no arquivo de
+    saída, e a tela contava a ocorrência como tarjada.
+
+    Toda tarja guardada está no espaço da folha exibida. Quem obtém
+    retângulo do texto (`search_for`, `get_text`) passa por aqui; quem
+    o obtém do mouse já está nesse espaço.
+    """
+    r = fitz.Rect(retangulo) * pagina.rotation_matrix
+    r.normalize()
+    return r
+
+
 def compor(doc, tarjas_por_pagina: dict, escala: float = ESCALA,
            progresso=None, cancelado=None) -> tuple:
     """Rasteriza cada página, cobre as áreas e devolve (documento, resumo).
