@@ -250,74 +250,154 @@ def analisar_pdf(caminho: Path, a: Analise):
         return
 
     # Cada gravação incremental deixa o seu próprio fim de arquivo. Mais
-    # de um significa que o documento foi alterado depois de criado — e
-    # que a versão anterior continua ali dentro.
+    # de um costuma significar alteração depois de criado — mas não só:
+    # a assinatura digital e a otimização para a web também gravam assim.
+    # A peça diz o que se constata, e não o que se supõe.
     fins = bruto.count(b"%%EOF")
     if fins > 1:
         a.anotar(
-            f"O documento foi salvo {fins} vezes, de forma incremental",
-            f"Cada gravação incremental preserva a versão anterior dentro "
-            f"do próprio arquivo. Há {fins - 1} revisão(ões) anterior(es) "
-            f"recuperável(is), com o conteúdo como estava antes das "
-            f"alterações.",
-            ALERTA, "estrutura do PDF")
+            f"O arquivo tem {fins} marcas de fim de arquivo",
+            "Indica gravação incremental: o documento pode ter sido "
+            "alterado depois de criado, caso em que a versão anterior "
+            "continua recuperável dentro do próprio arquivo. A aposição "
+            "de assinatura digital e a otimização para leitura pela "
+            "internet produzem o mesmo sinal sem que haja alteração de "
+            "conteúdo — a distinção exige exame das revisões.",
+            ATENCAO, "estrutura do PDF")
+
+    def exame(nome, funcao):
+        # Cada verificação por si: a falha de uma não pode calar as
+        # seguintes. Já calou — um erro ao ler os metadados XMP impedia
+        # que anexos, cifra, anotações e formulário fossem verificados, e
+        # a peça só dizia "falhas durante o exame".
+        try:
+            funcao()
+        except Exception as e:                           # noqa: BLE001
+            a.erros.append(f"{nome} — verificação não realizada "
+                           f"({type(e).__name__}: {e})")
 
     try:
-        with fitz.open(caminho) as doc:
-            xmp = doc.xref_xml_metadata() or ""
-            if xmp.strip():
+        doc = fitz.open(caminho)
+    except Exception as e:                               # noqa: BLE001
+        a.erros.append(f"PDF: não foi possível abrir para o exame "
+                       f"({type(e).__name__}: {e})")
+        doc = None
+
+    achou = {"javascript": False, "launch": False, "anexo": False}
+
+    if doc is not None:
+        def xmp():
+            texto = doc.get_xml_metadata() or ""
+            if texto.strip():
                 a.anotar(
                     "Metadados XMP presentes",
-                    f"{len(xmp)} caracteres de metadados em formato XMP, "
+                    f"{len(texto)} caracteres de metadados em formato XMP, "
                     f"que costumam guardar histórico de edição e "
                     f"identificação de ferramentas."
-                    + _resumo_xmp(xmp),
+                    + _resumo_xmp(texto),
                     ATENCAO, "metadados XMP")
 
-            if doc.embfile_count():
-                nomes = []
-                for i in range(doc.embfile_count()):
-                    try:
-                        info = doc.embfile_info(i)
-                        nomes.append(f"{info.get('filename', '?')} "
-                                     f"({info.get('size', 0)} bytes)")
-                    except Exception:                    # noqa: BLE001
-                        pass
-                a.anotar(
-                    f"{doc.embfile_count()} arquivo(s) embutido(s) no PDF",
-                    "Arquivos anexados dentro do documento, que não "
-                    "aparecem ao lê-lo:\n" + "\n".join(nomes),
-                    ALERTA, "anexos do PDF")
+        def anexos():
+            if not doc.embfile_count():
+                return
+            achou["anexo"] = True
+            nomes = []
+            for i in range(doc.embfile_count()):
+                try:
+                    info = doc.embfile_info(i)
+                    nomes.append(f"{info.get('filename', '?')} "
+                                 f"({info.get('size', 0)} bytes)")
+                except Exception:                        # noqa: BLE001
+                    pass
+            a.anotar(
+                f"{doc.embfile_count()} arquivo(s) embutido(s) no PDF",
+                "Arquivos anexados dentro do documento, que não "
+                "aparecem ao lê-lo:\n" + "\n".join(nomes),
+                ALERTA, "anexos do PDF")
 
+        def cifra():
             if doc.is_encrypted or doc.metadata.get("encryption"):
                 a.anotar("Documento cifrado",
                          f"Método: {doc.metadata.get('encryption') or '—'}",
                          INFORMATIVO, "estrutura do PDF")
 
+        def anotacoes():
             if doc.has_annots():
                 a.anotar("O documento tem anotações",
                          "Comentários, marcações ou carimbos acrescentados "
                          "após a criação.", ATENCAO, "estrutura do PDF")
+
+        def formulario():
             if doc.is_form_pdf:
                 a.anotar("O documento é um formulário",
                          "Campos preenchíveis podem guardar valores que não "
                          "aparecem impressos.", ATENCAO, "estrutura do PDF")
-    except Exception as e:                               # noqa: BLE001
-        a.erros.append(f"PDF: {type(e).__name__}: {e}")
+
+        def objetos():
+            # Pelos objetos do documento, já descomprimidos: procurar
+            # nos bytes crus não enxerga o que está em fluxo comprimido,
+            # e acusa a palavra que apareça em texto da página.
+            total = min(doc.xref_length(), TETO_OBJETOS)
+            for x in range(1, total):
+                try:
+                    obj = doc.xref_object(x, compressed=True)
+                except Exception:                        # noqa: BLE001
+                    continue
+                if "/JavaScript" in obj or re.search(r"/JS\b", obj):
+                    achou["javascript"] = True
+                if "/Launch" in obj:
+                    achou["launch"] = True
+                if "/EmbeddedFile" in obj:
+                    achou["anexo_objeto"] = True
+            if doc.xref_length() > TETO_OBJETOS:
+                a.erros.append(
+                    f"estrutura — examinados os primeiros {TETO_OBJETOS} "
+                    f"objetos de {doc.xref_length()}")
+
+        for nome, funcao in (("metadados XMP", xmp), ("anexos", anexos),
+                             ("cifra", cifra), ("anotações", anotacoes),
+                             ("formulário", formulario),
+                             ("ações e código", objetos)):
+            exame(nome, funcao)
+        try:
+            doc.close()
+        except Exception:                                # noqa: BLE001
+            pass
+    else:
+        # Sem o leitor de PDF, resta a busca nos bytes — que não vê o que
+        # está comprimido. Dito na peça.
+        achou["javascript"] = bool(re.search(rb"/JavaScript|/JS\b", bruto))
+        achou["launch"] = b"/Launch" in bruto
+        a.erros.append("ações e código — verificados apenas nos bytes do "
+                       "arquivo, sem leitura da estrutura")
 
     # JavaScript embutido: legítimo em formulário, suspeito no resto.
-    if re.search(rb"/JavaScript|/JS\b", bruto):
+    if achou["javascript"]:
         a.anotar(
             "O documento contém JavaScript",
             "Código que roda ao abrir o documento. É comum em formulários; "
             "em documento comum, merece exame.",
             ALERTA, "estrutura do PDF")
 
-    if re.search(rb"/Launch|/EmbeddedFile\b", bruto):
+    # Duas coisas diferentes, que saíam sob um rótulo só: executar um
+    # programa é ação; trazer um arquivo anexado é conteúdo.
+    if achou["launch"]:
         a.anotar(
-            "O documento tem ação de abrir programa ou arquivo externo",
-            "Presença de /Launch ou /EmbeddedFile na estrutura.",
+            "O documento tem ação de executar programa ou abrir arquivo "
+            "externo",
+            "Presença de ação /Launch na estrutura.",
             ALERTA, "estrutura do PDF")
+    if achou.get("anexo_objeto") and not achou["anexo"]:
+        a.anotar(
+            "O documento traz arquivo anexado fora da lista de anexos",
+            "Há objeto de arquivo embutido (/EmbeddedFile) que não consta "
+            "da relação de anexos do documento — é o caso do arquivo "
+            "anexado a uma anotação.",
+            ALERTA, "anexos do PDF")
+
+
+#: Quantos objetos do PDF são percorridos na busca por ações e código.
+TETO_OBJETOS = 200_000
 
 
 _XMP_ALVOS = (

@@ -178,5 +178,95 @@ class ADataVaiComOFuso(unittest.TestCase):
                                   campos["Data da captura"])
 
 
+class OExameAvancadoDoPdf(unittest.TestCase):
+    """Cada verificação por si, e cada achado com o nome certo."""
+
+    def analisar(self, monta):
+        import tempfile
+        import fitz
+        from temis.tools import metadados_avancado as av
+        with tempfile.TemporaryDirectory() as pasta:
+            alvo = Path(pasta) / "doc.pdf"
+            doc = fitz.open()
+            doc.new_page().insert_text((72, 100), "texto")
+            monta(doc)
+            doc.save(alvo)
+            doc.close()
+            a = av.Analise(caminho=str(alvo))
+            av.analisar_pdf(alvo, a)
+        return a
+
+    def titulos(self, a):
+        return " | ".join(x.titulo for x in a.achados)
+
+    def test_pdf_com_xmp_nao_interrompe_o_exame(self):
+        # Era aqui que o exame morria: os anexos, logo abaixo, deixavam
+        # de ser verificados.
+        def monta(doc):
+            doc.set_xml_metadata(
+                "<x:xmpmeta xmlns:x='adobe:ns:meta/'><xmp:CreatorTool>"
+                "Editor X</xmp:CreatorTool></x:xmpmeta>")
+            doc.embfile_add("planilha.xlsx", b"conteudo anexado")
+        a = self.analisar(monta)
+        self.assertIn("Metadados XMP presentes", self.titulos(a))
+        self.assertIn("arquivo(s) embutido(s)", self.titulos(a))
+        self.assertEqual(a.erros, [])
+
+    def test_anexo_nao_e_chamado_de_acao_de_abrir_programa(self):
+        a = self.analisar(lambda d: d.embfile_add("a.txt", b"x"))
+        self.assertIn("arquivo(s) embutido(s)", self.titulos(a))
+        self.assertNotIn("executar programa", self.titulos(a))
+
+    def test_a_palavra_no_texto_da_pagina_nao_e_javascript(self):
+        a = self.analisar(lambda d: d[0].insert_text(
+            (72, 200), "O campo /JavaScript e a acao /Launch do manual"))
+        self.assertNotIn("JavaScript", self.titulos(a))
+        self.assertNotIn("executar programa", self.titulos(a))
+
+    def test_javascript_de_verdade_e_achado(self):
+        def monta(doc):
+            x = doc.get_new_xref()
+            doc.update_object(
+                x, "<</S/JavaScript/JS(app.alert\\(1\\))>>")
+            doc.xref_set_key(doc.pdf_catalog(), "OpenAction", f"{x} 0 R")
+        a = self.analisar(monta)
+        self.assertIn("contém JavaScript", self.titulos(a))
+
+    def test_falha_de_uma_verificacao_e_nomeada_e_nao_cala_as_outras(self):
+        import fitz
+        original = fitz.Document.get_xml_metadata
+
+        def estoura(self):
+            raise RuntimeError("xmp ilegível")
+
+        fitz.Document.get_xml_metadata = estoura
+        self.addCleanup(setattr, fitz.Document, "get_xml_metadata", original)
+        a = self.analisar(lambda d: d.embfile_add("a.txt", b"x"))
+        self.assertTrue(any("metadados XMP — verificação não realizada"
+                            in e for e in a.erros))
+        self.assertIn("arquivo(s) embutido(s)", self.titulos(a))
+
+    def test_gravacao_incremental_nao_e_afirmada_como_alteracao(self):
+        import tempfile
+        import fitz
+        from temis.tools import metadados_avancado as av
+        with tempfile.TemporaryDirectory() as pasta:
+            alvo = Path(pasta) / "doc.pdf"
+            doc = fitz.open()
+            doc.new_page()
+            doc.save(alvo)
+            doc.close()
+            doc = fitz.open(alvo)
+            doc.new_page()
+            doc.save(alvo, incremental=True,
+                     encryption=fitz.PDF_ENCRYPT_KEEP)
+            doc.close()
+            a = av.Analise(caminho=str(alvo))
+            av.analisar_pdf(alvo, a)
+        achado = next(x for x in a.achados if "marcas de fim" in x.titulo)
+        self.assertIn("assinatura digital", achado.detalhe)
+        self.assertEqual(achado.relevancia, av.ATENCAO)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

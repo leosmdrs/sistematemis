@@ -355,7 +355,7 @@ def _de_pdf(caminho: Path) -> list[Campo]:
                 f"{len(camadas)}" + (f", {ocultas} desligada(s)"
                                      if ocultas else ""),
                 "Técnico", bool(ocultas)))
-        if doc.xref_xml_metadata():
+        if (doc.get_xml_metadata() or "").strip():
             campos.append(Campo("Metadados XMP", "Presentes", "Técnico"))
     return campos
 
