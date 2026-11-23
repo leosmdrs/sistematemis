@@ -206,6 +206,97 @@ class OQueChegaPeloConsoleEConferidoDeNovo(unittest.TestCase):
         self.assertNotIn("nunca", texto)
 
 
+SEGREDO = "0123456789abcdef0123456789abcdef"
+
+PAGINA_HOSTIL = """
+<html><head><script>
+// Uma página preparada para enganar o registro.
+window.addEventListener('click', function (e) {
+  e.stopImmediatePropagation();
+}, true);
+document.addEventListener('submit', function (e) {
+  e.stopImmediatePropagation();
+}, true);
+</script></head><body>
+<button id="apagar">Apagar registros</button>
+<form id="f" onsubmit="return false"><input name="q" value="alvo">
+<button id="enviar" type="submit">Enviar</button></form>
+</body></html>
+"""
+
+GESTOS_HOSTIS = {
+    "clique": "document.getElementById('apagar').click();",
+    "envio": "document.getElementById('f').requestSubmit();",
+    "forjado": ("console.log('TEMIS::clique::BUTTON::Consultar "
+                "servidor::');"),
+    "sonda": ("console.log('VE=' + (typeof window.__temis_espia) + '/' + "
+              "(typeof PREFIXO));"),
+}
+
+
+class APaginaNaoSuprimeNemForjaORegistro(unittest.TestCase):
+    """O código injetado como o programa o injeta: isolado e primeiro."""
+
+    brutos = None
+
+    @classmethod
+    def setUpClass(cls):
+        pedido = json.dumps({
+            "pagina": PAGINA_HOSTIL, "mundo": "aplicacao",
+            "codigo": ec.montar_espia(SEGREDO),
+            "gestos": list(GESTOS_HOSTIS.values())})
+        try:
+            r = subprocess.run(
+                [sys.executable, str(RAIZ / "provas" / "_navegador.py")],
+                input=pedido, capture_output=True, text=True, timeout=120)
+        except (OSError, subprocess.TimeoutExpired):
+            raise unittest.SkipTest("sem o navegador embutido")
+        linha = next((l for l in r.stdout.splitlines()
+                      if l.startswith("RESULTADO ")), None)
+        if linha is None:
+            raise unittest.SkipTest("sem o navegador embutido")
+        cls.brutos = dict(zip(GESTOS_HOSTIS,
+                              json.loads(linha[len("RESULTADO "):])))
+
+    def atos(self, gesto):
+        lidos = (ec.ler_console(m, SEGREDO) for m in self.brutos[gesto])
+        return [a for a in lidos if a]
+
+    def test_a_pagina_nao_consegue_suprimir_o_clique(self):
+        atos = self.atos("clique")
+        self.assertEqual(len(atos), 1)
+        self.assertIn("Apagar registros", atos[0][1])
+
+    def test_nem_o_envio_de_formulario(self):
+        atos = self.atos("envio")
+        self.assertTrue(any(a[0] == ec.FORMULARIO and "q=alvo" in a[2]
+                            for a in atos))
+
+    def test_entrada_forjada_pela_pagina_e_descartada(self):
+        self.assertTrue(self.brutos["forjado"])          # ela escreveu
+        self.assertEqual(self.atos("forjado"), [])       # e não entrou
+
+    def test_a_pagina_nao_enxerga_o_codigo_nem_o_segredo(self):
+        self.assertEqual(self.brutos["sonda"], ["VE=undefined/undefined"])
+        tudo = " ".join(m for lista in self.brutos.values() for m in lista
+                        if not m.startswith(ec.MARCA + SEGREDO))
+        self.assertNotIn(SEGREDO, tudo)
+
+
+class OSegredoNaMensagem(unittest.TestCase):
+
+    def test_com_segredo_a_marca_sozinha_nao_basta(self):
+        self.assertIsNone(ec.ler_console("TEMIS::clique::A::x::", SEGREDO))
+        self.assertIsNone(
+            ec.ler_console("TEMIS::outro-segredo::clique::A::x::", SEGREDO))
+        ato = ec.ler_console(f"TEMIS::{SEGREDO}::clique::A::x::", SEGREDO)
+        self.assertEqual(ato[0], ec.CLIQUE)
+
+    def test_o_codigo_gerado_leva_o_segredo(self):
+        self.assertIn(SEGREDO, ec.montar_espia(SEGREDO))
+        self.assertNotIn(SEGREDO, ec.ESPIA_JS)
+
+
 class ODiligenciaSoAbreEnderecoDaRede(unittest.TestCase):
     """`file://` e `smb://` não são sistema consultado."""
 

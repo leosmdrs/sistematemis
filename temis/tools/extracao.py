@@ -116,9 +116,13 @@ class _Pagina(QWebEnginePage):
 
     ato = pyqtSignal(str, str, str)      # tipo, descrição, detalhe
 
+    #: O segredo desta diligência. Mensagem sem ele não é do código
+    #: injetado, por mais que traga a marca.
+    segredo = ""
+
     def javaScriptConsoleMessage(self, _nivel, mensagem,  # noqa: N802
                                  _linha, _origem):
-        lido = core.ler_console(mensagem or "")
+        lido = core.ler_console(mensagem or "", self.segredo)
         if lido is not None:
             self.ato.emit(*lido)
 
@@ -556,15 +560,18 @@ class ExtracaoTool(ToolPage):
 
         script = QWebEngineScript()
         script.setName("temis_espia")
-        script.setSourceCode(core.ESPIA_JS)
+        import secrets
+        self._segredo = secrets.token_hex(16)
+        script.setSourceCode(core.montar_espia(self._segredo))
         script.setInjectionPoint(
-            QWebEngineScript.InjectionPoint.DocumentReady)
-        script.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
+            QWebEngineScript.InjectionPoint.DocumentCreation)
+        script.setWorldId(QWebEngineScript.ScriptWorldId.ApplicationWorld)
         script.setRunsOnSubFrames(True)
         self._perfil.scripts().insert(script)
 
         self._view = QWebEngineView()
         self._pagina = _Pagina(self._perfil, self._view)
+        self._pagina.segredo = self._segredo
         self._view.setPage(self._pagina)
         self._pagina.settings().setAttribute(
             QWebEngineSettings.WebAttribute.ScreenCaptureEnabled, False)

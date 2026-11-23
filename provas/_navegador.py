@@ -34,6 +34,19 @@ def main() -> int:
 
     pagina = Pagina()
 
+    # "aplicacao": o código entra como entra no programa — num mundo
+    # isolado do da página, antes de qualquer script dela.
+    if pedido.get("mundo") == "aplicacao":
+        from PyQt6.QtWebEngineCore import QWebEngineScript
+        script = QWebEngineScript()
+        script.setName("temis_espia")
+        script.setSourceCode(pedido["codigo"])
+        script.setInjectionPoint(
+            QWebEngineScript.InjectionPoint.DocumentCreation)
+        script.setWorldId(QWebEngineScript.ScriptWorldId.ApplicationWorld)
+        script.setRunsOnSubFrames(True)
+        pagina.scripts().insert(script)
+
     def esperar(ms):
         laco = QEventLoop()
         QTimer.singleShot(ms, laco.quit)
@@ -55,7 +68,8 @@ def main() -> int:
     if not carregou:
         return 3
 
-    rodar(pedido["codigo"])
+    if pedido.get("mundo") != "aplicacao":
+        rodar(pedido["codigo"])
     saida = []
     for gesto in pedido["gestos"]:
         mensagens.clear()

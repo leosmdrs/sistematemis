@@ -83,10 +83,12 @@ ROTULO_EVENTO = {
 
 #: Código injetado em toda página, inclusive em quadros internos.
 #:
-#: Roda no mundo principal porque precisa enxergar os mesmos elementos
-#: que o usuário vê. Escuta na fase de captura (`true` no terceiro
-#: argumento) para que um `stopPropagation` da própria página não o
-#: silencie.
+#: Roda num mundo isolado do da página: enxerga os mesmos elementos que
+#: o usuário vê, mas a página não enxerga o código, nem as variáveis
+#: dele, nem pode trocar as funções que ele usa. É injetado antes de
+#: qualquer script da página e escuta na janela, na fase de captura —
+#: é o primeiro a ouvir, e um `stopImmediatePropagation` da página, que
+#: no mundo principal bastava para suprimir o registro, chega tarde.
 _ESPIA_MODELO = r"""
 (function () {
   if (window.__temis_espia) { return; }
@@ -95,6 +97,7 @@ _ESPIA_MODELO = r"""
   var SIGILO = new RegExp(__SIGILO__, 'i');
   var EXATOS = __EXATOS__;
   var SUPRIMIDO = __SUPRIMIDO__;
+  var PREFIXO = __PREFIXO__;
   // Campo que já foi de senha continua sigiloso depois que o "mostrar
   // senha" da página o troca para texto.
   var foiSenha = new WeakSet();
@@ -152,12 +155,12 @@ _ESPIA_MODELO = r"""
   }
 
   ['focusin', 'input', 'change', 'keydown'].forEach(function (nome) {
-    document.addEventListener(nome, function (ev) {
+    window.addEventListener(nome, function (ev) {
       try { marcar(ev.target); } catch (e) { }
     }, true);
   });
 
-  document.addEventListener('click', function (ev) {
+  window.addEventListener('click', function (ev) {
     try {
       var el = ev.target;
       marcar(el);
@@ -165,12 +168,12 @@ _ESPIA_MODELO = r"""
         ? (el.closest('a,button,input[type=submit],input[type=button],' +
                       '[role=button],[onclick]') || el)
         : el;
-      console.log('TEMIS::clique::' + ((alvo && alvo.tagName) || '') +
+      console.log(PREFIXO + 'clique::' + ((alvo && alvo.tagName) || '') +
                   '::' + rotulo(alvo) + '::' + ((alvo && alvo.href) || ''));
     } catch (e) { }
   }, true);
 
-  document.addEventListener('submit', function (ev) {
+  window.addEventListener('submit', function (ev) {
     try {
       var f = ev.target, campos = [], i, c, autenticacao = false;
       for (i = 0; i < f.elements.length; i++) {
@@ -191,7 +194,7 @@ _ESPIA_MODELO = r"""
           campos.push(c.name + '=' + String(c.value || '').slice(0, 140));
         }
       }
-      console.log('TEMIS::formulario::' + (f.getAttribute('action') || '') +
+      console.log(PREFIXO + 'formulario::' + (f.getAttribute('action') || '') +
                   '::' + (f.method || 'get') + '::' + campos.join(' | '));
     } catch (e) { }
   }, true);
@@ -226,13 +229,30 @@ SIGILOSOS_EXATOS = ("code", "state", "sid", "pin", "ticket", "sig")
 SUPRIMIDO = "[suprimido]"
 
 
-def _montar_espia() -> str:
+def montar_espia(segredo: str = "") -> str:
+    """O código a injetar, com a regra de sigilo e o segredo da sessão.
+
+    O registro chega ao programa pelo console do navegador, e o console
+    é de quem quiser escrever nele: uma página preparada para isso
+    escrevia `TEMIS::clique::…` e punha no termo um ato que ninguém
+    praticou. Com o segredo — sorteado a cada diligência e conhecido só
+    do código injetado, que roda num mundo isolado do da página —, a
+    mensagem que não o trouxer é descartada.
+    """
     import json
     padrao = "|".join(re.escape(s) for s in SIGILOSOS)
     return (_ESPIA_MODELO
             .replace("__SIGILO__", json.dumps(padrao))
             .replace("__EXATOS__", json.dumps(list(SIGILOSOS_EXATOS)))
-            .replace("__SUPRIMIDO__", json.dumps(SUPRIMIDO)))
+            .replace("__SUPRIMIDO__", json.dumps(SUPRIMIDO))
+            .replace("__PREFIXO__", json.dumps(prefixo_das_mensagens(segredo))))
+
+
+def prefixo_das_mensagens(segredo: str = "") -> str:
+    return MARCA + (segredo + "::" if segredo else "")
+
+
+_montar_espia = montar_espia
 
 
 #: O código pronto para injetar, com a lista de nomes sigilosos embutida:
@@ -421,15 +441,18 @@ def limpar_campos(campos: str) -> str:
     return " | ".join(saida)
 
 
-def ler_console(mensagem: str) -> tuple[str, str, str] | None:
+def ler_console(mensagem: str,
+                segredo: str = "") -> tuple[str, str, str] | None:
     """Traduz uma mensagem do código injetado em (tipo, descrição, detalhe).
 
     Devolve None para tudo que não vier com a marca — a página tem os
-    próprios `console.log` e eles não interessam ao registro.
+    próprios `console.log` e eles não interessam ao registro. Com
+    `segredo`, a marca sozinha não basta: a mensagem tem de trazê-lo.
     """
-    if not mensagem.startswith(MARCA):
+    prefixo = prefixo_das_mensagens(segredo)
+    if not mensagem.startswith(prefixo):
         return None
-    partes = mensagem[len(MARCA):].split("::")
+    partes = mensagem[len(prefixo):].split("::")
     genero = partes[0] if partes else ""
 
     if genero == "clique":
