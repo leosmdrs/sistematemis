@@ -1778,3 +1778,11 @@ class QuadroTool(ToolPage):
     def shutdown(self):
         self._view._encerrar_edicoes()
         self._gravar()
+        # A imagem de um item removido fica no disco enquanto o Ctrl+Z
+        # puder trazê-lo de volta. Ao fechar, o histórico acaba — e a
+        # imagem de material de apuração que ninguém mais referencia
+        # deixa de ficar esquecida na pasta.
+        try:
+            self._acervo.limpar_imagens_orfas(self._casos)
+        except OSError:
+            pass

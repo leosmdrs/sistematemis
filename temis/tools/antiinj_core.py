@@ -306,7 +306,58 @@ def analyze_page(page: fitz.Page, baseline_keys: set | None = None,
             injection=injection,
         ))
 
-    return findings
+    return _reunir_camada_de_ocr(page, findings)
+
+
+#: Fração da página que uma imagem precisa ocupar para a página ser
+#: tratada como digitalização.
+FRACAO_DIGITALIZADA = 0.7
+
+
+def _reunir_camada_de_ocr(page, findings: list) -> list:
+    """Reúne num achado só a camada de OCR de uma página digitalizada.
+
+    Página digitalizada tornada pesquisável é uma imagem do tamanho da
+    folha com o texto reconhecido por cima, invisível — é assim que o PDF
+    Pesquisável deste sistema grava, e todo escâner também. Cada palavra
+    dessa camada saía como um achado de "renderização invisível": o
+    documento que o próprio sistema acabara de produzir vinha acusado de
+    centenas de textos ocultos, e o achado que importasse se perdia no
+    meio.
+
+    Reúnem-se só os trechos cujo **único** sinal é a renderização
+    invisível, e que não trazem instrução dirigida ao leitor. O que tiver
+    outro sinal, ou padrão de injeção, continua achado próprio, com a
+    severidade que tinha. A camada não é omitida: vira um achado de
+    severidade baixa, com o texto inteiro, para ser conferido contra a
+    imagem.
+    """
+    simples = [f for f in findings
+               if f.codes == ["H6"] and not f.injection]
+    if not simples:
+        return findings
+    try:
+        area_pagina = max(1.0, abs(page.rect.get_area()))
+        maior = max((abs((fitz.Rect(i["bbox"]) & page.rect).get_area())
+                     for i in page.get_image_info()), default=0.0)
+    except Exception:                                       # noqa: BLE001
+        return findings
+    if maior / area_pagina < FRACAO_DIGITALIZADA:
+        return findings
+
+    caixa = fitz.Rect(simples[0].bbox)
+    for f in simples[1:]:
+        caixa |= f.bbox
+    reunido = Finding(
+        page=page.number, codes=["H6"], severity="baixa",
+        text=" ".join(f.text for f in simples), bbox=caixa,
+        details=[
+            f"camada de texto invisível sobre imagem que ocupa a página — "
+            f"padrão de documento digitalizado com reconhecimento óptico "
+            f"(OCR); {len(simples)} trecho(s) reunido(s)",
+            "confira se o texto corresponde ao que a imagem mostra",
+        ])
+    return [f for f in findings if f not in simples] + [reunido]
 
 
 def analyze_document(doc: fitz.Document, progress=None) -> list[Finding]:
