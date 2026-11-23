@@ -379,6 +379,8 @@ class VarreduraTool(ToolPage):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._indice: core.Indice | None = None
+        #: Pasta temporária das cópias abertas a pedido; apagada ao sair.
+        self._pasta_copias: str | None = None
         self._tarefa: IndexarThread | None = None
         self._achados: list[core.Achado] = []
         self._marcados: dict[int, core.Achado] = {}
@@ -1207,6 +1209,25 @@ class VarreduraTool(ToolPage):
             self._arvore.blockSignals(False)
         self._atualizar_rodape()
 
+    def _descartar_copias(self):
+        """Apaga as cópias abertas do material examinado."""
+        if self._pasta_copias is None:
+            return
+        import shutil
+        import stat
+
+        def soltar(funcao, caminho, _erro):
+            # As cópias são somente leitura, e o Windows não apaga
+            # arquivo assim sem antes tirar o atributo.
+            try:
+                os.chmod(caminho, stat.S_IWRITE)
+                funcao(caminho)
+            except OSError:
+                pass
+
+        shutil.rmtree(self._pasta_copias, onerror=soltar)
+        self._pasta_copias = None
+
     # ── ações sobre o arquivo ────────────────────
     def _caminho_absoluto(self) -> Path | None:
         if self._selecionado is None or self._indice is None:
@@ -1224,8 +1245,44 @@ class VarreduraTool(ToolPage):
                 f"O índice continua consultável, mas abrir o arquivo exige "
                 f"que a origem esteja conectada.")
             return
+        # Material sob exame não é confiável, e a origem não se abre
+        # direto: o que executa é recusado, e do resto abre-se uma cópia
+        # isolada, com a pessoa avisada do que está fazendo.
+        if core.tipo_que_executa(alvo):
+            QMessageBox.warning(
+                self, "Este tipo de arquivo não é aberto aqui",
+                f"{alvo.name}\n\nArquivos {alvo.suffix.lower()} executam "
+                "ao serem abertos, e material sob exame não é confiável. "
+                "A Varredura não abre este tipo.\n\nO conteúdo indexado, "
+                "o resumo e os metadados continuam disponíveis ao lado.")
+            return
         try:
-            os.startfile(str(alvo))                     # noqa: S606
+            tamanho = core.formatar_tamanho(alvo.stat().st_size)
+        except OSError:
+            tamanho = "tamanho desconhecido"
+        resposta = QMessageBox.question(
+            self, "Abrir arquivo do material examinado",
+            f"{alvo.name}  ({tamanho})\n\n"
+            "O arquivo vem de material sob exame, e o conteúdo dele não é "
+            "confiável: documento, imagem e vídeo também podem explorar "
+            "falha do programa que os abre.\n\n"
+            "Será aberta uma cópia, em pasta temporária desta estação, "
+            "pelo programa padrão do Windows. O arquivo na origem é "
+            "apenas lido para a cópia. A cópia é apagada ao fechar o "
+            "Sistema Têmis.\n\nAbrir a cópia?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        if resposta != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            if self._pasta_copias is None:
+                import tempfile
+                self._pasta_copias = tempfile.mkdtemp(
+                    prefix="temis-varredura-")
+            copia = core.copia_para_abrir(alvo, self._pasta_copias)
+            os.startfile(str(copia))                    # noqa: S606
+        except core.AberturaRecusada as e:
+            QMessageBox.warning(self, "Arquivo não aberto", str(e))
         except OSError as e:
             QMessageBox.warning(self, "Não foi possível abrir", str(e))
 
@@ -1282,3 +1339,4 @@ class VarreduraTool(ToolPage):
             self._tarefa.cancelar()
             self._tarefa.wait(4000)
         self._fechar_indice()
+        self._descartar_copias()

@@ -41,6 +41,7 @@ import hashlib
 import io
 import os
 import re
+import shutil
 import sqlite3
 import unicodedata
 import zipfile
@@ -1555,3 +1556,66 @@ def build_text(t: TermoVarredura) -> str:
     L += ["", ENCERRAMENTO, "", "_" * 40, t.nome,
           t.cargo]
     return "\n".join(L)
+
+
+# ─────────────────────────────────────────
+#  ABRIR UM ARQUIVO DO MATERIAL EXAMINADO
+# ─────────────────────────────────────────
+
+#: Tipos que, abertos, **executam**. Material apreendido não é confiável:
+#: um duplo clique sobre um destes roda, na estação de quem examina, o
+#: que estava na mídia de terceiro. Não são abertos por aqui.
+TIPOS_QUE_EXECUTAM = frozenset((
+    # programas e instaladores
+    ".exe", ".com", ".scr", ".pif", ".cpl", ".msi", ".msp", ".msix",
+    ".appx", ".dll", ".sys", ".drv", ".ocx", ".gadget", ".application",
+    ".appref-ms", ".jar", ".apk",
+    # roteiros
+    ".bat", ".cmd", ".ps1", ".psm1", ".ps1xml", ".vbs", ".vbe", ".js",
+    ".jse", ".wsf", ".wsh", ".hta", ".py", ".pyw", ".sh", ".reg", ".inf",
+    ".msc", ".scf", ".sct", ".wsc",
+    # atalhos e apontadores
+    ".lnk", ".url", ".website", ".library-ms", ".search-ms", ".settingcontent-ms",
+    # documentos que carregam macro, ajuda compilada, imagens de disco
+    ".docm", ".dotm", ".xlsm", ".xltm", ".xlam", ".pptm", ".potm", ".ppsm",
+    ".ppam", ".chm", ".hlp", ".iso", ".img", ".vhd", ".vhdx",
+))
+
+
+class AberturaRecusada(Exception):
+    """O arquivo não é aberto por esta ferramenta — com a razão."""
+
+
+def tipo_que_executa(caminho) -> bool:
+    return Path(str(caminho)).suffix.lower() in TIPOS_QUE_EXECUTAM
+
+
+def copia_para_abrir(origem, pasta) -> Path:
+    """Copia o arquivo para uma pasta isolada e devolve a cópia.
+
+    O que se abre é a cópia, somente leitura, e nunca o arquivo na mídia
+    de origem. Programa de escritório grava ao lado do que abre —
+    arquivo de bloqueio, salvamento automático, data de último acesso —,
+    e abrir direto na origem era alterar o material examinado. A cópia
+    não torna o conteúdo confiável: só garante que a origem não é
+    tocada além da leitura.
+    """
+    origem = Path(origem)
+    if tipo_que_executa(origem):
+        raise AberturaRecusada(
+            f"Arquivos {origem.suffix.lower()} executam ao serem abertos, e "
+            "material sob exame não é confiável. Este tipo não é aberto "
+            "pela Varredura.")
+    pasta = Path(pasta)
+    pasta.mkdir(parents=True, exist_ok=True)
+    destino = pasta / origem.name
+    n = 1
+    while destino.exists():
+        n += 1
+        destino = pasta / f"{origem.stem}-{n}{origem.suffix}"
+    shutil.copyfile(origem, destino)
+    try:
+        os.chmod(destino, 0o444)
+    except OSError:
+        pass
+    return destino

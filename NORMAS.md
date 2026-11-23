@@ -31,8 +31,10 @@ Outros pontos da norma, e a correspondência:
 
 - **Minimizar a manipulação do original.** Nenhuma ferramenta grava sobre
   o arquivo de entrada; o resultado é sempre arquivo novo, em separado. A
-  Varredura indexa o dispositivo uma vez e não volta a tocá-lo, de modo
-  que ele possa ser lacrado.
+  Varredura indexa o dispositivo uma vez e pode ser consultada com ele
+  lacrado. Abrir um arquivo a partir dela, com a origem conectada, lê o
+  arquivo para uma cópia temporária — é a cópia que se abre, e a origem
+  não é gravada.
 - **Documentar toda alteração.** Onde há alteração — censura, edição,
   análise —, ela é operação declarada, e o termo relaciona todas.
 - **Identificar quem manuseou.** A identificação do operador acompanha as
@@ -61,7 +63,7 @@ arquivamento.
 | **Desvio do relógio** — a diretriz manda registrar o relógio e o seu desvio | As peças declaram o fuso e o **estado de sincronização** do relógio da estação, apurado junto ao sistema operacional, e advertem que não constituem carimbo de tempo certificado. |
 | **Cadeia de custódia** — descrever onde a evidência foi encontrada, como foi manuseada e tudo o que lhe aconteceu | O termo de juntada registra de quem, por que meio e quando o material foi recebido; os termos derivados identificam original e produzido pelos resumos; a conferência de integridade confronta o resumo declarado na entrega. |
 | **Arquivamento** — preservar a evidência de alteração e registrar quem teve acesso | O original nunca é alterado. Cada peça produzida é identificada por resumo criptográfico, o que torna qualquer alteração posterior detectável. |
-| **Não confiar em programa da máquina sob exame** | A leitura é feita pelos componentes que acompanham o instalador, e não por programas do material examinado. |
+| **Não confiar em programa da máquina sob exame** | A leitura é feita pelos componentes que acompanham o instalador, e não por programas do material examinado. Arquivo do material que executa ao ser aberto (programa, roteiro, atalho, documento com macro) não é aberto pela Varredura; dos demais abre-se cópia isolada, pelo programa padrão do Windows, com aviso de que o conteúdo não é confiável. |
 
 **O que não é coberto.** A diretriz abre com a **ordem de volatilidade** —
 memória, tabelas de rotas, processos, disco — e trata de aquisição em
