@@ -33,7 +33,7 @@ import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .hash_core import sha256_file
+from .hash_core import nome_visivel, sha256_file
 
 #: Formatos de arquivo que a ferramenta abre.
 FORMATOS = (".txt", ".zip")
@@ -447,7 +447,7 @@ def intro(conversa, decl, proc):
     if proc.numero.strip():
         vinculo = ("visando instruir os autos " + artigo + " " + e(proc.tipo)
                    + " n\u00ba " + e(proc.numero) + ", ")
-    nome = Path(conversa.origem).name
+    nome = nome_visivel(Path(conversa.origem).name)
     corpo = ("procedi \u00e0 reconstru\u00e7\u00e3o da conversa contida no arquivo de "
              "exporta\u00e7\u00e3o <b>" + e(nome) + "</b>, cujo teor segue reproduzido "
              "abaixo.")
@@ -470,7 +470,8 @@ def build_html(conversa, decl=None, proc=None):
     periodo = ((ini.replace("T", " ") + " a " + fim.replace("T", " "))
                if ini else "n\u00e3o identificado")
     ident = "".join([
-        _linha_tabela("Arquivo de exporta\u00e7\u00e3o", Path(conversa.origem).name),
+        _linha_tabela("Arquivo de exporta\u00e7\u00e3o",
+                      nome_visivel(Path(conversa.origem).name)),
         _linha_tabela("Formato", "pacote com m\u00eddias (.zip)"
                       if conversa.formato == "pacote" else "texto (.txt)"),
         _linha_tabela("Resumo do arquivo (SHA-256)", conversa.resumo_origem, True),

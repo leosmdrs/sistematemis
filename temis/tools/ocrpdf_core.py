@@ -197,11 +197,13 @@ class Documento:
 
     @property
     def nome(self) -> str:
-        return Path(self.entrada).name
+        from .hash_core import nome_visivel
+        return nome_visivel(Path(self.entrada).name)
 
     @property
     def nome_saida(self) -> str:
-        return Path(self.saida).name if self.saida else ""
+        from .hash_core import nome_visivel
+        return nome_visivel(Path(self.saida).name) if self.saida else ""
 
     @property
     def reconhecidas(self) -> int:

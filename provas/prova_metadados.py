@@ -268,5 +268,37 @@ class OExameAvancadoDoPdf(unittest.TestCase):
         self.assertEqual(achado.relevancia, av.ATENCAO)
 
 
+class ONomeDoArquivoELidoComoEleE(unittest.TestCase):
+    """Controle de direção no nome faz ler um nome que o arquivo não tem."""
+
+    ENGANOSO = "relatorio\u202efdp.exe"        # exibido: relatorioexe.pdf
+
+    def test_o_caractere_invisivel_vai_a_vista(self):
+        from temis.tools.hash_core import nome_visivel
+        visivel = nome_visivel(self.ENGANOSO)
+        self.assertNotIn("\u202e", visivel)
+        self.assertEqual(visivel, "relatorio[U+202E]fdp.exe")
+
+    def test_nome_comum_fica_como_esta(self):
+        from temis.tools.hash_core import nome_visivel
+        for nome in ("Oitiva de João – 2ª via.pdf", "ata (1).docx", "図.png"):
+            self.assertEqual(nome_visivel(nome), nome)
+
+    def test_largura_zero_e_quebra_de_linha_tambem(self):
+        from temis.tools.hash_core import nome_visivel
+        self.assertEqual(nome_visivel("a\u200bb\nc.pdf"),
+                         "a[U+200B]b[U+000A]c.pdf")
+
+    def test_as_pecas_usam_o_nome_visivel_e_o_caminho_segue_intacto(self):
+        from temis.tools import derivado_core, ocrpdf_core
+        caminho = "/pasta/" + self.ENGANOSO
+        for objeto in (mc.Arquivo(caminho=caminho),
+                       derivado_core.Arquivo(caminho=caminho),
+                       ocrpdf_core.Documento(entrada=caminho)):
+            with self.subTest(type(objeto).__module__):
+                self.assertIn("[U+202E]", objeto.nome)
+        self.assertEqual(mc.Arquivo(caminho=caminho).caminho, caminho)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

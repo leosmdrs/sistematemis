@@ -49,7 +49,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import ocr_windows
-from .hash_core import ler_membro
+from .hash_core import ler_membro, nome_visivel
 
 #: Teto de cada parte de texto lida de dentro de um documento.
 TETO_TEXTO_INTERNO = 64 * 1024 * 1024
@@ -1336,7 +1336,7 @@ def _quadro_achados(achados: list[Achado], com_trecho: bool) -> str:
         linhas.append(
             "<tr>"
             + _cel(i, "center")
-            + _cel(a.caminho)
+            + _cel(nome_visivel(a.caminho))
             + _cel(formatar_tamanho(a.tamanho), "center")
             + _cel(ROTULO_ORIGEM.get(a.origem, a.origem), "center")
             + (f'<td><font color="{CINZA}" size="1">'
@@ -1356,7 +1356,7 @@ def _quadro_marcados(marcados: list[Achado]) -> str:
     linhas = "".join(
         "<tr>"
         + _cel(i, "center")
-        + _cel(a.caminho)
+        + _cel(nome_visivel(a.caminho))
         + _cel(formatar_tamanho(a.tamanho), "center")
         + _cel(a.sha256, "left", "Courier New", "1")
         + "</tr>"
@@ -1554,13 +1554,14 @@ def build_text(t: TermoVarredura) -> str:
                      + (f" — recorte: {r.recorte}" if r.recorte else ""))
             L.append(f"     {r.total} arquivo(s) retornados.")
             for a in r.achados:
-                L.append(f"       - {a.caminho}")
+                L.append(f"       - {nome_visivel(a.caminho)}")
             L.append("")
     if t.marcados:
         n = sec["marcados"]
         L += [f"{n}. ARQUIVOS DESTACADOS PARA JUNTADA", ""]
         for i, a in enumerate(t.marcados, 1):
-            L.append(f"{i}. {a.caminho}  ({formatar_tamanho(a.tamanho)})")
+            L.append(f"{i}. {nome_visivel(a.caminho)}  "
+                     f"({formatar_tamanho(a.tamanho)})")
             L.append(f"   SHA-256: {a.sha256}")
         L.append("")
     n = sec["ressalvas"]

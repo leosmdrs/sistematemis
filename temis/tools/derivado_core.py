@@ -72,7 +72,9 @@ class Arquivo:
 
     @property
     def nome(self) -> str:
-        return Path(self.caminho).name if self.caminho else ""
+        from .hash_core import nome_visivel
+        return nome_visivel(Path(self.caminho).name) if self.caminho \
+            else ""
 
 
 def ler(caminho, progresso=None, cancelado=None) -> Arquivo:

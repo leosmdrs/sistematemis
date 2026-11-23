@@ -293,3 +293,36 @@ def sha256_de_membro(pacote, nome: str) -> str:
             d.update(bloco)
     return d.hexdigest()
 
+
+# ─────────────────────────────────────────
+#  NOME DE ARQUIVO NA PEÇA
+# ─────────────────────────────────────────
+
+#: Caracteres que não se veem e mudam o que se lê: os controles de
+#: direção do texto, e os de largura zero.
+_INVISIVEIS = {
+    0x061C, 0x200B, 0x200C, 0x200D, 0x200E, 0x200F, 0x202A, 0x202B,
+    0x202C, 0x202D, 0x202E, 0x2060, 0x2066, 0x2067, 0x2068, 0x2069,
+    0xFEFF,
+}
+
+
+def nome_visivel(nome: str) -> str:
+    """O nome do arquivo como ele é, com o que não se vê posto à vista.
+
+    Um controle de direção no nome faz o resto ser desenhado de trás
+    para a frente: `relatorio‮fdp.exe` aparece como `relatorioexe.pdf`.
+    Numa peça que identifica arquivos pelo nome, isso é o leitor lendo
+    um nome que o arquivo não tem. O caractere é trocado pelo seu
+    código entre colchetes — visível, e sem alterar o que mais houver.
+
+    Só para exibir. Para abrir ou resumir o arquivo usa-se o caminho,
+    que não passa por aqui.
+    """
+    if not nome:
+        return nome
+    return "".join(
+        f"[U+{ord(c):04X}]" if ord(c) in _INVISIVEIS
+        or (ord(c) < 32) or ord(c) == 127 else c
+        for c in str(nome))
+
