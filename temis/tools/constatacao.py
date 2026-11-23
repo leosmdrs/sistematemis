@@ -368,6 +368,13 @@ class ConstatacaoTool(ToolPage):
             ajustes = self._pagina.settings()
             ajustes.setAttribute(
                 QWebEngineSettings.WebAttribute.ScreenCaptureEnabled, False)
+            # Endereço de esquema que o navegador não conhece (`ms-...:`,
+            # `tel:`, um aplicativo registrado) seria entregue ao sistema
+            # operacional, que abriria o programa associado a ele. Página
+            # sob constatação não abre programa na estação.
+            ajustes.setUnknownUrlSchemePolicy(
+                QWebEngineSettings.UnknownUrlSchemePolicy
+                .DisallowUnknownUrlSchemes)
             self._pagina.urlChanged.connect(self._ao_navegar)
             self._pagina.loadFinished.connect(self._ao_carregar)
             self._pagina.titleChanged.connect(
@@ -633,7 +640,16 @@ class ConstatacaoTool(ToolPage):
             c.ausentes.append("tela.png")
 
         c.ips = core.resolver(c.host)
-        c.certificado = core.certificado_tls(c.host)
+        # O certificado é o da porta em que a página foi servida. Lido
+        # sempre na 443, o de uma página em outra porta era o de outro
+        # serviço da mesma máquina, registrado como se fosse o dela.
+        endereco = self._pagina.url()
+        if endereco.scheme().lower() == "https":
+            c.certificado = core.certificado_tls(c.host, endereco.port(443))
+        else:
+            c.certificado = core.Certificado(
+                erro="a página foi servida sem TLS (http), e não há "
+                     "certificado a registrar")
 
         # O certificado diz quem o servidor afirma ser; o registro diz
         # quem respondeu pelo nome. A resposta bruta é guardada como peça

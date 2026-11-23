@@ -72,6 +72,13 @@ _SISTEMA = (
     "código de segurança", "security code changed",
 )
 
+#: Avisos que o aplicativo, em alguns formatos, escreve sob o nome do
+#: grupo como se fosse autor. Só estes, por inteiro e no começo do texto.
+_SISTEMA_COM_AUTOR = (
+    "as mensagens e as chamadas são", "as mensagens são protegidas",
+    "messages and calls are end-to-end",
+)
+
 #: Como as mídias aparecem no texto quando o export não as inclui, e
 #: quando inclui (iOS: "<anexado: arquivo>"; Android: "arquivo (arquivo
 #: anexado)").
@@ -130,8 +137,11 @@ class Conversa:
 
     @property
     def periodo(self) -> tuple:
+        # A menor e a maior, e não a primeira e a última do arquivo: o
+        # export nem sempre vem em ordem, e mensagem fora de ordem fazia
+        # a peça declarar um período menor que o da conversa.
         datas = [m.quando_iso for m in self.mensagens if m.quando_iso]
-        return (datas[0], datas[-1]) if datas else ("", "")
+        return (min(datas), max(datas)) if datas else ("", "")
 
     @property
     def n_mensagens(self) -> int:
@@ -192,19 +202,23 @@ def _quando_iso(data: str, hora: str, ampm: str) -> str:
 
 def _classificar(resto: str) -> tuple:
     """(autor, texto, é_sistema) a partir do que vem depois da data."""
-    baixo = resto.lower()
-    if any(marca in baixo for marca in _SISTEMA):
-        return "", resto, True
     # Autor e mensagem se separam no primeiro ": ". Nome de contato não
     # costuma ter mais que poucas palavras; texto longo antes do primeiro
     # dois-pontos é frase, não nome — e aí é mensagem de sistema.
     corte = resto.find(": ")
-    if corte < 0:
+    autor = resto[:corte].strip() if corte >= 0 else ""
+    if corte < 0 or len(autor) > 60 or "\n" in autor:
         return "", resto, True
-    autor = resto[:corte].strip()
-    if len(autor) > 60 or "\n" in autor:
+    texto = resto[corte + 2:]
+    # Linha com autor é fala de pessoa. As palavras que denunciam aviso
+    # de sistema — "saiu", "adicionou", "removeu" — eram procuradas na
+    # linha inteira, nome do autor incluído: "Fulano: ele saiu ontem"
+    # virava aviso, perdia o autor e sumia das contagens, e um contato
+    # chamado "Adicionou Silva" nunca tinha mensagem alguma. Com autor,
+    # só é aviso o que é inequivocamente do aplicativo.
+    if texto.strip().lower().startswith(_SISTEMA_COM_AUTOR):
         return "", resto, True
-    return autor, resto[corte + 2:], False
+    return autor, texto, False
 
 
 def parse_texto(texto: str) -> tuple:

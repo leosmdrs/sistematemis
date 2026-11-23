@@ -206,5 +206,44 @@ class OQueChegaPeloConsoleEConferidoDeNovo(unittest.TestCase):
         self.assertNotIn("nunca", texto)
 
 
+class ODiligenciaSoAbreEnderecoDaRede(unittest.TestCase):
+    """`file://` e `smb://` não são sistema consultado."""
+
+    def ir(self, texto):
+        import os
+        from types import SimpleNamespace
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PyQt6.QtWidgets import QMessageBox
+        from temis.tools import extracao as tela
+        abertos, avisos = [], []
+        original = QMessageBox.warning
+        QMessageBox.warning = staticmethod(
+            lambda *a, **k: avisos.append(a[2]))
+        self.addCleanup(setattr, QMessageBox, "warning", original)
+        guardado = tela.WEBVIEW_DISPONIVEL
+        tela.WEBVIEW_DISPONIVEL = True
+        self.addCleanup(setattr, tela, "WEBVIEW_DISPONIVEL", guardado)
+        f = SimpleNamespace(
+            _e_url=SimpleNamespace(text=lambda: texto),
+            _pagina=SimpleNamespace(
+                load=lambda url: abertos.append(url.toString())))
+        tela.ExtracaoTool._ir(f)
+        return abertos, avisos
+
+    def test_arquivo_local_e_pasta_de_rede_sao_recusados(self):
+        for endereco in ("file:///C:/Windows/win.ini", "smb://servidor/pasta",
+                         "ftp://exemplo.test/x", "javascript://x"):
+            with self.subTest(endereco):
+                abertos, avisos = self.ir(endereco)
+                self.assertEqual(abertos, [])
+                self.assertEqual(len(avisos), 1)
+
+    def test_http_e_https_abrem_e_o_resto_ganha_https(self):
+        self.assertEqual(self.ir("https://sistema.exemplo/x")[0],
+                         ["https://sistema.exemplo/x"])
+        self.assertEqual(self.ir("sistema.exemplo")[0],
+                         ["https://sistema.exemplo"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

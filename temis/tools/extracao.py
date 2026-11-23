@@ -568,6 +568,11 @@ class ExtracaoTool(ToolPage):
         self._view.setPage(self._pagina)
         self._pagina.settings().setAttribute(
             QWebEngineSettings.WebAttribute.ScreenCaptureEnabled, False)
+        # Endereço de esquema desconhecido não é entregue ao sistema
+        # operacional: o navegador da diligência não abre outro programa.
+        self._pagina.settings().setUnknownUrlSchemePolicy(
+            QWebEngineSettings.UnknownUrlSchemePolicy
+            .DisallowUnknownUrlSchemes)
         self._pagina.ato.connect(self._ao_ato)
         self._pagina.urlChanged.connect(self._ao_navegar)
         self._pagina.loadFinished.connect(self._ao_carregar)
@@ -802,6 +807,16 @@ class ExtracaoTool(ToolPage):
             return
         if "://" not in texto:
             texto = "https://" + texto
+        # Só a rede. O teste antigo — "tem ://?" — deixava passar
+        # `file://` e `smb://`: o navegador da diligência abria arquivo
+        # local e pasta de rede, e o termo registrava como acesso a
+        # sistema.
+        if QUrl(texto).scheme().lower() not in ("http", "https"):
+            QMessageBox.warning(
+                self, "Endereço não aceito",
+                "A Extração Registrada abre somente endereços http e "
+                "https.")
+            return
         self._pagina.load(QUrl(texto))
 
     def _voltar(self):

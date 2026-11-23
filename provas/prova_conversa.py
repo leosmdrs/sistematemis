@@ -179,5 +179,56 @@ class ADescricaoDaFerramentaConfereComORegistro(unittest.TestCase):
         self.assertIn("conversa", GUIAS)
 
 
+class FalaDePessoaNaoViraAvisoDeSistema(unittest.TestCase):
+    """As palavras do aviso também são palavras da conversa.
+
+    "saiu", "adicionou", "removeu" eram procuradas na linha inteira, nome
+    do autor incluído. A mensagem que as contivesse virava aviso de
+    sistema: perdia o autor e saía das contagens e da lista de
+    participantes — numa peça que reconstrói quem disse o quê.
+    """
+
+    TEXTO = (
+        "10/01/2025 09:00 - Fulano: ele saiu de casa às oito\n"
+        "10/01/2025 09:01 - Beltrana: adicionou o anexo ao processo?\n"
+        "10/01/2025 09:02 - Adicionou Silva: sim, removeu o antigo\n"
+        "10/01/2025 09:03 - Fulano saiu\n"
+        "10/01/2025 09:04 - Beltrana adicionou Sicrano\n")
+
+    def setUp(self):
+        self.msgs, _ = cc.parse_texto(self.TEXTO)
+
+    def test_a_fala_mantem_o_autor(self):
+        falas = [(m.autor, m.sistema) for m in self.msgs[:3]]
+        self.assertEqual(falas, [("Fulano", False), ("Beltrana", False),
+                                 ("Adicionou Silva", False)])
+
+    def test_o_aviso_de_verdade_continua_sendo_aviso(self):
+        self.assertTrue(all(m.sistema for m in self.msgs[3:]))
+
+    def test_o_aviso_de_criptografia_sob_o_nome_do_grupo_e_aviso(self):
+        msgs, _ = cc.parse_texto(
+            "10/01/2025 08:00 - Grupo: As mensagens e as chamadas são "
+            "protegidas com a criptografia de ponta a ponta.\n"
+            "10/01/2025 09:00 - Fulano: bom dia\n")
+        self.assertTrue(msgs[0].sistema)
+        self.assertFalse(msgs[1].sistema)
+
+
+class OPeriodoEODaConversaInteira(unittest.TestCase):
+
+    def test_mensagem_fora_de_ordem_nao_encurta_o_periodo(self):
+        texto = ("12/01/2025 09:00 - Fulano: terceira\n"
+                 "10/01/2025 09:00 - Fulano: primeira\n"
+                 "11/01/2025 09:00 - Fulano: segunda\n")
+        with tempfile.TemporaryDirectory() as pasta:
+            alvo = Path(pasta) / "conversa.txt"
+            alvo.write_text(texto, encoding="utf-8")
+            conversa = cc.abrir(str(alvo))
+        inicio, fim = conversa.periodo
+        self.assertTrue(inicio.startswith("2025-01-10"))
+        self.assertTrue(fim.startswith("2025-01-12"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

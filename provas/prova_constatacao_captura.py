@@ -235,6 +235,39 @@ class APastaDaCapturaNaoEReaproveitada(_ComFerramenta):
         self.assertEqual(s.proximo_numero(), 4)
 
 
+class OCertificadoEODaPortaDaPagina(_ComFerramenta):
+
+    def com_endereco(self, endereco):
+        portas = []
+        cc.certificado_tls = lambda host, porta=443: (
+            portas.append(porta), cc.Certificado())[1]
+        self.f._pagina.url = lambda: QUrl(endereco)
+        self.capturar()
+        return portas, self.f._sessao.capturas[-1]
+
+    def test_pagina_em_outra_porta_tem_o_certificado_dessa_porta(self):
+        portas, _ = self.com_endereco("https://exemplo.gov.br:8443/x")
+        self.assertEqual(portas, [8443])
+
+    def test_https_comum_segue_na_443(self):
+        portas, _ = self.com_endereco("https://exemplo.gov.br/x")
+        self.assertEqual(portas, [443])
+
+    def test_pagina_sem_tls_nao_recebe_certificado_alheio(self):
+        portas, captura = self.com_endereco("http://exemplo.gov.br/x")
+        self.assertEqual(portas, [])
+        self.assertIn("sem TLS", captura.certificado.erro)
+
+
+class APaginaEmBrancoNaoECaptura(_ComFerramenta):
+
+    def test_sem_endereco_da_rede_nada_e_capturado(self):
+        self.f._pagina.url = lambda: QUrl("about:blank")
+        self.f._capturar()
+        self.assertEqual(self.f._sessao.capturas, [])
+        self.assertFalse(self.f._capturando)
+
+
 class AConclusao(unittest.TestCase):
 
     def test_conclui_quando_tudo_chega_e_so_uma_vez(self):
