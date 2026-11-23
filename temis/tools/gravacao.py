@@ -903,18 +903,23 @@ class GravacaoTool(ToolPage):
 
     def _nova_diligencia(self):
         """Esvazia a lista para começar outro registro."""
-        if not self._resultados:
+        if not self._resultados and not self._capturas:
             return
         resposta = QMessageBox.question(
             self, "Nova diligência",
             f"Esvaziar a lista para começar outro registro?\n\n"
-            f"Os {len(self._resultados)} vídeo(s) já gravado(s) permanecem "
+            f"Os {len(self._resultados)} vídeo(s) e as "
+            f"{len(self._capturas)} captura(s) de tela já feitos permanecem "
             f"onde estão, e o termo que você já tenha salvo continua "
             f"valendo. O que se limpa aqui é apenas o que entraria no "
             f"próximo termo.")
         if resposta != QMessageBox.StandardButton.Yes:
             return
         self._resultados.clear()
+        # As capturas de tela também são da diligência que termina.
+        # Ficando na lista, entravam no termo da seguinte — imagens de
+        # um procedimento nos autos de outro.
+        self._capturas.clear()
         self._arvore.clear()
         # O número do processo e o objeto mudam a cada diligência; o nome
         # de quem opera, não — é o mesmo o dia inteiro.

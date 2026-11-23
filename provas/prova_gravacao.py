@@ -565,5 +565,78 @@ class GravarSemMicrofone(unittest.TestCase):
             self.assertIn(marca, gc._explicar_falha(erro, microfone=""))
 
 
+class OCaminhoComApostrofoChegaAoFiltro(unittest.TestCase):
+    """A faixa de identificação é lida de arquivo na pasta temporária.
+
+    A pasta leva o nome do usuário. Com apóstrofo nele — "D'Avila" —, o
+    caminho fechava a citação do filtro antes da hora, o FFmpeg não
+    achava o arquivo e a faixa não era aplicada.
+    """
+
+    FONTE = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+
+    def test_o_ffmpeg_le_o_arquivo_em_pasta_com_apostrofo(self):
+        import subprocess
+        import tempfile
+        from temis.tools import video_core
+        exe = video_core.ffmpeg_path()
+        if exe is None or not Path(self.FONTE).is_file():
+            self.skipTest("sem FFmpeg ou sem a fonte de teste")
+        with tempfile.TemporaryDirectory() as raiz:
+            pasta = Path(raiz) / "D'Avila"
+            pasta.mkdir()
+            texto = pasta / "faixa.txt"
+            texto.write_text("PROCESSO 08650.000123/2026-11",
+                             encoding="utf-8")
+            saida = Path(raiz) / "saida.mp4"
+            filtro = (f"drawtext=fontfile='{self.FONTE}'"
+                      f":textfile='{gc._caminho_para_filtro(texto)}'"
+                      ":fontcolor=white")
+            r = subprocess.run(
+                [str(exe), "-y", "-loglevel", "error", "-f", "lavfi", "-i",
+                 "color=c=black:s=320x80:d=0.2", "-vf", filtro, str(saida)],
+                capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertNotIn("Cannot read file", r.stderr)
+            self.assertTrue(saida.is_file())
+
+    def test_caminho_sem_apostrofo_fica_como_era(self):
+        self.assertEqual(gc._caminho_para_filtro("C:\\Temp\\x.txt"),
+                         "C\\:/Temp/x.txt")
+
+
+class ACapturaDeTelaNaoSobrescreveOutra(unittest.TestCase):
+
+    def test_o_nome_ja_usado_na_pasta_nao_e_reaproveitado(self):
+        import tempfile
+        from PyQt6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+        with tempfile.TemporaryDirectory() as pasta:
+            anterior = Path(pasta) / "captura-001.png"
+            anterior.write_bytes(b"captura da diligencia anterior")
+            c = gc.capturar_tela(pasta, 1, "desktop", None)
+            self.assertNotEqual(Path(c.caminho), anterior)
+            self.assertEqual(anterior.read_bytes(),
+                             b"captura da diligencia anterior")
+
+
+class NovaDiligenciaComecaSemCapturasDaAnterior(unittest.TestCase):
+
+    def test_as_capturas_nao_entram_no_termo_seguinte(self):
+        from PyQt6.QtWidgets import QApplication, QMessageBox
+        QApplication.instance() or QApplication([])
+        from temis.tools import gravacao as tela
+        original = QMessageBox.question
+        QMessageBox.question = staticmethod(
+            lambda *a, **k: QMessageBox.StandardButton.Yes)
+        self.addCleanup(setattr, QMessageBox, "question", original)
+        f = tela.GravacaoTool()
+        self.addCleanup(f.deleteLater)
+        f._capturas.append(gc.Captura(nome="captura-001.png",
+                                        caminho="/x/captura-001.png"))
+        f._nova_diligencia()
+        self.assertEqual(f._capturas, [])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

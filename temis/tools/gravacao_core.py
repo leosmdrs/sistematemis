@@ -421,8 +421,16 @@ def _caminho_para_filtro(caminho: str | Path) -> str:
 
     A letra da unidade precisa do dois-pontos escapado e as barras
     invertidas viram barras normais.
+
+    O apóstrofo fecha a citação em que o caminho vai escrito, e a pasta
+    temporária leva o nome do usuário: com "D'Avila" no perfil, a faixa
+    de identificação não era aplicada. Sai da citação, entra escapado e
+    a citação reabre — com três barras, porque o filtro é lido em dois
+    níveis e cada um consome a sua. Medido no FFmpeg: com uma ou duas
+    barras o arquivo não é achado.
     """
-    return str(caminho).replace("\\", "/").replace(":", "\\:")
+    return (str(caminho).replace("\\", "/").replace(":", "\\:")
+            .replace("'", "'\\\\\\''"))
 
 
 def _fonte() -> str:
@@ -896,8 +904,17 @@ def capturar_tela(pasta, indice: int, monitor: str = "",
     from ..relogio import carimbo
 
     pasta = Path(pasta)
+    # Nome que não existe na pasta. O índice volta a 1 a cada diligência
+    # e a pasta é a mesma no dia: sem isto, a primeira captura de uma
+    # diligência gravava por cima da primeira da anterior, já citada em
+    # termo pelo resumo.
     nome = f"captura-{indice:03d}.png"
     alvo = pasta / nome
+    n = 1
+    while alvo.exists():
+        n += 1
+        nome = f"captura-{indice:03d}-{n}.png"
+        alvo = pasta / nome
     c = Captura(nome=nome, caminho=str(alvo), quando=carimbo(),
                 monitor=monitor, decorrido=decorrido)
     try:
