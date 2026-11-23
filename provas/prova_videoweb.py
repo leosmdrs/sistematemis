@@ -443,5 +443,127 @@ class ATela(unittest.TestCase):
         self.assertIn(PALETTE["warning"], texto)
 
 
+class OQueSeCapturaEOQueSeConsultou(ATela):
+    """A tela não captura endereço diferente do que está mostrando."""
+
+    def com_fios_falsos(self):
+        from temis.tools import videoweb as modulo
+        criados = []
+
+        class _Fio:
+            def __init__(self, *argumentos):
+                self.argumentos = argumentos
+                self.rodando = False
+                self.pronto = self.andamento = self
+                criados.append(self)
+
+            def connect(self, _retorno):
+                pass
+
+            def start(self):
+                self.rodando = True
+
+            def isRunning(self):
+                return self.rodando
+
+            def wait(self, *_):
+                self.rodando = False
+
+        for nome in ("Sondador", "Capturador"):
+            original = getattr(modulo, nome)
+            setattr(modulo, nome, _Fio)
+            self.addCleanup(setattr, modulo, nome, original)
+        return criados
+
+    def test_o_enter_durante_a_consulta_nao_abre_outra(self):
+        criados = self.com_fios_falsos()
+        self.tela._e_url.setText("https://exemplo.invalido/a")
+        self.tela._consultar()
+        self.tela._consultar()                 # o Enter no campo
+        self.assertEqual(len(criados), 1)
+        self.assertFalse(self.tela._e_url.isEnabled())
+
+    def test_captura_o_endereco_consultado_e_nao_o_do_campo(self):
+        from PyQt6.QtWidgets import QFileDialog
+        criados = self.com_fios_falsos()
+        original = QFileDialog.getExistingDirectory
+        QFileDialog.getExistingDirectory = staticmethod(
+            lambda *a, **k: "/tmp")
+        self.addCleanup(setattr, QFileDialog, "getExistingDirectory",
+                        original)
+        self.tela._publicacao = self.publicacao(
+            url="https://exemplo.invalido/A")
+        self.tela._e_url.blockSignals(True)
+        self.tela._e_url.setText("https://exemplo.invalido/B")
+        self.tela._e_url.blockSignals(False)
+        self.tela._capturar()
+        self.assertEqual(criados[-1].argumentos[0],
+                         "https://exemplo.invalido/A")
+
+    def test_publicacao_restrita_e_recusada_pela_ferramenta(self):
+        from PyQt6.QtWidgets import QMessageBox
+        criados = self.com_fios_falsos()
+        avisos = []
+        original = QMessageBox.warning
+        QMessageBox.warning = staticmethod(
+            lambda *a, **k: avisos.append(a[2]))
+        self.addCleanup(setattr, QMessageBox, "warning", original)
+        for restricao in (dict(disponibilidade="private"),
+                          dict(disponibilidade="needs_auth"),
+                          dict(restricao_idade=18)):
+            with self.subTest(restricao):
+                self.tela._publicacao = self.publicacao(**restricao)
+                self.tela._capturar()
+        self.assertEqual(criados, [])
+        self.assertEqual(len(avisos), 3)
+
+
+class ADisponibilidadeNaoDeclaradaNaoEPublica(unittest.TestCase):
+
+    def test_so_e_publica_a_que_a_plataforma_declarou(self):
+        self.assertTrue(vc.Publicacao(disponibilidade="public").publica)
+        self.assertFalse(vc.Publicacao(disponibilidade="").publica)
+        self.assertFalse(vc.Publicacao(disponibilidade="unlisted").publica)
+
+    def test_a_peca_consigna_a_que_nao_foi_declarada(self):
+        linhas = dict(vc._linhas_da_publicacao(vc.Publicacao(url="x")))
+        self.assertEqual(linhas["Disponibilidade declarada"],
+                         "não declarada pela plataforma")
+
+    def test_publica_e_nao_listada_podem_ser_capturadas(self):
+        for d in ("public", "unlisted", ""):
+            self.assertEqual(vc.Publicacao(disponibilidade=d).impedimento, "")
+
+
+class OTermoConfereOArquivoQueCita(unittest.TestCase):
+
+    def captura(self, pasta, conteudo=b"video capturado"):
+        import hashlib
+        arquivo = Path(pasta) / "video [abc].mp4"
+        arquivo.write_bytes(conteudo)
+        return vc.Captura(arquivo=str(arquivo),
+                          sha256=hashlib.sha256(conteudo).hexdigest(),
+                          publicacao=vc.Publicacao(url="https://x.test/v"))
+
+    def test_arquivo_intacto_nao_gera_alerta(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            termo = vc.montar_termo(self.captura(pasta))
+        self.assertFalse(any("ATENÇÃO" in r for r in termo.ressalvas))
+
+    def test_arquivo_alterado_depois_da_captura_e_acusado(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            c = self.captura(pasta)
+            Path(c.arquivo).write_bytes(b"outro conteudo")
+            termo = vc.montar_termo(c)
+        self.assertIn("não confere com o resumo", termo.ressalvas[0])
+
+    def test_arquivo_removido_tambem(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            c = self.captura(pasta)
+            Path(c.arquivo).unlink()
+            termo = vc.montar_termo(c)
+        self.assertIn("ATENÇÃO", termo.ressalvas[0])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

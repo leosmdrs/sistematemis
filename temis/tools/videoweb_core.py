@@ -181,7 +181,44 @@ class Publicacao:
 
     @property
     def publica(self) -> bool:
-        return self.disponibilidade in ("public", "")
+        """A plataforma **declarou** a publicação como pública.
+
+        Disponibilidade não declarada não é pública: é desconhecida. Já
+        contou como pública, e a tela a mostrava na cor neutra.
+        """
+        return self.disponibilidade == "public"
+
+    @property
+    def disponibilidade_legivel(self) -> str:
+        return {"public": "pública",
+                "unlisted": "não listada (acessível por quem tem o "
+                            "endereço)",
+                "": "não declarada pela plataforma",
+                }.get(self.disponibilidade, self.disponibilidade)
+
+    @property
+    def impedimento(self) -> str:
+        """Por que esta publicação não é capturada — vazio se pode ser.
+
+        O guia e o termo prometem que só se alcança o que é público e que
+        restrição alguma é contornada. A recusa cabia à plataforma; agora
+        é da ferramenta, antes de pedir o arquivo.
+        """
+        if self.disponibilidade in RESTRITAS:
+            return ("A plataforma declara esta publicação como de acesso "
+                    f"restrito ({self.disponibilidade}). Esta ferramenta "
+                    "alcança somente o que está publicamente acessível.")
+        if self.restricao_idade:
+            return ("A plataforma restringe esta publicação por idade "
+                    f"({self.restricao_idade} anos), o que exige conta "
+                    "identificada. Esta ferramenta não apresenta "
+                    "credencial nem contorna restrição.")
+        return ""
+
+
+#: Disponibilidades que a plataforma declara e que não são de acesso
+#: público.
+RESTRITAS = ("private", "needs_auth", "premium_only", "subscriber_only")
 
 
 def _data_publicada(info: dict) -> str:
@@ -545,10 +582,7 @@ def _quadro(titulo: str, linhas: list) -> str:
 
 
 def _linhas_da_publicacao(p: Publicacao) -> list:
-    disponibilidade = {"public": "pública",
-                       "unlisted": "não listada (acessível por quem tem o "
-                                   "endereço)"}.get(p.disponibilidade,
-                                                    p.disponibilidade)
+    disponibilidade = p.disponibilidade_legivel
     return [
         ("Endereço", p.url),
         ("Plataforma", p.extrator),
@@ -667,10 +701,24 @@ def build_texto(t: TermoCaptura) -> str:
 def montar_termo(captura: Captura) -> TermoCaptura:
     """A peça pronta para receber a qualificação de quem assina."""
     item = derivado.Derivacao(origens=[], saida=derivado.ler(captura.arquivo))
+    ressalvas = RESSALVAS
+    relido = item.saida.resumo
+    if not relido or relido != captura.sha256:
+        # O arquivo é relido para o termo, e o termo cita o resumo tomado
+        # na captura. Diferindo os dois, o que está em disco não é mais
+        # o que foi capturado — e a peça dizia que era.
+        ressalvas = (
+            "ATENÇÃO — o arquivo hoje em disco não confere com o resumo "
+            "tomado no instante da captura"
+            + (f" (em disco: {relido})" if relido else
+               " (o arquivo não pôde ser lido)")
+            + ". O resumo consignado nesta peça é o da captura. O arquivo "
+            "foi alterado, substituído ou removido depois dela, e não "
+            "deve ser juntado como sendo o capturado.",) + tuple(RESSALVAS)
     return TermoCaptura(
         titulo="Termo de Captura de Material Audiovisual Publicado na Internet",
         operacao="captura de material audiovisual publicado",
-        ressalvas=RESSALVAS,
+        ressalvas=ressalvas,
         motores=("video",),
         itens=[item],
         captura=captura)

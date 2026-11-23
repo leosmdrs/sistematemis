@@ -195,13 +195,19 @@ class VideoWebTool(ToolPage):
 
     def _consultar(self):
         url = self._e_url.text().strip()
-        if not url:
+        if not url or self._ocupada():
+            # O Enter no campo chega aqui mesmo com os botões desligados:
+            # sem esta guarda, abriam-se duas consultas e duas capturas.
             return
         self._lbl_estado.setText("Consultando o endereço…")
         self._b_consultar.setEnabled(False)
         self._b_capturar.setEnabled(False)
+        # Travado até a resposta: trocado o endereço no meio da consulta,
+        # a tela mostrava os dados de um e capturava o outro.
+        self._e_url.setEnabled(False)
 
         def pronto(publicacao):
+            self._e_url.setEnabled(True)
             self._b_consultar.setEnabled(True)
             if publicacao.erro:
                 self._lbl_estado.setText("")
@@ -223,10 +229,8 @@ class VideoWebTool(ToolPage):
 
     def _mostrar(self, p):
         self._lbl_titulo.setText(p.titulo or "(sem título)")
-        disponibilidade = {
-            "public": "pública",
-            "unlisted": "não listada",
-        }.get(p.disponibilidade, p.disponibilidade or "—")
+        disponibilidade = getattr(p, "disponibilidade_legivel", None) \
+            or p.disponibilidade or "não declarada pela plataforma"
         cor = (PALETTE["text3"] if p.publica else PALETTE["warning"])
         e = _escapar
         linhas = [
@@ -246,8 +250,16 @@ class VideoWebTool(ToolPage):
         self._lbl_descricao.setText(p.descricao or "")
 
     # ── captura ──────────────────────────
+    def _ocupada(self) -> bool:
+        return any(t is not None and t.isRunning()
+                   for t in (self._sondador, self._capturador))
+
     def _capturar(self):
-        if self._publicacao is None:
+        if self._publicacao is None or self._ocupada():
+            return
+        if self._publicacao.impedimento:
+            QMessageBox.warning(self, "Publicação não capturada",
+                                self._publicacao.impedimento)
             return
         alvo = self.destino_na_sessao("Vídeos", "", str(Path.home()))
         pasta = QFileDialog.getExistingDirectory(
@@ -259,6 +271,7 @@ class VideoWebTool(ToolPage):
         self._barra.setRange(0, 0)
         self._b_capturar.setEnabled(False)
         self._b_consultar.setEnabled(False)
+        self._e_url.setEnabled(False)
         self._lbl_estado.setText("Capturando…")
 
         def andou(feito, total):
@@ -270,6 +283,7 @@ class VideoWebTool(ToolPage):
 
         def pronto(captura):
             self._barra.setVisible(False)
+            self._e_url.setEnabled(True)
             self._b_consultar.setEnabled(True)
             if captura.erro:
                 self._lbl_estado.setText("")
@@ -289,8 +303,10 @@ class VideoWebTool(ToolPage):
                 "dados que a plataforma publicava, a hora da captura e "
                 "este resumo criptográfico.")
 
+        # O endereço capturado é o da publicação consultada — a que a
+        # tela está mostrando —, e não o que estiver escrito no campo.
         self._capturador = Capturador(
-            self._e_url.text().strip(), pasta,
+            self._publicacao.url, pasta,
             self._cb_qualidade.currentData() or "melhor")
         self._capturador.andamento.connect(andou)
         self._capturador.pronto.connect(pronto)
@@ -315,6 +331,16 @@ class VideoWebTool(ToolPage):
                             modulo=vc).exec()
 
     # ── ciclo de vida ────────────────────
+    def can_close(self) -> bool:
+        if self._capturador is not None and self._capturador.isRunning():
+            resposta = QMessageBox.question(
+                self, "Captura em andamento",
+                "Há um vídeo sendo capturado. Sair agora interrompe a "
+                "captura, e o arquivo não será obtido.\n\n"
+                "Deseja interromper e sair?")
+            return resposta == QMessageBox.StandardButton.Yes
+        return True
+
     def shutdown(self):
         for t in (self._sondador, self._capturador):
             if t is not None and t.isRunning():
