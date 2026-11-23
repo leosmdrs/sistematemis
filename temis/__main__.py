@@ -78,6 +78,41 @@ def _calar_telemetria():
     os.environ["YTDLP_NO_PLUGINS"] = "1"
 
 
+def travar_instancia(pasta=None):
+    """Garante uma execução por usuário. Devolve a trava, ou None.
+
+    Duas execuções abertas no mesmo segundo recebiam o mesmo
+    identificador de sessão, dividiam a pasta e o arquivo de registro, e
+    uma apagava as anotações da outra; no Quadro de Evidências, cada uma
+    gravava o arquivo de casos por cima do da outra e apagava as imagens
+    dela como órfãs. A trava é um arquivo na pasta de dados do usuário:
+    quem não a obtém avisa e sai.
+
+    A trava de uma execução que caiu não prende ninguém: o Qt confere se
+    o processo que a criou ainda existe.
+    """
+    import os
+    from pathlib import Path
+    from PyQt6.QtCore import QLockFile
+
+    base = pasta or (os.environ.get("LOCALAPPDATA")
+                     or os.path.expanduser("~"))
+    destino = Path(base) / "SistemaTemis"
+    try:
+        destino.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        # Sem onde pôr a trava, o programa abre assim mesmo: a trava
+        # protege o trabalho, e não pode ser o que o impede.
+        return False
+    trava = QLockFile(str(destino / "em-execucao.lock"))
+    trava.setStaleLockTime(0)
+    if trava.tryLock(0):
+        return trava
+    if trava.error() == QLockFile.LockError.LockFailedError:
+        return None
+    return False
+
+
 def main() -> int:
     _calar_telemetria()
 
@@ -104,6 +139,17 @@ def main() -> int:
     # tratou é registrado e avisado, em vez de fechar o programa.
     from . import falhas
     falhas.instalar()
+
+    trava = travar_instancia()
+    if trava is None:
+        from PyQt6.QtWidgets import QMessageBox
+        QMessageBox.information(
+            None, __appname__,
+            "O Sistema Têmis já está aberto nesta estação, com este "
+            "usuário.\n\nUse a janela que já está aberta. Duas execuções "
+            "ao mesmo tempo gravariam sobre o registro de sessão e sobre "
+            "os casos uma da outra.")
+        return 0
 
     win = TemisWindow()
     win.show()
