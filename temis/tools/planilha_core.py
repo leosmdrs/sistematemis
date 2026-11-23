@@ -331,7 +331,23 @@ def _ler_csv(caminho) -> list[list]:
         conteudo = dados.decode("latin-1", "replace")
     amostra = conteudo[:8192]
     sep = max(";,\t|", key=amostra.count)
-    return [list(l) for l in csv.reader(conteudo.splitlines(), delimiter=sep)]
+    # O texto inteiro, com as quebras de linha como estão: é o leitor de
+    # CSV quem decide onde acaba uma linha, porque célula entre aspas
+    # pode ter quebra dentro. Entregar-lhe o texto já partido em linhas
+    # apagava essa quebra — e partia em mais linhas do que o arquivo tem,
+    # nos separadores exóticos (U+2028, avanço de página) que o
+    # `splitlines` também conta.
+    import io
+    try:
+        return [list(l) for l in csv.reader(
+            io.StringIO(conteudo, newline=""), delimiter=sep)]
+    except csv.Error:
+        # Aspa aberta e nunca fechada faz o leitor engolir o resto do
+        # arquivo como uma célula só, até estourar o limite de campo.
+        # Arquivo assim é lido linha a linha, que perde a quebra dentro
+        # de célula mas não perde as linhas.
+        return [list(l) for l in csv.reader(
+            conteudo.split("\n"), delimiter=sep)]
 
 
 def carregar(caminho, aba: str = "", linha_cabecalho: int = 1) -> Tabela:

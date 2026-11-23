@@ -97,6 +97,12 @@ def normalizar_resumo(texto: str) -> str:
     import re
 
     bruto = texto or ""
+    # O rótulo sai antes de tudo. "SHA-256: ab12…" traz no próprio
+    # rótulo letras e algarismos hexadecimais — o "a" e o "256" —, que
+    # varridos junto entravam no resumo e o faziam "não conferir".
+    bruto = re.sub(
+        r"(?i)\b(sha[\s\-_]?2?[\s\-_]?256|hash|resumo|checksum|digest)\b"
+        r"\s*[:=]?", " ", bruto)
     # Primeiro: alguma palavra isolada que já seja o resumo inteiro? É o
     # caso da linha de `sha256sum`, que traz o resumo e, ao lado, o nome
     # do arquivo — e "arquivo.pdf" tem três letras hexadecimais dentro
@@ -161,8 +167,18 @@ class Arquivo:
         """
         if not self.declarado.strip() or not self.sha256:
             return None
+        if not resumo_valido(self.declarado):
+            # O que foi declarado não tem a forma de um resumo: faltou
+            # pedaço, sobrou texto. Não é divergência — é referência
+            # ilegível, e a peça diz isso em vez de acusar.
+            return None
         return normalizar_resumo(self.declarado) == normalizar_resumo(
             self.sha256)
+
+    @property
+    def declarado_ilegivel(self) -> bool:
+        return bool(self.declarado.strip()) and not resumo_valido(
+            self.declarado)
 
     @property
     def extensao(self) -> str:
@@ -253,7 +269,6 @@ def _do_sistema(caminho: Path) -> list[Campo]:
     st = caminho.stat()
     campos = [
         Campo("Nome do arquivo", caminho.name, "Arquivo"),
-        Campo("Pasta", str(caminho.parent), "Arquivo"),
         Campo("Tamanho", formatar_tamanho(st.st_size), "Arquivo"),
         Campo("Modificado em", _data_br(st.st_mtime), "Arquivo", True),
     ]
@@ -340,13 +355,26 @@ _EXIF = {
 }
 
 
-def _graus(valor, referencia: str) -> float | None:
-    """Converte coordenada EXIF (grau, minuto, segundo) para decimal."""
+def _graus(valor, referencia: str, limite: float = 180.0) -> float | None:
+    """Converte coordenada EXIF (grau, minuto, segundo) para decimal.
+
+    Devolve None para o que não é coordenada: valor não numérico, não
+    finito, minuto ou segundo fora de 0–60, ou resultado além do limite
+    (90 para latitude, 180 para longitude). O EXIF é gravável por quem
+    detém o arquivo, e "latitude 123°" ia para o termo como se fosse.
+    """
+    import math
     try:
         g, m, s = (float(x) for x in valor)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
+    if not all(math.isfinite(x) for x in (g, m, s)):
+        return None
+    if g < 0 or not (0 <= m < 60) or not (0 <= s < 60):
         return None
     decimal = g + m / 60 + s / 3600
+    if decimal > limite:
+        return None
     if str(referencia).upper() in ("S", "W"):
         decimal = -decimal
     return round(decimal, 6)
@@ -406,13 +434,30 @@ def _gps(bruto, nomes: dict) -> list[Campo]:
         return []
 
     gps = {ExifTags.GPSTAGS.get(k, k): v for k, v in dados.items()}
-    lat = _graus(gps.get("GPSLatitude"), gps.get("GPSLatitudeRef", "N"))
-    lon = _graus(gps.get("GPSLongitude"), gps.get("GPSLongitudeRef", "E"))
+    ref_lat = str(gps.get("GPSLatitudeRef") or "").strip().upper()
+    ref_lon = str(gps.get("GPSLongitudeRef") or "").strip().upper()
+    lat = _graus(gps.get("GPSLatitude"), ref_lat, 90.0)
+    lon = _graus(gps.get("GPSLongitude"), ref_lon, 180.0)
     if lat is None or lon is None:
-        return []
+        if gps.get("GPSLatitude") is None and gps.get("GPSLongitude") is None:
+            return []
+        return [Campo("Coordenadas",
+                      "gravadas no arquivo com valor inválido — não "
+                      "aproveitadas", "Localização", True)]
+    if ref_lat not in ("N", "S") or ref_lon not in ("E", "W"):
+        # Sem a referência não se sabe o hemisfério. Presumir norte e
+        # leste punha no termo um ponto do outro lado do mundo.
+        return [Campo("Coordenadas",
+                      f"{abs(lat)}, {abs(lon)} — hemisfério não informado "
+                      "no arquivo; a posição não pode ser determinada",
+                      "Localização", True)]
 
     campos = [
         Campo("Coordenadas", f"{lat}, {lon}", "Localização", True),
+        Campo("Origem da localização",
+              "dado gravado no próprio arquivo pelo aparelho ou por "
+              "programa; pode ser alterado por quem detém o arquivo",
+              "Localização", False),
         # O endereço não é consultado em serviço nenhum: o sistema não
         # envia dado de arquivo para fora da máquina. O link fica à
         # disposição de quem quiser conferir por conta própria.
@@ -998,8 +1043,13 @@ def _celula_conferencia(a: Arquivo) -> str:
 
     e = _h.escape
     resultado = a.confere
+    if a.declarado_ilegivel:
+        return (f'<td><font color="{DESTAQUE}" size="1"><b>não conferido'
+                "</b> — o resumo declarado está incompleto ou "
+                "ilegível</font></td>")
     if resultado is None:
         return f'<td><font color="{CINZA}" size="1">não declarado</font></td>'
+
     cor = "#1B6E3C" if resultado else DESTAQUE
     palavra = "CONFERE" if resultado else "NÃO CONFERE"
     return (f'<td><font color="{cor}"><b>{palavra}</b></font>'

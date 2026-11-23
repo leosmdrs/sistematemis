@@ -482,5 +482,35 @@ class TextoComCaraDeFormulaContinuaTexto(unittest.TestCase):
         self.assertEqual(pc.ressalva_formulas(limpa, "r.xlsx"), ())
 
 
+class OCsvELidoComoCsv(unittest.TestCase):
+    """Quem decide onde acaba a linha é o formato, e não a quebra.
+
+    O texto era partido em linhas antes de chegar ao leitor de CSV. A
+    quebra de linha dentro de uma célula entre aspas — um endereço, uma
+    observação — era apagada, e separadores exóticos criavam linhas que
+    o arquivo não tem.
+    """
+
+    def ler(self, conteudo: str):
+        with tempfile.TemporaryDirectory() as pasta:
+            alvo = Path(pasta) / "dados.csv"
+            alvo.write_bytes(conteudo.encode("utf-8"))
+            return pc.carregar(str(alvo))
+
+    def test_quebra_de_linha_dentro_de_celula_e_preservada(self):
+        t = self.ler('Nome;Endereco\r\nFulano;"Rua A, 10\nBairro B"\r\n')
+        self.assertEqual(t.n_linhas, 1)
+        self.assertEqual(t.linhas[0][1], "Rua A, 10\nBairro B")
+
+    def test_separador_exotico_nao_cria_linha(self):
+        t = self.ler("Nome;Obs\nFulano;antes\u2028depois\nBeltrano;x\x0cy\n")
+        self.assertEqual(t.n_linhas, 2)
+        self.assertIn("\u2028", t.linhas[0][1])
+
+    def test_aspa_que_nao_fecha_nao_derruba_a_leitura(self):
+        t = self.ler('Nome;Obs\nFulano;"aberta\n' + "x;y\n" * 5)
+        self.assertGreaterEqual(t.n_linhas, 1)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
