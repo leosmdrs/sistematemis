@@ -143,12 +143,69 @@ def baixar_modelo(chave: str) -> Path:
     from huggingface_hub import snapshot_download
 
     destino = pasta_do_modelo(chave)
+    opcoes = {}
+    if REVISOES.get(chave):
+        # Revisão fixa: o que se baixa hoje é o que se baixou ontem.
+        opcoes["revision"] = REVISOES[chave]
     snapshot_download(
         repo_id=f"Systran/faster-whisper-{chave}",
         local_dir=str(destino),
         allow_patterns=["*.bin", "*.json", "*.txt"],
+        **opcoes,
     )
+    esperado = RESUMOS_MODELO.get(chave)
+    if esperado and resumo_do_modelo(chave, refazer=True) != esperado:
+        (destino / "model.bin").unlink(missing_ok=True)
+        raise ErroTranscricao(
+            "O modelo recebido não confere com o resumo de referência e "
+            "foi descartado.")
     return destino
+
+
+#: Revisão (commit) de cada repositório de modelo, e o SHA-256 do
+#: `model.bin` correspondente. Preenchidos, o download passa a ser de uma
+#: revisão fixa e conferido contra o resumo; vazios, baixa-se a revisão
+#: corrente do repositório. Em qualquer dos casos o termo registra o
+#: resumo do modelo que de fato reconheceu a fala — é isso que permite a
+#: terceiro repetir a degravação com o mesmo modelo.
+REVISOES: dict[str, str] = {}
+RESUMOS_MODELO: dict[str, str] = {}
+
+
+def resumo_do_modelo(chave: str, refazer: bool = False) -> str:
+    """SHA-256 do `model.bin` em disco. Vazio se não houver modelo.
+
+    Guardado ao lado do modelo, com o tamanho e a data dele: resumir
+    1,5 GB a cada termo custaria mais do que a peça justifica.
+    """
+    import hashlib
+    import json
+
+    arquivo = pasta_do_modelo(chave) / "model.bin"
+    if not arquivo.is_file():
+        return ""
+    info = arquivo.stat()
+    nota = arquivo.with_name("model.bin.resumo.json")
+    if not refazer:
+        try:
+            guardado = json.loads(nota.read_text(encoding="utf-8"))
+            if (guardado.get("tamanho"), guardado.get("data")) == \
+                    (info.st_size, info.st_mtime_ns):
+                return str(guardado.get("sha256", ""))
+        except (OSError, ValueError):
+            pass
+    d = hashlib.sha256()
+    with open(arquivo, "rb") as f:
+        for bloco in iter(lambda: f.read(1 << 20), b""):
+            d.update(bloco)
+    resumo = d.hexdigest()
+    try:
+        nota.write_text(json.dumps({
+            "tamanho": info.st_size, "data": info.st_mtime_ns,
+            "sha256": resumo}), encoding="utf-8")
+    except OSError:
+        pass
+    return resumo
 
 
 #: Modelos da separação de locutores. Vêm dos lançamentos do sherpa-onnx,
@@ -156,7 +213,10 @@ def baixar_modelo(chave: str) -> Path:
 #: de órgão público.
 BASE_DIARIZACAO = "https://github.com/k2-fsa/sherpa-onnx/releases/download"
 
-#: (nome do arquivo local, endereço, MB). O modelo de voz é o titanet:
+#: (nome do arquivo local, endereço, MB, SHA-256 do que se baixa). O
+#: resumo é o do arquivo publicado, conferido antes de qualquer uso: o
+#: endereço é de terceiro, e sem ele o que chegasse seria aceito como
+#: viesse. O modelo de voz é o titanet:
 #: medindo com áudio de duas vozes e gabarito conhecido, ele separou as
 #: falas por completo, enquanto o campplus — o primeiro que testei —
 #: juntava as duas num locutor só. A diferença entre os dois modelos foi
@@ -164,13 +224,20 @@ BASE_DIARIZACAO = "https://github.com/k2-fsa/sherpa-onnx/releases/download"
 ARQUIVOS_DIARIZACAO = (
     ("segmentacao.onnx",
      f"{BASE_DIARIZACAO}/speaker-segmentation-models/"
-     "sherpa-onnx-pyannote-segmentation-3-0.tar.bz2", 7),
+     "sherpa-onnx-pyannote-segmentation-3-0.tar.bz2", 7,
+     "24615ee884c897d9d2ba09bb4d30da6bb1b15e685065962db5b02e76e4996488"),
     ("voz.onnx",
      f"{BASE_DIARIZACAO}/speaker-recongition-models/"
-     "nemo_en_titanet_small.onnx", 39),
+     "nemo_en_titanet_small.onnx", 39,
+     "ad4a1802485d8b34c722d2a9d04249662f2ece5d28a7a039063ca22f515a789e"),
 )
 
 DIARIZACAO_MB = sum(a[2] for a in ARQUIVOS_DIARIZACAO)
+
+#: Teto de leitura de cada arquivo de modelo: o dobro do maior, com
+#: folga. Sem teto, o endereço que passasse a servir outra coisa
+#: encheria a memória antes de qualquer conferência.
+LIMITE_MODELO = 128 * 1024 * 1024
 
 #: Acima deste limiar duas falas são tidas como da mesma pessoa. Medido:
 #: 0,7 e 0,8 acertaram por completo o áudio de teste; 0,4 e 0,6 partiram
@@ -186,17 +253,40 @@ def pasta_diarizacao() -> Path:
 
 def diarizacao_baixada() -> bool:
     pasta = pasta_diarizacao()
-    return all((pasta / nome).is_file() for nome, _u, _m in ARQUIVOS_DIARIZACAO)
+    return all((pasta / a[0]).is_file() for a in ARQUIVOS_DIARIZACAO)
+
+
+def _modelo_do_pacote(dados: bytes) -> bytes:
+    """Tira o `model.onnx` de dentro do pacote, sem extrair o pacote.
+
+    Lê-se o único membro que interessa, direto para a memória. Extrair
+    o pacote inteiro para o disco entregava a ele a escolha de onde
+    gravar: um membro `../../x` ou um elo simbólico saía da pasta de
+    destino.
+    """
+    import io
+    import tarfile
+
+    with tarfile.open(fileobj=io.BytesIO(dados), mode="r:*") as t:
+        for membro in t:
+            if not membro.isfile() or Path(membro.name).name != "model.onnx":
+                continue
+            if membro.size > LIMITE_MODELO:
+                break
+            origem = t.extractfile(membro)
+            if origem is not None:
+                return origem.read(LIMITE_MODELO)
+    raise ErroTranscricao(
+        "O pacote de segmentação veio sem o modelo esperado.")
 
 
 def baixar_diarizacao(progresso=None) -> Path:
-    """Traz os dois modelos da separação de locutores."""
-    import tarfile
-    import tempfile
+    """Traz os dois modelos da separação de locutores, e os confere."""
+    import hashlib
     import urllib.request
 
     pasta = pasta_diarizacao()
-    for i, (nome, url, _mb) in enumerate(ARQUIVOS_DIARIZACAO, 1):
+    for i, (nome, url, _mb, esperado) in enumerate(ARQUIVOS_DIARIZACAO, 1):
         alvo = pasta / nome
         if alvo.is_file():
             continue
@@ -204,21 +294,19 @@ def baixar_diarizacao(progresso=None) -> Path:
             progresso(i, len(ARQUIVOS_DIARIZACAO))
         pedido = urllib.request.Request(url, headers={"User-Agent": "Temis"})
         with urllib.request.urlopen(pedido, timeout=180) as r:
-            dados = r.read()
+            dados = r.read(LIMITE_MODELO + 1)
+        if len(dados) > LIMITE_MODELO \
+                or hashlib.sha256(dados).hexdigest() != esperado:
+            raise ErroTranscricao(
+                f"O arquivo de modelo “{nome}” não confere com o resumo "
+                "de referência e foi descartado. Nada foi instalado.")
         if url.endswith(".tar.bz2"):
-            # O modelo de segmentação vem empacotado; interessa só o .onnx.
-            with tempfile.TemporaryDirectory() as tmp:
-                pacote = Path(tmp) / "pacote.tar.bz2"
-                pacote.write_bytes(dados)
-                with tarfile.open(pacote) as t:
-                    t.extractall(tmp)
-                achado = next((x for x in Path(tmp).rglob("model.onnx")), None)
-                if achado is None:
-                    raise ErroTranscricao(
-                        "O pacote de segmentação veio sem o modelo esperado.")
-                alvo.write_bytes(achado.read_bytes())
-        else:
-            alvo.write_bytes(dados)
+            dados = _modelo_do_pacote(dados)
+        # Nome provisório e troca: download interrompido não deixa meio
+        # modelo com cara de modelo inteiro.
+        parcial = alvo.with_name(alvo.name + ".parcial")
+        parcial.write_bytes(dados)
+        parcial.replace(alvo)
     return pasta
 
 
@@ -609,6 +697,8 @@ def build_html(d: Degravacao, decl: Declarante | None = None,
             ("Duração", hms(d.duracao), False),
             ("Resumo do arquivo (SHA-256)", d.sha256, True),
             ("Reconhecimento", f"Whisper {d.modelo} — {m.rotulo}", False),
+            ("Modelo de reconhecimento (SHA-256)",
+             resumo_do_modelo(d.modelo), True),
             ("Idioma", {"pt": "português"}.get(d.idioma, d.idioma), False),
         ))
 
