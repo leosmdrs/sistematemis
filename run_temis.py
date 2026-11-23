@@ -373,7 +373,10 @@ def autoteste() -> int:
 
     anotar("")
     anotar(f"{len(falhas)} verificação(ões) falharam: {', '.join(falhas)}"
-           if falhas else "Instalação íntegra.")
+           if falhas else
+           "Nenhuma verificação falhou. Este autoteste confere se os "
+           "componentes funcionam; não confere se os arquivos instalados "
+           "são os publicados.")
 
     base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
     destino = Path(base) / "SistemaTemis" / "autoteste.txt"

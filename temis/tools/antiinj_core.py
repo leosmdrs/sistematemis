@@ -108,6 +108,21 @@ def orgao_padrao() -> str:
     return _do_perfil("orgao")
 
 
+#: O que a conclusão cobre, dito na própria peça. A conclusão negativa
+#: desta ferramenta protege quem lê o documento, e conclusão negativa sem
+#: alcance declarado é lida como "não há" — quando o que se constatou foi
+#: "estas verificações não acharam".
+ALCANCE = (
+    "O exame consiste em seis verificações sobre a camada de texto: "
+    "opacidade zero, corpo minúsculo, texto fora da página, texto da cor "
+    "do fundo branco, camada desligada e modo de renderização invisível. "
+    "Não alcança texto recortado por área de corte, texto encoberto por "
+    "figura ou retângulo opaco, texto de cor próxima à de um fundo que "
+    "não seja branco, nem conteúdo inserido como imagem. A ausência de "
+    "achados não equivale a atestado de que o documento não contém "
+    "conteúdo oculto.")
+
+
 @dataclass
 class Finding:
     page: int                       # índice 0-based
@@ -417,8 +432,9 @@ def build_html(file_name: str, n_pages: int, findings: list[Finding],
                       f"<b>CRÍTICA</b>")
         frase += ", conforme o quadro abaixo."
     else:
-        frase = ("<b>Não foram identificados</b> trechos de texto ocultos à "
-                 "leitura convencional no documento examinado.")
+        frase = ("<b>As verificações desta ferramenta não detectaram</b> "
+                 "trechos de texto ocultos à leitura convencional no "
+                 "documento examinado. " + ALCANCE)
 
     linhas = []
     for i, f in enumerate(ordenados, 1):
@@ -515,8 +531,10 @@ def build_report(file_name: str, n_pages: int, findings: list[Finding],
     L.append("")
 
     if not findings:
-        L.append("Não foram identificados trechos de texto ocultos à leitura")
-        L.append("convencional no documento examinado.")
+        L.append("As verificações desta ferramenta não detectaram trechos de")
+        L.append("texto ocultos à leitura convencional no documento examinado.")
+        L.append("")
+        L.append(ALCANCE)
         return "\n".join(L)
 
     frase = (

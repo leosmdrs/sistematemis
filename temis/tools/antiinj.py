@@ -669,7 +669,9 @@ class AntiInjectionTool(ToolPage):
 
         s = core.summarize(findings)
         if s["total"] == 0:
-            self.status_msg.emit("Nenhum texto oculto encontrado no documento")
+            self.status_msg.emit(
+                "As verificações não detectaram texto oculto — veja o "
+                "alcance no relatório")
         else:
             self.status_msg.emit(
                 f"{s['total']} achado(s) em {s['paginas']} página(s) — "
@@ -699,8 +701,10 @@ class AntiInjectionTool(ToolPage):
         if s["total"] == 0:
             self._lbl_breakdown.setText(
                 f"<span style='color:{PALETTE['success']}'>"
-                "✓ Nenhum texto oculto detectado</span>")
-            item = QListWidgetItem("  Documento sem indícios de texto oculto.")
+                "Nada detectado pelas verificações H1 a H6</span>")
+            item = QListWidgetItem(
+                "  As seis verificações não acharam texto oculto. "
+                "Há técnicas que elas não alcançam: o relatório as nomeia.")
             item.setForeground(QColor(PALETTE["text3"]))
             self._list.addItem(item)
             return

@@ -245,7 +245,9 @@ class OProgramaResumeASiMesmo(unittest.TestCase):
 
     def setUp(self):
         procedencia._RESUMO_PROGRAMA.clear()
+        procedencia._RESUMOS_COMPONENTES.clear()
         self.addCleanup(procedencia._RESUMO_PROGRAMA.clear)
+        self.addCleanup(procedencia._RESUMOS_COMPONENTES.clear)
 
     def test_do_codigo_fonte_nao_ha_executavel_a_resumir(self):
         # O executável seria o interpretador Python, e resumi-lo não
@@ -275,7 +277,57 @@ class OProgramaResumeASiMesmo(unittest.TestCase):
                 sys.executable = guardado[1]
             self.assertEqual(resumo, sha256_file(str(falso)))
             self.assertIn(resumo, frase)
-            self.assertIn("executável que produziu esta peça", frase)
+            self.assertIn("SistemaTemis.exe", frase)
+
+    def test_o_pacote_com_o_codigo_tambem_e_resumido(self):
+        # O executável é só o carregador. Trocado o pacote ao lado dele,
+        # o resumo do executável seguia igual, e a peça afirmava sobre o
+        # instrumento o que o resumo não cobria.
+        import sys
+        import tempfile
+        from temis.tools.hash_core import sha256_file
+        with tempfile.TemporaryDirectory() as pasta:
+            carregador = Path(pasta) / "SistemaTemis.exe"
+            pacote = Path(pasta) / "SistemaTemis.pkg"
+            carregador.write_bytes(b"carregador")
+            pacote.write_bytes(b"codigo do programa")
+            guardado = (getattr(sys, "frozen", None), sys.executable)
+            sys.frozen = True
+            sys.executable = str(carregador)
+            try:
+                antes = procedencia.frase([])
+                procedencia._RESUMOS_COMPONENTES.clear()
+                pacote.write_bytes(b"codigo adulterado")
+                depois = procedencia.frase([])
+            finally:
+                if guardado[0] is None:
+                    del sys.frozen
+                else:
+                    sys.frozen = guardado[0]
+                sys.executable = guardado[1]
+            self.assertIn("SistemaTemis.pkg", antes)
+            self.assertIn(sha256_file(str(pacote)), depois)
+            self.assertNotEqual(antes, depois)
+
+    def test_a_peca_nao_apresenta_o_resumo_como_garantia(self):
+        import sys
+        import tempfile
+        with tempfile.TemporaryDirectory() as pasta:
+            falso = Path(pasta) / "SistemaTemis.exe"
+            falso.write_bytes(b"x")
+            guardado = (getattr(sys, "frozen", None), sys.executable)
+            sys.frozen = True
+            sys.executable = str(falso)
+            try:
+                frase = procedencia.frase([])
+            finally:
+                if guardado[0] is None:
+                    del sys.frozen
+                else:
+                    sys.frozen = guardado[0]
+                sys.executable = guardado[1]
+        self.assertIn("calculados por ele próprio", frase)
+        self.assertIn("não é assinado", frase)
 
 
 class ORegistroDeAtividadesSeEncadeia(unittest.TestCase):

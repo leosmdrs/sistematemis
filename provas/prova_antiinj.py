@@ -144,5 +144,33 @@ class ORelatorioEDoDocumentoAnalisado(Base):
         self.assertEqual(self.relatorios, [])
 
 
+class AConclusaoNegativaDizOProprioAlcance(unittest.TestCase):
+    """Sem achados, a peça diz o que examinou — e o que não alcança.
+
+    A conclusão "não foram identificados trechos ocultos" era lida como
+    atestado de que não há. O que a ferramenta constata é menos: que
+    seis verificações não acharam. Há técnicas conhecidas que elas não
+    alcançam, e a peça não as nomeava.
+    """
+
+    def pecas(self):
+        from temis.tools import antiinj_core as core
+        html = core.build_html("doc.pdf", 3, [], "23/11/2026 às 10:00")
+        texto = core.build_report("doc.pdf", 3, [], "23/11/2026 às 10:00")
+        return html, texto
+
+    def test_a_conclusao_nao_afirma_ausencia(self):
+        for peca in self.pecas():
+            self.assertNotIn("Não foram identificados", peca)
+            self.assertIn("não detectaram", peca)
+            self.assertIn("não equivale a atestado", peca)
+
+    def test_o_que_nao_e_alcancado_vai_nomeado(self):
+        for peca in self.pecas():
+            for tecnica in ("área de corte", "retângulo opaco",
+                            "fundo que não seja branco", "como imagem"):
+                self.assertIn(tecnica, peca)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

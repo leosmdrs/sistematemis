@@ -189,6 +189,41 @@ def resumo_do_programa() -> str:
     return resumo
 
 
+#: Calculados uma vez por execução, como o resumo acima.
+_RESUMOS_COMPONENTES: list = []
+
+
+def componentes_do_programa() -> dict:
+    """Os arquivos que são o programa, cada um com o seu resumo.
+
+    O executável é só o carregador: desde que o pacote com o código
+    passou a ficar ao lado dele, resumir o executável deixou de dizer
+    qualquer coisa sobre o código que roda — trocava-se o pacote e o
+    resumo impresso nas peças seguia o mesmo. Os dois vão declarados.
+
+    O que isto vale precisa ficar dito: são resumos calculados pelo
+    próprio programa em execução, e servem para **confronto** com os
+    publicados no manifesto da versão. Programa adulterado pode imprimir
+    o resumo que quiser; quem prova o instrumento é a assinatura de
+    código, que este programa ainda não tem.
+    """
+    if _RESUMOS_COMPONENTES:
+        return dict(_RESUMOS_COMPONENTES[0])
+    achados = {}
+    if getattr(sys, "frozen", False):
+        from pathlib import Path
+        from .tools.hash_core import sha256_file
+        executavel = Path(sys.executable)
+        for arquivo in (executavel, executavel.with_suffix(".pkg")):
+            try:
+                if arquivo.is_file():
+                    achados[arquivo.name] = sha256_file(str(arquivo))
+            except Exception:                           # noqa: BLE001
+                pass
+    _RESUMOS_COMPONENTES.append(dict(achados))
+    return achados
+
+
 def plataforma() -> str:
     """O sistema operacional, como ele se identifica."""
     try:
@@ -246,10 +281,16 @@ def frase(lista: list) -> str:
               "auditabilidade, à repetibilidade e à reprodutibilidade; o "
               "alcance dessa observância, e o que fica fora dela, consta "
               "do arquivo NORMAS.md publicado com o código-fonte.")
-    resumo = resumo_do_programa()
-    if resumo:
-        texto += (" O executável que produziu esta peça tem resumo SHA-256 "
-                  + resumo + ".")
+    componentes = componentes_do_programa()
+    if componentes:
+        partes = "; ".join(f"{nome}, {resumo}"
+                           for nome, resumo in componentes.items())
+        texto += (" Os arquivos do programa que produziu esta peça têm os "
+                  "seguintes resumos SHA-256, calculados por ele próprio "
+                  "para confronto com os publicados no manifesto da "
+                  "versão: " + partes + ". Este programa não é assinado "
+                  "digitalmente, e o confronto dos resumos não substitui "
+                  "a assinatura.")
     elif getattr(sys, "frozen", False) is False:
         texto += (" Esta peça foi produzida a partir do código-fonte, e não "
                   "de executável empacotado.")

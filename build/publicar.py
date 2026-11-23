@@ -143,6 +143,15 @@ def escrever_manifesto(instalador: Path, versao: str, notas: str,
         "notas": notas,
         "critica": critica,
     }
+    # Os arquivos que são o programa, com os resumos que cada peça
+    # imprime. É contra estes que se confronta o que a peça declara.
+    componentes = {}
+    for nome in ("SistemaTemis.exe", "SistemaTemis.pkg"):
+        arquivo = DIST / "SistemaTemis" / nome
+        if arquivo.is_file():
+            componentes[nome] = sha256(arquivo)
+    if componentes:
+        manifesto["componentes"] = componentes
     alvo = DIST / "versao.json"
     alvo.write_text(json.dumps(manifesto, ensure_ascii=False, indent=2),
                     encoding="utf-8")
