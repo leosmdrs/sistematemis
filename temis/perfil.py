@@ -175,8 +175,19 @@ def gravar(p: Perfil) -> None:
     tmp.replace(alvo)
 
 
-def aplicar(pagina, p: Perfil | None = None) -> list[str]:
+#: Marca posta no campo a que o perfil já foi oferecido.
+_JA_OFERECIDO = "temis_perfil_oferecido"
+
+
+def aplicar(pagina, p: Perfil | None = None,
+            repetir: bool = False) -> list[str]:
     """Oferece o perfil aos campos vazios da ferramenta.
+
+    Uma vez por campo. O perfil era oferecido de novo a cada vez que a
+    ferramenta era aberta, e o campo que o operador tinha apagado de
+    propósito — porque quem assina aquela peça é outra pessoa — voltava
+    preenchido. `repetir=True` é para quando o próprio operador acabou
+    de guardar uma identificação nova e quer vê-la nos campos vazios.
 
     Devolve os nomes dos campos que preencheu — não por elegância, mas
     para que o autoteste possa conferir que o perfil de fato chega às
@@ -198,7 +209,9 @@ def aplicar(pagina, p: Perfil | None = None) -> list[str]:
             if widget is None or not hasattr(widget, "setText"):
                 continue
             try:
-                if widget.text().strip():
+                ja = bool(widget.property(_JA_OFERECIDO))
+                widget.setProperty(_JA_OFERECIDO, True)
+                if (ja and not repetir) or widget.text().strip():
                     continue
                 widget.setText(valor)
             except (AttributeError, RuntimeError):

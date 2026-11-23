@@ -87,6 +87,21 @@ class ConversaTool(ToolPage):
         self._e_processo.setPlaceholderText("08650.000123/2026-11")
         painel.body.addWidget(self._e_processo)
 
+        # Quem assina a peça, à vista e editável. O termo tomava o nome
+        # do perfil guardado na estação, sem mostrá-lo: em máquina de
+        # uso comum, a peça saía em nome de quem a usou por último.
+        painel.body.addWidget(hsep())
+        painel.body.addWidget(field_label("Quem assina o termo"))
+        self._e_nome = QLineEdit()
+        self._e_nome.setPlaceholderText("Nome completo")
+        painel.body.addWidget(self._e_nome)
+        self._e_matricula = QLineEdit()
+        self._e_matricula.setPlaceholderText("Matrícula")
+        painel.body.addWidget(self._e_matricula)
+        self._e_lotacao = QLineEdit()
+        self._e_lotacao.setPlaceholderText("Lotação")
+        painel.body.addWidget(self._e_lotacao)
+
         painel.body.addWidget(hsep())
         painel.body.addWidget(field_label("RESUMO"))
         self._lbl_resumo = QLabel("Nenhuma conversa aberta.")
@@ -167,9 +182,14 @@ class ConversaTool(ToolPage):
     def _declarante(self) -> core.Declarante:
         from ..perfil import ler
         p = ler()
-        return core.Declarante(nome=p.nome, matricula=p.matricula,
-                               lotacao=p.lotacao, cargo=p.cargo or "",
-                               orgao=p.orgao or "")
+        # O que está nos campos da tela — é o que o operador vê e
+        # conferiu. Do perfil vêm só o cargo e o órgão, que a tela não
+        # pergunta.
+        return core.Declarante(
+            nome=self._e_nome.text().strip(),
+            matricula=self._e_matricula.text().strip(),
+            lotacao=self._e_lotacao.text().strip(),
+            cargo=p.cargo or "", orgao=p.orgao or "")
 
     def _procedimento(self) -> core.Procedimento:
         return core.Procedimento(tipo=ler_procedimento(self._cb_tipo),

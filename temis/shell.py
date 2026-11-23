@@ -683,7 +683,9 @@ class PerfilDialog(QDialog):
         limpar = QPushButton("  Limpar")
         limpar.setIcon(draw_icon("trash", 16, PALETTE["text2"]))
         limpar.setCursor(Qt.CursorShape.PointingHandCursor)
-        limpar.setToolTip("Apaga a identificação guardada nesta máquina")
+        limpar.setToolTip(
+            "Esvazia os campos. Para apagar a identificação guardada "
+            "nesta máquina, clique em Guardar com os campos vazios")
         limpar.clicked.connect(self._limpar)
         acoes.addWidget(limpar)
         acoes.addStretch()
@@ -1136,7 +1138,7 @@ class TemisWindow(QMainWindow):
         # Vale já para as ferramentas abertas nesta sessão, sem esperar
         # que sejam reabertas — mas só nos campos ainda vazios.
         p = perfil.ler()
-        alcancadas = sum(bool(perfil.aplicar(t, p))
+        alcancadas = sum(bool(perfil.aplicar(t, p, repetir=True))
                          for t in self._tools.values())
         self.statusBar().showMessage(
             "Identificação guardada nesta máquina."
