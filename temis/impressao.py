@@ -218,6 +218,58 @@ def preparar_escritor(caminho: str, titulo: str = "",
     return escritor
 
 
+def resumos_alterados(html_gerado: str, texto_atual: str) -> list:
+    """Os resumos que o programa calculou e que o texto editado não traz.
+
+    O termo é aberto para ajuste de redação antes de exportar, e o que se
+    exporta é o que está na tela. O resumo criptográfico é o que amarra
+    a peça ao arquivo: um caractere trocado nele, por descuido ou não, e
+    a peça passa a identificar outra coisa — sem que nada acuse.
+
+    Compara-se o que o programa gerou com o que está para sair. Devolve
+    os resumos que aparecem **menos vezes** no texto atual do que no
+    gerado: conta por ocorrência, porque o mesmo resumo costuma estar no
+    quadro e no corpo, e trocar só um deles já é alteração. Os espaços
+    são ignorados — a célula quebra o valor em várias linhas.
+    """
+    import re
+    from PyQt6.QtGui import QTextDocument
+
+    original = QTextDocument()
+    original.setHtml(html_gerado or "")
+    plano = original.toPlainText()
+    esperados = list(dict.fromkeys(
+        m.lower() for m in re.findall(
+            r"(?<![0-9a-fA-F])[0-9a-fA-F]{64}(?![0-9a-fA-F])", plano)))
+
+    def colado(texto):
+        return re.sub(r"\s+", "", texto or "").lower()
+
+    antes, agora = colado(plano), colado(texto_atual)
+    return [r for r in esperados if agora.count(r) < antes.count(r)]
+
+
+def confirmar_resumos(pai, html_gerado: str, texto_atual: str) -> bool:
+    """Pergunta antes de exportar termo com resumo alterado. True = seguir."""
+    from PyQt6.QtWidgets import QMessageBox
+
+    alterados = resumos_alterados(html_gerado, texto_atual)
+    if not alterados:
+        return True
+    lista = "\n".join(alterados[:6]) + ("\n…" if len(alterados) > 6 else "")
+    resposta = QMessageBox.warning(
+        pai, "Resumo criptográfico alterado no texto",
+        f"{len(alterados)} resumo(s) calculado(s) pelo sistema não "
+        "aparecem mais no texto como foram calculados:\n\n"
+        f"{lista}\n\n"
+        "O resumo é o que liga a peça ao arquivo. Exportado assim, o "
+        "termo não comprovará a integridade desse(s) arquivo(s).\n\n"
+        "Exportar mesmo assim?",
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        QMessageBox.StandardButton.No)
+    return resposta == QMessageBox.StandardButton.Yes
+
+
 def conferir_gravado(caminho) -> None:
     """Levanta `OSError` se o arquivo não existir ou estiver vazio.
 

@@ -59,8 +59,9 @@ class TermoDerivadoDialog(QDialog):
 
         layout.addWidget(subtext(
             "Os resumos criptográficos e os nomes dos arquivos foram lidos "
-            "do disco e não são editáveis — é o que amarra a peça aos "
-            "arquivos. Complete a qualificação de quem assina.", wrap=True))
+            "do disco — é o que amarra a peça aos arquivos. Complete a "
+            "qualificação de quem assina. Se algum resumo for alterado "
+            "na prévia, o sistema avisa antes de exportar.", wrap=True))
 
         layout.addWidget(self._montar_formulario())
         layout.addWidget(hsep())
@@ -186,7 +187,20 @@ class TermoDerivadoDialog(QDialog):
         return t
 
     def _remontar(self):
-        self._vista.setHtml(self._core.build_html(self._atualizado()))
+        self._html_gerado = self._core.build_html(self._atualizado())
+        self._vista.setHtml(self._html_gerado)
+
+    def _resumos_conferem(self) -> bool:
+        """A prévia aceita edição, e o que se exporta é o que está nela.
+
+        O aviso acima da prévia diz que nomes e resumos não são
+        editáveis. Eram: a prévia é um campo de texto. Antes de exportar,
+        os resumos do texto são conferidos contra os que o programa
+        calculou.
+        """
+        from ..impressao import confirmar_resumos
+        return confirmar_resumos(self, getattr(self, "_html_gerado", ""),
+                                 self._vista.toPlainText())
 
     def _sugerir(self, extensao: str) -> str:
         base = "termo"
@@ -199,7 +213,7 @@ class TermoDerivadoDialog(QDialog):
     def _salvar_pdf(self):
         caminho, _ = QFileDialog.getSaveFileName(
             self, "Salvar o termo", self._sugerir(".pdf"), "PDF (*.pdf)")
-        if not caminho:
+        if not caminho or not self._resumos_conferem():
             return
         doc = QTextDocument()
         doc.setHtml(self._vista.toHtml())
@@ -215,7 +229,7 @@ class TermoDerivadoDialog(QDialog):
     def _salvar_html(self):
         caminho, _ = QFileDialog.getSaveFileName(
             self, "Salvar o termo", self._sugerir(".html"), "HTML (*.html)")
-        if not caminho:
+        if not caminho or not self._resumos_conferem():
             return
         try:
             Path(caminho).write_text(

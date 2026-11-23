@@ -287,9 +287,17 @@ class TermoDialog(QDialog):
         )
 
     def _remontar(self):
-        self._view.setHtml(core.build_html(
+        # Guardado como saiu do programa: é contra ele que se conferem
+        # os resumos do texto editado, na hora de exportar.
+        self._html_gerado = core.build_html(
             self._arquivos, self._quando, self._declarante(),
-            self._modo, self._juntada()))
+            self._modo, self._juntada())
+        self._view.setHtml(self._html_gerado)
+
+    def _resumos_conferem(self) -> bool:
+        from ..impressao import confirmar_resumos
+        return confirmar_resumos(self, getattr(self, "_html_gerado", ""),
+                                 self._view.toPlainText())
 
     def _copiar(self):
         QGuiApplication.clipboard().setText(self._view.toPlainText())
@@ -306,6 +314,8 @@ class TermoDialog(QDialog):
             return
         if not caminho.lower().endswith((".html", ".htm")):
             caminho += ".html"
+        if not self._resumos_conferem():
+            return
         try:
             # Sai o documento em edição, e não o remontado: os ajustes de
             # redação feitos aqui têm de acompanhar o arquivo exportado.
@@ -333,6 +343,8 @@ class TermoDialog(QDialog):
             return
         if not caminho.lower().endswith(".pdf"):
             caminho += ".pdf"
+        if not self._resumos_conferem():
+            return
         try:
             escritor = preparar_escritor(
                 caminho, "Termo de Juntada e Extração de Metadados")

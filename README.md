@@ -132,10 +132,13 @@ limitações que o navegador impunha:
 - **Termo editável com verificação de integridade.** O documento pode ser
   ajustado antes de exportar, e o PDF sai do que está na tela — o
   `QTextDocument` é clonado, não remontado a partir dos dados, senão as
-  edições seriam descartadas em silêncio. A coluna de hash também fica
-  editável, e **o programa não reconfere os hashes do texto editado**
-  antes de exportar: quem ajusta a redação responde por não tocar nos
-  resumos, e deve conferi-los na peça exportada.
+  edições seriam descartadas em silêncio. Como a coluna de hash também
+  fica editável, antes de exportar os resumos do texto são conferidos
+  contra os que o programa calculou — por ocorrência, e ignorando
+  espaços, porque a célula quebra o valor em várias linhas. Se algum
+  tiver sido alterado, o usuário é avisado de que o termo não comprovará
+  a integridade daquele arquivo, e decide se exporta. Vale também para
+  os termos das demais ferramentas.
 - **PDF de verdade** via `QPdfWriter`, em vez de depender de
   “Imprimir → Salvar como PDF” do navegador.
 - **Arrastar e soltar** arquivos, ausente no original.
