@@ -352,6 +352,9 @@ class Captura:
     registro: Registro = field(default_factory=Registro)
     pecas: list[Peca] = field(default_factory=list)
     recursos: list[Recurso] = field(default_factory=list)
+    #: Peças pedidas ao navegador que não chegaram dentro do prazo. O
+    #: termo as nomeia: captura sem o PDF é fato a declarar, não a calar.
+    ausentes: list[str] = field(default_factory=list)
 
     @property
     def host(self) -> str:
@@ -397,6 +400,18 @@ class Sessao:
     autenticada: bool = False
     conta: str = ""
     observacoes: str = ""
+    #: Quantas pastas de captura esta diligência já abriu. Só cresce.
+    sequencia: int = 0
+
+    def proximo_numero(self) -> int:
+        """Número da pasta da próxima captura — nunca reaproveitado.
+
+        Contar as capturas listadas não serve: removida uma, a seguinte
+        recebia o número de outra ainda listada e gravava por cima dos
+        arquivos dela, cujo resumo no termo deixava de conferir.
+        """
+        self.sequencia += 1
+        return self.sequencia
 
     @property
     def inicio_br(self) -> str:
@@ -419,6 +434,50 @@ class Sessao:
     @property
     def pecas(self) -> list[Peca]:
         return [p for c in self.capturas for p in c.pecas]
+
+
+class Conclusao:
+    """Garante que uma captura seja concluída uma única vez.
+
+    A captura pede ao navegador o PDF e o código-fonte, que chegam cada
+    um a seu tempo, e arma um prazo para o caso de algum não chegar.
+    Sem trava, o prazo concluía de novo uma captura já concluída: vinte
+    segundos depois a imagem da tela era regravada com o que a janela
+    mostrasse naquele momento, o resumo recalculado sobre o arquivo novo,
+    e a captura entrava duas vezes na diligência.
+
+    Depois de concluída, nada mais é aceito: `chegou` devolve False, e
+    quem chama não grava a peça atrasada — o arquivo dela não está entre
+    os resumos do termo.
+    """
+
+    def __init__(self, esperadas, ao_concluir):
+        self._pendentes = list(esperadas)
+        self._ao_concluir = ao_concluir
+        self.concluida = False
+
+    def aceita(self) -> bool:
+        return not self.concluida
+
+    def chegou(self, nome: str) -> bool:
+        """Registra a chegada de uma peça. False se a captura já fechou."""
+        if self.concluida:
+            return False
+        if nome in self._pendentes:
+            self._pendentes.remove(nome)
+        if not self._pendentes:
+            self._fechar()
+        return True
+
+    def forcar(self) -> None:
+        """Fim do prazo: conclui com o que houver, se ainda não concluiu."""
+        if not self.concluida:
+            self._fechar()
+
+    def _fechar(self) -> None:
+        self.concluida = True
+        faltaram, self._pendentes = self._pendentes, []
+        self._ao_concluir(faltaram)
 
 
 def pasta_sessoes() -> Path:
@@ -609,6 +668,15 @@ def _bloco_captura(c: Captura, numero: int, total: int) -> str:
         "</tr>"
         for p in c.pecas)
 
+    bloco_ausentes = ""
+    if c.ausentes:
+        bloco_ausentes = (
+            f'<p align="justify" style="font-size:9pt; line-height:150%;">'
+            f'<font color="{DESTAQUE}"><b>Peça não obtida:</b> '
+            f"{e(', '.join(c.ausentes))}. O navegador não a entregou "
+            "dentro do prazo de espera, e ela não integra esta "
+            "captura.</font></p>")
+
     terceiros = c.dominios_terceiros
     bloco_terceiros = ""
     if terceiros:
@@ -637,7 +705,7 @@ def _bloco_captura(c: Captura, numero: int, total: int) -> str:
   </tr>
   {pecas}
 </table>
-{bloco_terceiros}
+{bloco_ausentes}{bloco_terceiros}
 """
 
 

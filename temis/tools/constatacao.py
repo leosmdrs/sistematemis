@@ -602,13 +602,26 @@ class ConstatacaoTool(ToolPage):
         c = core.Captura(url=self._pagina.url().toString())
         c.url_final = c.url
         c.titulo = self._pagina.title()
-        c.ips = core.resolver(c.host)
-        c.certificado = core.certificado_tls(c.host)
         c.recursos = list(self._espiao.recursos)
 
-        n = len(self._sessao.capturas) + 1
+        n = self._sessao.proximo_numero()
         destino = self._pasta / f"{n:02d}"
         destino.mkdir(parents=True, exist_ok=True)
+
+        # A imagem é do instante do clique, antes de qualquer consulta à
+        # rede. Tirada ao final, mostrava o que a janela exibisse quando
+        # o PDF e o código-fonte chegassem — e, se o operador já tivesse
+        # navegado, era a imagem de outra página sob o endereço e a hora
+        # desta.
+        tela = destino / "tela.png"
+        if self._view.grab().save(str(tela)):
+            c.pecas.append(core.Peca("tela.png", "captura da tela exibida",
+                                     str(tela)))
+        else:
+            c.ausentes.append("tela.png")
+
+        c.ips = core.resolver(c.host)
+        c.certificado = core.certificado_tls(c.host)
 
         # O certificado diz quem o servidor afirma ser; o registro diz
         # quem respondeu pelo nome. A resposta bruta é guardada como peça
@@ -625,15 +638,13 @@ class ConstatacaoTool(ToolPage):
                     str(alvo)))
             except OSError:
                 pass
-        pendentes = {"pdf": False, "html": False}
 
-        def concluir():
-            if not all(pendentes.values()):
-                return
-            tela = destino / "tela.png"
-            self._view.grab().save(str(tela))
-            c.pecas.append(core.Peca("tela.png", "captura da tela exibida",
-                                     str(tela)))
+        limite = QTimer(self)
+        limite.setSingleShot(True)
+
+        def concluir(faltaram):
+            limite.stop()
+            c.ausentes.extend(faltaram)
             for p in c.pecas:
                 p.calcular()
             self._sessao.capturas.append(c)
@@ -641,22 +652,36 @@ class ConstatacaoTool(ToolPage):
             self._capturando = False
             self._btn_capturar.setEnabled(True)
             self._preencher_lista()
-            self.status_msg.emit(
-                f"Captura {n} registrada · resumo {c.resumo[:12]}…")
+            if c.ausentes:
+                self.status_msg.emit(
+                    f"Captura {n} registrada sem {', '.join(c.ausentes)} "
+                    "— o termo declara a falta.")
+            else:
+                self.status_msg.emit(
+                    f"Captura {n} registrada · resumo {c.resumo[:12]}…")
+
+        fecho = core.Conclusao(("pagina.pdf", "pagina.html"), concluir)
 
         def salvar_pdf(dados):
+            # Peça que chega depois do prazo não é gravada: a captura já
+            # fechou, e o arquivo ficaria na pasta sem resumo no termo.
+            if not fecho.aceita():
+                return
             alvo = destino / "pagina.pdf"
             try:
+                if not dados:
+                    raise OSError("o navegador não devolveu o PDF")
                 alvo.write_bytes(dados)
                 c.pecas.append(core.Peca(
                     "pagina.pdf", "página inteira, com texto selecionável",
                     str(alvo)))
             except OSError:
-                pass
-            pendentes["pdf"] = True
-            concluir()
+                c.ausentes.append("pagina.pdf")
+            fecho.chegou("pagina.pdf")
 
         def salvar_html(texto):
+            if not fecho.aceita():
+                return
             alvo = destino / "pagina.html"
             try:
                 alvo.write_text(texto, encoding="utf-8")
@@ -664,16 +689,16 @@ class ConstatacaoTool(ToolPage):
                     "pagina.html", "código-fonte como exibido (DOM)",
                     str(alvo)))
             except OSError:
-                pass
-            pendentes["html"] = True
-            concluir()
+                c.ausentes.append("pagina.html")
+            fecho.chegou("pagina.html")
 
         self._pagina.printToPdf(salvar_pdf)
         self._pagina.toHtml(salvar_html)
         # Rede lenta ou página que nunca assenta não pode travar a
-        # ferramenta: passado o limite, encerra com o que houver.
-        QTimer.singleShot(20000, lambda: (
-            pendentes.update(pdf=True, html=True), concluir()))
+        # ferramenta: passado o limite, encerra com o que houver — uma
+        # vez só, e o prazo é desarmado quando a captura conclui antes.
+        limite.timeout.connect(fecho.forcar)
+        limite.start(20000)
 
     def _preencher_lista(self):
         self._lista.clear()
