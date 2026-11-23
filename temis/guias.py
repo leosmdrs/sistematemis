@@ -264,9 +264,14 @@ GUIAS: dict[str, Guia] = {
         limites=(
             "O reconhecimento é automático e erra — sobretudo em "
             "manuscrito, carimbo, documento de má qualidade e algarismo. "
-            "Por isso a camada é invisível e fica atrás da imagem: quem lê "
+            "Por isso a camada é invisível, sobreposta à imagem: quem lê "
             "continua lendo o original. Divergência resolve-se sempre em "
             "favor da imagem.",
+            "De um PDF, a imagem de cada página segue idêntica. De um "
+            "arquivo de imagem (foto, PNG, TIFF) sai um documento "
+            "derivado: a imagem é recodificada, e os metadados dela — "
+            "data, aparelho, localização — não seguem. Preserve o "
+            "arquivo recebido.",
             "Não achar um termo na busca não permite concluir que ele não "
             "está no documento.",
             "O arquivo recebido nunca é sobrescrito: o pesquisável sai em "

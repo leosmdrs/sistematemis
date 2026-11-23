@@ -187,6 +187,13 @@ class Documento:
     tamanho_saida: int = 0
     segundos: float = 0.0
     erro: str = ""
+    #: O que a conversão fez à imagem recebida, quando a entrada é imagem
+    #: e não PDF. Vai para o termo: o documento gerado é derivado dela.
+    adaptacoes: list[str] = field(default_factory=list)
+
+    @property
+    def de_imagem(self) -> bool:
+        return Path(self.entrada).suffix.lower() in EXT_IMAGEM
 
     @property
     def nome(self) -> str:
@@ -369,8 +376,63 @@ def aplicar_camada(pagina, leitura: "ocr_windows.Leitura", zoom: float) -> tuple
 #  CONVERSÃO
 # ─────────────────────────────────────────
 
-def _abrir_como_pdf(entrada: Path):
-    """Devolve um documento do PyMuPDF, convertendo imagem em PDF."""
+def preparar_imagem(quadro) -> tuple:
+    """Deixa a imagem como ela é vista, e diz o que precisou fazer.
+
+    Devolve (imagem em RGB, lista do que foi adaptado). Quatro coisas se
+    perdiam em silêncio na conversão para PDF, sob um termo que dizia
+    "preservada exatamente":
+
+    * a orientação gravada no EXIF era ignorada, e a foto feita com o
+      celular de lado saía deitada;
+    * a transparência virava preto — um PNG transparente saía como
+      página inteiramente preta;
+    * a imagem de 16 bits era cortada em 8, e tudo o que passasse de 255
+      virava branco;
+    * o CMYK era convertido para RGB.
+
+    As duas primeiras deixam de acontecer; as outras duas são
+    inevitáveis no formato de saída, e passam a ser declaradas.
+    """
+    from PIL import Image, ImageOps
+
+    feito = []
+    try:
+        if (quadro.getexif() or {}).get(0x0112, 1) not in (0, 1):
+            quadro = ImageOps.exif_transpose(quadro)
+            feito.append("a orientação indicada nos metadados da imagem "
+                         "foi aplicada")
+    except Exception:                                       # noqa: BLE001
+        pass
+
+    modo = quadro.mode
+    if modo in ("I;16", "I;16L", "I;16B", "I", "F"):
+        # Escala para a faixa de 8 bits em vez de cortar nela.
+        minimo, maximo = quadro.getextrema()
+        faixa = (maximo - minimo) or 1
+        quadro = quadro.point(
+            lambda v: (v - minimo) * 255.0 / faixa).convert("L")
+        feito.append("a profundidade de cor foi reduzida para 8 bits por "
+                     "canal")
+    elif modo == "CMYK":
+        feito.append("o espaço de cor foi convertido de CMYK para RGB")
+
+    if quadro.mode == "P" and "transparency" in quadro.info:
+        quadro = quadro.convert("RGBA")
+    if quadro.mode in ("RGBA", "LA"):
+        fundo = Image.new("RGBA", quadro.size, (255, 255, 255, 255))
+        fundo.alpha_composite(quadro.convert("RGBA"))
+        quadro = fundo
+        feito.append("as áreas transparentes foram compostas sobre fundo "
+                     "branco")
+    return quadro.convert("RGB"), feito
+
+
+def _abrir_como_pdf(entrada: Path, adaptacoes: list | None = None):
+    """Devolve um documento do PyMuPDF, convertendo imagem em PDF.
+
+    `adaptacoes`, se dada, recebe o que a conversão fez à imagem.
+    """
     import fitz
 
     if entrada.suffix.lower() in EXT_PDF:
@@ -384,7 +446,9 @@ def _abrir_como_pdf(entrada: Path):
     saida = fitz.open()
     with Image.open(entrada) as imagem:
         for quadro in ImageSequence.Iterator(imagem):
-            quadro = quadro.convert("RGB")
+            quadro, feito = preparar_imagem(quadro)
+            if adaptacoes is not None:
+                adaptacoes.extend(f for f in feito if f not in adaptacoes)
             import io
             buf = io.BytesIO()
             quadro.save(buf, "PNG")
@@ -423,7 +487,7 @@ def converter(entrada: str | Path, saida: str | Path,
 
     zoom = opcoes.dpi / 72.0
     try:
-        pdf = _abrir_como_pdf(entrada)
+        pdf = _abrir_como_pdf(entrada, doc.adaptacoes)
     except Exception as e:                                  # noqa: BLE001
         doc.erro = f"{type(e).__name__}: {e}"
         return doc
@@ -533,16 +597,21 @@ ENCERRAMENTO = "Sem mais a relatar, encerro o presente termo."
 #: O que o reconhecimento não garante. Vai impresso: uma peça que se cala
 #: sobre os próprios limites convida a que se lhe atribua alcance que ela
 #: não tem.
+#: Vale para o que foi recebido em PDF, e só para ele: ali a página não
+#: é redesenhada, e a imagem embutida segue byte a byte.
+RESSALVA_PDF = (
+    "A imagem de cada página dos documentos recebidos em PDF foi "
+    "preservada exatamente como recebida, sem rasterização nem redesenho: "
+    "o documento gerado renderiza conteúdo visual idêntico ao do "
+    "original, e a imagem nele embutida é a mesma. A eventual diferença "
+    "de tamanho entre os arquivos decorre apenas da compressão dos fluxos "
+    "do PDF, que se dá sem perda.")
+
 RESSALVAS = (
-    "A imagem de cada página foi preservada exatamente como recebida, sem "
-    "rasterização nem redesenho: o documento gerado renderiza conteúdo "
-    "visual idêntico ao do original, e a imagem nele embutida é a mesma. "
-    "A eventual diferença de tamanho entre os arquivos decorre apenas da "
-    "compressão dos fluxos do PDF, que se dá sem perda.",
-    "O texto acrescentado é invisível e situa-se atrás da imagem: a "
-    "leitura do documento continua sendo a do original digitalizado. A "
-    "camada de texto serve à pesquisa, à seleção e à cópia, e não "
-    "substitui o que está escrito na imagem.",
+    "O texto acrescentado é invisível e fica sobreposto à imagem, na "
+    "mesma posição das palavras: a leitura do documento continua sendo a "
+    "do original digitalizado. A camada de texto serve à pesquisa, à "
+    "seleção e à cópia, e não substitui o que está escrito na imagem.",
     "O reconhecimento óptico é automático e sujeito a erro, sobretudo em "
     "manuscritos, carimbos, documentos de baixa qualidade e algarismos. "
     "Divergência entre o texto pesquisável e a imagem resolve-se sempre "
@@ -551,6 +620,40 @@ RESSALVAS = (
     "não permite concluir pela inexistência do termo procurado no "
     "original.",
 )
+
+
+def ressalvas_do(t) -> tuple:
+    """As ressalvas do termo, conforme o que de fato foi recebido.
+
+    A afirmação de que a imagem foi "preservada exatamente" é verdadeira
+    para o PDF e falsa para o arquivo de imagem, que é convertido: a
+    página é uma nova codificação dele, e os metadados não seguem. Saía
+    a mesma frase para os dois.
+    """
+    documentos = [d for d in getattr(t, "documentos", []) if not d.erro]
+    de_pdf = [d for d in documentos if not d.de_imagem]
+    de_imagem = [d for d in documentos if d.de_imagem]
+    linhas = []
+    if de_pdf or not documentos:
+        linhas.append(RESSALVA_PDF)
+    if de_imagem:
+        nomes = ", ".join(d.nome for d in de_imagem)
+        feito = []
+        for d in de_imagem:
+            feito += [a for a in d.adaptacoes if a not in feito]
+        frase = (
+            f"Os arquivos recebidos como imagem ({nomes}) foram convertidos "
+            "em PDF. O documento gerado a partir deles é derivado, e não "
+            "cópia: a imagem foi recodificada, sem perda, em nova página.")
+        if feito:
+            frase += " Na conversão, " + "; ".join(feito) + "."
+        frase += (
+            " Os metadados da imagem — entre eles a data, o aparelho e a "
+            "localização, quando existirem — não seguem para o documento "
+            "gerado: permanecem no arquivo recebido, identificado pelo "
+            "resumo consignado acima, que deve ser preservado.")
+        linhas.append(frase)
+    return tuple(linhas) + RESSALVAS
 
 
 @dataclass
@@ -705,7 +808,7 @@ def build_html(t: TermoOCR) -> str:
 
     partes.append('<p style="font-size:11pt;"><b>3. Ressalvas</b></p>')
     partes += [f'<p align="justify" style="font-size:10.5pt; '
-               f'line-height:150%;">{e(linha)}</p>' for linha in RESSALVAS]
+               f'line-height:150%;">{e(linha)}</p>' for linha in ressalvas_do(t)]
 
     partes.append(f'<p align="justify" style="font-size:11pt; '
                   f'margin-top:18px;">{ENCERRAMENTO}</p>')
@@ -741,7 +844,7 @@ def build_text(t: TermoOCR) -> str:
                  + ", ".join(d.nome for d in t.falhos))
         L.append("")
     L += ["2. MÉTODO", ""] + [f"  - {linha}" for linha in t.opcoes.resumo()]
-    L += ["", "3. RESSALVAS", ""] + [f"  - {linha}" for linha in RESSALVAS]
+    L += ["", "3. RESSALVAS", ""] + [f"  - {linha}" for linha in ressalvas_do(t)]
     L += ["", ENCERRAMENTO, "", "_" * 40, t.nome,
           t.cargo]
     return "\n".join(L)
