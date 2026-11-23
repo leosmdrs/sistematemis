@@ -1,18 +1,14 @@
-GRAVAÇÃO DE TELA E EXTRAÇÃO REGISTRADA — gravar o monitor que não é o principal
+ATUALIZAÇÃO — o sistema passa a ser distribuído pelo GitLab da PRF
 
-A 1.15.1 resolveu a gravação no monitor principal, mas o outro monitor
-continuava recusado quando os dois estavam em escalas diferentes (por
-exemplo, o principal a 150% e o outro a 100%). Aparecia a janela "Não foi
-possível gravar", dizendo que a região ficou fora da área que o Windows
-mostrou ao codificador.
+Até a 1.15.2, o aviso de versão nova e o instalador vinham do GitHub. A
+partir desta versão, vêm de git.prf.gov.br, onde o código-fonte também
+passou a ficar.
 
-A causa era a mesma, num ponto que a correção anterior não alcançou: para
-saber onde fica cada monitor em pixels reais, o sistema procurava o
-monitor pelo nome, e o nome que chegava não era o que o Windows usa. Sem
-achar, voltava à conta antiga, que erra justamente no monitor de escala
-diferente da do principal. Agora o monitor é achado pela posição na tela,
-que não depende do nome.
+Nada muda no uso nem nas ferramentas: esta versão troca apenas o endereço
+que o sistema consulta ao abrir. A consulta continua a mesma — a leitura
+de um arquivo de versão, sem identificação do usuário nem da estação — e
+pode ser desligada em Sobre.
 
-Se a região ainda assim não puder ser aberta, a mensagem passa a trazer
-as medidas que o codificador informou, o que permite saber, de longe, o
-que aconteceu.
+Para receber as versões seguintes, a estação precisa alcançar
+git.prf.gov.br. Onde ele não responder, o sistema abre e funciona
+normalmente, só não avisa de versão nova.
