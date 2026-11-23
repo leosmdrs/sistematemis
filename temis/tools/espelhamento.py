@@ -772,6 +772,52 @@ class EspelhamentoTool(ToolPage):
                   self._e_objeto, self._op_observar, self._op_audio):
             w.setEnabled(not espelhando and not ocupado)
 
+    def _finalizar_ao_sair(self):
+        """Conclui a sessão em curso e espera o arquivo ficar pronto.
+
+        A faixa de identificação exige recodificar, o que numa sessão
+        longa leva minutos. Espera-se o que for preciso, com a janela
+        dizendo o que está acontecendo: prazo curto aqui era trocar a
+        gravação pela pressa de fechar.
+        """
+        from PyQt6.QtWidgets import QApplication, QProgressDialog
+
+        fio = self._encerramento
+        if fio is None:
+            fio = EncerrarThread(self._espelhador)
+            self._encerramento = fio
+        else:
+            try:
+                fio.concluido.disconnect(self._terminou)
+            except TypeError:
+                pass
+        desfecho = []
+        fio.concluido.connect(desfecho.append)
+        if not fio.isRunning() and not fio.isFinished():
+            fio.start()
+
+        aviso = QProgressDialog(
+            "Encerrando o espelhamento e gravando o arquivo…", None, 0, 0,
+            self)
+        aviso.setWindowTitle("Espelhamento de Celular")
+        aviso.setWindowModality(Qt.WindowModality.ApplicationModal)
+        aviso.setMinimumDuration(0)
+        aviso.show()
+        while fio.isRunning():
+            QApplication.processEvents()
+            fio.wait(50)
+        QApplication.processEvents()
+        aviso.close()
+
+        self._encerramento = None
+        self._espelhador = None
+        r = desfecho[0] if desfecho else None
+        if r is not None and r.erro:
+            QMessageBox.critical(self, "A sessão falhou", r.erro)
+        elif r is not None and r.arquivo:
+            self.status_msg.emit(
+                f"Sessão encerrada ao sair: {Path(r.arquivo).name}")
+
     # ── ciclo de vida ────────────────────────────
     def can_close(self) -> bool:
         if self._espelhador is not None:
@@ -781,17 +827,22 @@ class EspelhamentoTool(ToolPage):
                 "Deseja encerrar e sair?")
             if resposta != QMessageBox.StandardButton.Yes:
                 return False
-            self._encerrar()
+            # Só a resposta. Encerrar fica para o `shutdown`, que só é
+            # chamado depois de todas as ferramentas concordarem em
+            # fechar: encerrando aqui, bastava outra ferramenta recusar
+            # para o programa seguir aberto com esta sessão já terminada.
         return True
 
     def shutdown(self):
         self._pulso.stop()
         if self._espelhador is not None:
-            self._espelhador.cancelar()
-            self._espelhador = None
-        for t in (self._procura, self._encerramento):
-            if t is not None and t.isRunning():
-                t.wait(6000)
+            # Fechar o programa **encerra** a sessão — fecha o arquivo,
+            # aplica a faixa e o deixa na pasta. Aqui se chamava o
+            # cancelamento, que apaga a gravação: quem confirmava
+            # "encerrar e sair" perdia a diligência inteira, sem aviso.
+            self._finalizar_ao_sair()
+        if self._procura is not None and self._procura.isRunning():
+            self._procura.wait(6000)
         # O adb deixa um processo de fundo residente; encerrá-lo evita
         # deixar no computador um serviço que ninguém pediu.
         core.encerrar_servidor()

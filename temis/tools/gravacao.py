@@ -962,7 +962,10 @@ class GravacaoTool(ToolPage):
                 "Deseja encerrar a gravação e sair?")
             if resposta != QMessageBox.StandardButton.Yes:
                 return False
-            self._encerrar()
+            # Só a resposta: quem encerra é o `shutdown`, chamado depois
+            # de todas as ferramentas concordarem em fechar. Encerrando
+            # aqui, bastava outra recusar para o programa seguir aberto
+            # com a gravação já terminada.
         return True
 
     def shutdown(self):

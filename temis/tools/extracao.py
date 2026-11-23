@@ -977,13 +977,19 @@ class ExtracaoTool(ToolPage):
                 "Deseja encerrar e sair?")
             if resposta != QMessageBox.StandardButton.Yes:
                 return False
-            self._encerrar_sessao()
+            # Só a resposta: quem encerra é o `shutdown`, chamado depois
+            # de todas as ferramentas concordarem em fechar.
         return True
 
     def shutdown(self):
         self._pulso.stop()
         if self._gravador is not None:
-            self._gravador.encerrar()
+            video = self._gravador.encerrar()
             self._gravador = None
+            if self._sessao is not None:
+                if video.erro:
+                    self._sessao.erros.append(f"gravação: {video.erro}")
+                else:
+                    self._sessao.video = video
         if self._sessao is not None and self._sessao.ativa:
             self._sessao.encerrar()
