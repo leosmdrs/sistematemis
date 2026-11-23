@@ -85,6 +85,7 @@ def rotulo_qualidade(chave: str) -> str:
 
 def versao() -> str:
     try:
+        _sem_plugins()
         import yt_dlp
         return str(yt_dlp.version.__version__)
     except Exception:                                       # noqa: BLE001
@@ -254,6 +255,7 @@ def sondar(url: str) -> Publicacao:
     e para que erro de endereço apareça como recado, e não como diligência
     perdida no meio.
     """
+    _sem_plugins()
     import yt_dlp
 
     opcoes = {"quiet": True, "no_warnings": True, "skip_download": True,
@@ -349,6 +351,20 @@ def explicar_falha(erro: str) -> str:
     return (limpo or "a captura falhou, e a biblioteca não disse por quê") + sufixo
 
 
+def _sem_plugins() -> None:
+    """Impede a biblioteca de carregar código das pastas do usuário.
+
+    Usada como programa, ela procura *plugins* em pastas do perfil de
+    quem a executa e os carrega sem perguntar — é recurso dela. Embutida
+    aqui, isso seria executar, dentro do Têmis, qualquer arquivo que
+    outro programa tivesse deixado numa dessas pastas. A variável é a
+    chave que a própria biblioteca oferece para desligar a procura, e
+    tem de estar posta antes de ela ser importada.
+    """
+    import os
+    os.environ["YTDLP_NO_PLUGINS"] = "1"
+
+
 def marca_da_captura(pasta, agora=None) -> str:
     """Data e hora para o nome do arquivo, sem repetir na pasta.
 
@@ -375,6 +391,7 @@ def baixar(url: str, pasta, qualidade: str = "melhor",
     disco, e do relógio qualificado do sistema — é o instante em que se
     passou a ter o material, que é o que a peça declara.
     """
+    _sem_plugins()
     import yt_dlp
 
     from ..relogio import carimbo

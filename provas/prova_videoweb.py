@@ -565,5 +565,38 @@ class OTermoConfereOArquivoQueCita(unittest.TestCase):
         self.assertIn("ATENÇÃO", termo.ressalvas[0])
 
 
+class ABibliotecaNaoCarregaCodigoDoPerfilDoUsuario(unittest.TestCase):
+
+    def test_a_procura_de_plugins_e_desligada_antes_do_uso(self):
+        import os
+        try:
+            import yt_dlp.plugins as plugins
+        except ImportError:
+            self.skipTest("yt-dlp não está instalado")
+        guardado = os.environ.pop("YTDLP_NO_PLUGINS", None)
+
+        def repor():
+            if guardado is None:
+                os.environ.pop("YTDLP_NO_PLUGINS", None)
+            else:
+                os.environ["YTDLP_NO_PLUGINS"] = guardado
+
+        self.addCleanup(repor)
+        vc._sem_plugins()
+        self.assertEqual(os.environ.get("YTDLP_NO_PLUGINS"), "1")
+        # A chave é a que a biblioteca de fato consulta.
+        import inspect
+        self.assertIn("YTDLP_NO_PLUGINS", inspect.getsource(plugins))
+
+    def test_toda_importacao_da_biblioteca_vem_depois_de_desligar(self):
+        import inspect
+        linhas = inspect.getsource(vc).splitlines()
+        importacoes = [i for i, l in enumerate(linhas)
+                       if l.strip() == "import yt_dlp"]
+        self.assertTrue(importacoes)
+        for i in importacoes:
+            self.assertEqual(linhas[i - 1].strip(), "_sem_plugins()")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

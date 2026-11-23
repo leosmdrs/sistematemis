@@ -73,6 +73,9 @@ def _calar_telemetria():
     os.environ["DISABLE_TELEMETRY"] = "1"
     os.environ["DO_NOT_TRACK"] = "1"
     os.environ["HF_HUB_USER_AGENT_ORIGIN"] = "SistemaTemis"
+    # O baixador de vídeo, usado como biblioteca, carregaria código das
+    # pastas de plugins do perfil do usuário. Aqui não carrega.
+    os.environ["YTDLP_NO_PLUGINS"] = "1"
 
 
 def main() -> int:
