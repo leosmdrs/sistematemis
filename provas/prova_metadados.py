@@ -130,5 +130,53 @@ class OArquivoExaminadoNaoDecideQuantaMemoriaSeGasta(unittest.TestCase):
         self.assertEqual(dados["revision"], "3")
 
 
+class ADataVaiComOFuso(unittest.TestCase):
+    """Hora sem fuso, numa peça, é lida como hora local."""
+
+    def test_data_do_office_em_utc_e_dita_como_utc(self):
+        self.assertEqual(mc._data_iso("2026-03-10T14:30:00Z"),
+                         "10/03/2026 às 14:30:00 (UTC)")
+
+    def test_data_com_desvio_o_conserva(self):
+        self.assertEqual(mc._data_iso("2026-03-10T11:30:00-03:00"),
+                         "10/03/2026 às 11:30:00 (UTC-03:00)")
+
+    def test_data_sem_fuso_diz_que_nao_ha(self):
+        self.assertIn("fuso não informado",
+                      mc._data_iso("2026-03-10T14:30:00"))
+
+    def test_data_do_pdf(self):
+        self.assertEqual(mc._data_pdf("D:20260310143000Z"),
+                         "10/03/2026 às 14:30:00 (UTC)")
+        self.assertEqual(mc._data_pdf("D:20260310113000-03'00'"),
+                         "10/03/2026 às 11:30:00 (UTC-03:00)")
+        self.assertIn("fuso não informado", mc._data_pdf("D:20260310143000"))
+
+    def test_data_do_sistema_de_arquivos_traz_o_fuso_da_estacao(self):
+        self.assertRegex(mc._data_br(1_700_000_000),
+                         r"\(UTC([+-]\d{2}:\d{2})?\)$")
+
+    def test_foto_com_e_sem_fuso_no_exif(self):
+        import tempfile
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as pasta:
+            for desvio, esperado in (("-03:00", "(UTC-03:00)"),
+                                     (None, "fuso não informado")):
+                alvo = Path(pasta) / f"foto{desvio or 'sem'}.jpg".replace(
+                    ":", "")
+                imagem = Image.new("RGB", (8, 8))
+                exif = imagem.getexif()
+                ifd = exif.get_ifd(0x8769)
+                ifd[0x9003] = "2026:03:10 11:30:00"      # DateTimeOriginal
+                if desvio:
+                    ifd[0x9011] = desvio                 # OffsetTimeOriginal
+                imagem.save(alvo, exif=exif)
+                campos = {c.rotulo: c.valor for c in mc._de_imagem(alvo)}
+                with self.subTest(desvio):
+                    self.assertIn(esperado, campos["Data da captura"])
+                    self.assertIn("10/03/2026 às 11:30:00",
+                                  campos["Data da captura"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

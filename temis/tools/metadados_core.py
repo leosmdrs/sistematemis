@@ -226,11 +226,37 @@ def formatar_tamanho(n: int) -> str:
     return f"{n} bytes"
 
 
+SEM_FUSO = "fuso não informado no arquivo"
+
+
+def _fuso(quando: datetime.datetime) -> str:
+    """O fuso de uma data, escrito como vai na peça."""
+    desvio = quando.utcoffset()
+    if desvio is None:
+        return SEM_FUSO
+    minutos = int(desvio.total_seconds() // 60)
+    if minutos == 0:
+        return "UTC"
+    sinal = "+" if minutos > 0 else "-"
+    horas, resto = divmod(abs(minutos), 60)
+    return f"UTC{sinal}{horas:02d}:{resto:02d}"
+
+
 def _data_br(quando) -> str:
+    """Data e hora, sempre com o fuso dito.
+
+    Hora sem fuso numa peça é lida como hora local. A data de um
+    documento do Office vem em UTC, e saía sem essa indicação: três
+    horas de diferença em Brasília, numa apuração em que a hora é o que
+    se discute. Quando o arquivo não informa o fuso, a peça diz que não
+    informa.
+    """
     if isinstance(quando, (int, float)):
-        quando = datetime.datetime.fromtimestamp(quando)
+        # Data do sistema de arquivos: é a hora desta estação.
+        quando = datetime.datetime.fromtimestamp(quando).astimezone()
     if isinstance(quando, datetime.datetime):
-        return quando.strftime("%d/%m/%Y às %H:%M:%S")
+        return (quando.strftime("%d/%m/%Y às %H:%M:%S")
+                + f" ({_fuso(quando)})")
     return str(quando)
 
 
@@ -247,7 +273,11 @@ def _data_pdf(texto: str) -> str:
     ano, mes, dia, hora, minuto, seg = (p or "00" for p in m.groups())
     fuso = texto[m.end():].strip().replace("'", ":").rstrip(":")
     base = f"{dia}/{mes}/{ano} às {hora}:{minuto}:{seg}"
-    return f"{base} (UTC{fuso})" if fuso and fuso not in ("Z", "") else base
+    if fuso == "Z" or fuso in ("+00:00", "-00:00", "+00", "-00"):
+        return f"{base} (UTC)"
+    if re.fullmatch(r"[+-]\d{2}(:\d{2})?", fuso):
+        return f"{base} (UTC{fuso})"
+    return f"{base} ({SEM_FUSO})"
 
 
 def _data_iso(texto: str) -> str:
@@ -334,6 +364,13 @@ def _de_pdf(caminho: Path) -> list[Campo]:
 #  IMAGEM (EXIF)
 # ─────────────────────────────────────────
 
+#: Onde o EXIF guarda o fuso de cada uma das suas datas.
+_DESVIO_EXIF = {
+    "DateTimeOriginal": "OffsetTimeOriginal",
+    "DateTimeDigitized": "OffsetTimeDigitized",
+    "DateTime": "OffsetTime",
+}
+
 #: Etiquetas EXIF que interessam, com o grupo e o destaque de cada uma.
 _EXIF = {
     "Make": ("Fabricante do equipamento", "Origem", True),
@@ -416,6 +453,16 @@ def _de_imagem(caminho: Path) -> list[Campo]:
             if etiqueta.startswith("DateTime"):
                 texto = re.sub(r"^(\d{4}):(\d{2}):(\d{2})",
                                r"\3/\2/\1 às", texto)
+                # A hora do EXIF é a do relógio do aparelho. O fuso vem
+                # em campo à parte, quando vem.
+                desvio = str(legivel.get(
+                    _DESVIO_EXIF.get(etiqueta, ""), "") or "").strip()
+                if re.fullmatch(r"[+-]\d{2}:\d{2}", desvio):
+                    texto += (" (UTC)" if desvio in ("+00:00", "-00:00")
+                              else f" (UTC{desvio})")
+                else:
+                    texto += (" (hora do relógio do aparelho; "
+                              + SEM_FUSO + ")")
             campos.append(Campo(rotulo, texto, grupo, relevante))
 
         campos += _gps(bruto, nomes)
