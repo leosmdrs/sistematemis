@@ -160,7 +160,9 @@ def main() -> int:
     if args.conferir:
         print("Conferido. Seria enviado:")
         for arquivo in (instalador, manifesto):
-            print(f"  {arquivo}  →  "
+            # Sem seta: o console do Windows em cp1252 não a imprime, e o
+            # script morria justamente na hora de mostrar o que faria.
+            print(f"  {arquivo}\n    para "
                   f"{endereco_pacote(args.repositorio, args.versao, arquivo.name)}")
         print(json.dumps(corpo, ensure_ascii=False, indent=2))
         return 0
