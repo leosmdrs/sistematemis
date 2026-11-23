@@ -469,5 +469,91 @@ class ATela(Base):
         self.assertEqual(rotulos["Páginas do resultado"], "6")
 
 
+class ConteudoDeCamadaDesligadaNaoVemATona(Base):
+    """O que o original esconde não aparece na peça produzida.
+
+    Texto posto em camada opcional desligada não é exibido no documento
+    de origem. A montagem do resultado copiava as páginas sem a
+    configuração das camadas, e o texto passava a aparecer — numa peça
+    que o termo atestava como fiel ao original.
+    """
+
+    def com_camada(self, nome="camadas.pdf"):
+        doc = fitz.open()
+        pagina = doc.new_page()
+        oculta = doc.add_ocg("rascunho", on=False)
+        pagina.insert_text((72, 100), "TEXTO OCULTO", oc=oculta)
+        pagina.insert_text((72, 200), "texto visível")
+        alvo = str(self.dir / nome)
+        doc.save(alvo)
+        doc.close()
+        return alvo
+
+    def test_a_camada_desligada_e_reconhecida(self):
+        doc = fitz.open(self.com_camada())
+        self.assertEqual(pc.camadas_desligadas(doc), ["rascunho"])
+        doc.close()
+
+    def test_as_tres_operacoes_recusam_e_dizem_por_que(self):
+        origem = self.com_camada()
+        for operacao, parametros in (("mesclar", {}),
+                                     ("separar", {"paginas": [0]}),
+                                     ("comprimir", {"nivel": ""})):
+            with self.subTest(operacao):
+                with self.assertRaises(RuntimeError) as erro:
+                    pc.executar(operacao, [origem], parametros)
+                self.assertIn("camada desligada", str(erro.exception))
+                self.assertIn("rascunho", str(erro.exception))
+
+    def test_documento_sem_camada_desligada_segue_normal(self):
+        doc = fitz.open()
+        pagina = doc.new_page()
+        ligada = doc.add_ocg("visivel", on=True)
+        pagina.insert_text((72, 100), "texto", oc=ligada)
+        alvo = str(self.dir / "ligada.pdf")
+        doc.save(alvo)
+        doc.close()
+        producao = pc.executar("mesclar", [alvo], {})
+        self.assertTrue(producao.paginas_intactas)
+        producao.documento.close()
+
+
+class ARessalvaSegueAConferencia(unittest.TestCase):
+    """A peça só afirma igualdade quando a conferência a constatou."""
+
+    def roteiro(self, operacao, intactas, nivel=""):
+        from types import SimpleNamespace
+        return SimpleNamespace(operacao=operacao, paginas_intactas=intactas,
+                               parametros={"nivel": nivel})
+
+    def ressalvas(self, *a, **k):
+        from temis.tools.pdf import PDFTool
+        return " ".join(PDFTool.ressalvas_da_operacao(self.roteiro(*a, **k)))
+
+    def sem_perda(self):
+        return next(n.chave for n in pc.NIVEIS if not n.com_perda)
+
+    def test_compactacao_sem_perda_que_divergiu_nao_atesta_igualdade(self):
+        texto = self.ressalvas("comprimir", False, self.sem_perda())
+        self.assertNotIn("resumo idêntico", texto)
+        self.assertIn("conferência acusou", texto)
+
+    def test_compactacao_sem_perda_que_conferiu_atesta(self):
+        texto = self.ressalvas("comprimir", True, self.sem_perda())
+        self.assertIn("resumo idêntico", texto)
+
+    def test_mesclagem_divergente_e_dita_como_tal(self):
+        texto = self.ressalvas("mesclar", False)
+        self.assertNotIn("resumo idêntico", texto)
+        self.assertIn("ATENÇÃO", texto)
+
+    def test_toda_peca_diz_o_que_a_conferencia_cobre(self):
+        for operacao, intactas in (("mesclar", True), ("separar", False),
+                                   ("comprimir", True)):
+            texto = self.ressalvas(operacao, intactas, self.sem_perda())
+            self.assertIn("Não cobre a camada de texto", texto)
+            self.assertIn("anotações", texto)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

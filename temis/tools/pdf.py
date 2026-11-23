@@ -528,7 +528,20 @@ class PDFTool(ToolPage):
     RESSALVA_INTACTAS = (
         "Cada página do documento produzido tem resumo idêntico ao da "
         "página de origem correspondente: a operação reordenou e reuniu "
-        "páginas, sem alterar nenhuma delas.")
+        "páginas, sem alterar o que nenhuma delas exibe.")
+    #: O que a conferência das páginas cobre — vale para toda operação.
+    RESSALVA_ALCANCE = (
+        "O resumo de cada página é tomado da imagem dela, renderizada a "
+        f"{pc.DPI_CONFERENCIA} pontos por polegada: atesta o que a página "
+        "exibe nessa resolução. Não cobre a camada de texto pesquisável, "
+        "as anotações, os campos de formulário nem os arquivos anexados "
+        "ao documento. Os metadados e os anexos do original não seguem "
+        "para o documento produzido.")
+    RESSALVA_DIVERGENTE = (
+        "ATENÇÃO — a conferência acusou página do documento produzido que "
+        "não exibe o mesmo que a página de origem correspondente. A "
+        "operação não deveria alterar páginas, e a divergência deve ser "
+        "examinada antes de o documento ser juntado.")
     RESSALVA_COM_PERDA = (
         "A compactação foi feita com perda: as imagens do documento foram "
         "reamostradas, e por isso as páginas produzidas diferem das "
@@ -541,6 +554,38 @@ class PDFTool(ToolPage):
         "supérfluos e recomprimiram-se os fluxos, sem tocar nas imagens. "
         "Cada página do documento produzido tem resumo idêntico ao da "
         "página original.")
+    #: A mesma compactação, quando a conferência não confirmou o que a
+    #: ressalva acima afirma. Já saiu a de cima mesmo assim.
+    RESSALVA_SEM_PERDA_DIVERGENTE = (
+        "A compactação foi pedida sem perda, mas a conferência acusou "
+        "página do documento produzido que não exibe o mesmo que a "
+        "original. A divergência deve ser examinada antes de o documento "
+        "ser juntado.")
+
+    @classmethod
+    def ressalvas_da_operacao(cls, r) -> list:
+        """As ressalvas que dependem do que a conferência constatou.
+
+        A afirmação de que as páginas são idênticas só sai quando a
+        conferência a confirmou. Já saiu pela operação pedida, sem olhar
+        o resultado: a compactação "sem perda" atestava igualdade mesmo
+        com a conferência acusando a página divergente.
+        """
+        ressalvas = []
+        if r.operacao == "comprimir":
+            nivel = pc.nivel_por_chave(r.parametros.get("nivel", ""))
+            if nivel.com_perda:
+                ressalvas.append(cls.RESSALVA_COM_PERDA)
+            elif r.paginas_intactas:
+                ressalvas.append(cls.RESSALVA_SEM_PERDA)
+            else:
+                ressalvas.append(cls.RESSALVA_SEM_PERDA_DIVERGENTE)
+        elif r.paginas_intactas:
+            ressalvas.append(cls.RESSALVA_INTACTAS)
+        else:
+            ressalvas.append(cls.RESSALVA_DIVERGENTE)
+        ressalvas.append(cls.RESSALVA_ALCANCE)
+        return ressalvas
 
     def _detalhes_do_termo(self) -> list:
         r = self._roteiro
@@ -601,12 +646,7 @@ class PDFTool(ToolPage):
         situacao, resumo, explicacao, item = dados
         r = self._roteiro
         ressalvas = list(self.RESSALVAS)
-        if r.operacao == "comprimir":
-            nivel = pc.nivel_por_chave(r.parametros.get("nivel", ""))
-            ressalvas.append(self.RESSALVA_COM_PERDA if nivel.com_perda
-                             else self.RESSALVA_SEM_PERDA)
-        elif r.paginas_intactas:
-            ressalvas.append(self.RESSALVA_INTACTAS)
+        ressalvas.extend(self.ressalvas_da_operacao(r))
         ressalvas.append(pc.frase_reproducao(situacao, resumo, explicacao))
 
         termo = derivado.TermoDerivado(

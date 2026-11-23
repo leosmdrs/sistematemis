@@ -296,6 +296,16 @@ class Producao:
             self.documento = None
 
 
+def camadas_desligadas(doc) -> list:
+    """Os nomes das camadas opcionais que o documento traz desligadas."""
+    try:
+        camadas = doc.get_ocgs() or {}
+    except Exception:                                       # noqa: BLE001
+        return []
+    return [str(c.get("name") or "sem nome") for c in camadas.values()
+            if not c.get("on", True)]
+
+
 def _abrir(caminho):
     doc = fitz.open(str(caminho))
     if doc.needs_pass:
@@ -303,6 +313,20 @@ def _abrir(caminho):
         raise RuntimeError(
             f"{Path(caminho).name} está protegido por senha e não pôde ser "
             "aberto.")
+    # Conteúdo em camada desligada não aparece no documento de origem. A
+    # montagem do resultado copia as páginas e perde a configuração das
+    # camadas: o que estava escondido passava a ser exibido, numa peça
+    # que seria atestada como fiel. Sem meio seguro de preservar a
+    # configuração, a operação é recusada e a razão é dita.
+    desligadas = camadas_desligadas(doc)
+    if desligadas:
+        doc.close()
+        raise RuntimeError(
+            f"{Path(caminho).name} tem conteúdo em camada desligada "
+            f"({', '.join(desligadas[:5])}). Nas operações desta "
+            "ferramenta esse conteúdo passaria a aparecer no documento "
+            "produzido, que deixaria de corresponder ao que o original "
+            "exibe. A operação não foi feita.")
     return doc
 
 

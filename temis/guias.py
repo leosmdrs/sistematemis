@@ -788,9 +788,14 @@ GUIAS: dict[str, Guia] = {
             "formato PDF guarda dentro de si dados que variam a cada "
             "gravação, e refazer a mesma operação gera arquivos de "
             "resumos diferentes ainda que o conteúdo seja o mesmo.",
-            "Mesclar e separar não alteram página alguma, e o termo "
-            "afirma isso por conferência: cada página do resultado tem "
-            "resumo idêntico ao da página de origem.",
+            "Mesclar e separar não alteram o que as páginas exibem, e o "
+            "termo afirma isso por conferência: compara a imagem de cada "
+            "página do resultado com a da página de origem. A conferência "
+            "não cobre camada de texto, anotações, formulários nem "
+            "anexos.",
+            "Documento com conteúdo em camada desligada é recusado: "
+            "nestas operações o que estava escondido passaria a aparecer "
+            "no resultado.",
             "Comprimir sem perda costuma ganhar pouco, ou nada, num "
             "arquivo já limpo — o ganho vem de reamostrar imagem. Nos "
             "graus com perda a redução é grande, e o custo é real: as "
