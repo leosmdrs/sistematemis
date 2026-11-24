@@ -140,7 +140,9 @@ def escrever_resumos(instalador: Path, versao: str) -> Path:
         if arquivo.is_file():
             linhas.append(f"{sha256(arquivo)}  SistemaTemis/{nome}")
     alvo = DIST / "SHA256SUMS.txt"
-    alvo.write_text("\n".join(linhas) + "\n", encoding="utf-8")
+    # Fim de linha LF mesmo no Windows: com CRLF, o `sha256sum -c` toma o
+    # \r como parte do nome do arquivo e diz que ele não existe.
+    alvo.write_text("\n".join(linhas) + "\n", encoding="utf-8", newline="\n")
     tamanho = instalador.stat().st_size
     print(f"\nresumos gravados em {alvo}:")
     print("\n".join(f"  {l}" for l in linhas))
