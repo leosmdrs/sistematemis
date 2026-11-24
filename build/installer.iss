@@ -7,8 +7,8 @@
 ; ─────────────────────────────────────────────────────────────
 
 #define AppName        "Sistema Têmis"
-#define AppVersion     "1.15.3"
-#define AppPublisher   "Leonardo Medeiros"
+#define AppVersion     "1.16.0"
+#define AppPublisher   "Corregedoria-Geral da Polícia Rodoviária Federal"
 #define AppExe         "SistemaTemis.exe"
 
 [Setup]

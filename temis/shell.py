@@ -21,11 +21,10 @@ from PyQt6.QtGui import (QColor, QKeySequence,
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFrame, QLabel, QVBoxLayout,
     QHBoxLayout, QStackedWidget, QPushButton, QScrollArea, QMessageBox,
-    QCheckBox, QDialog, QLineEdit,
+    QDialog, QLineEdit,
 )
 
-from . import (__appname__, __author__, __org__, __version__,
-               atualizacao, perfil)
+from . import __appname__, __author__, __org__, __version__, perfil
 from .icons import draw_icon, temis_pixmap, app_icon
 from .theme import PALETTE, stylesheet
 from .tools import REGISTRY, build_tool, ToolMeta
@@ -429,10 +428,6 @@ class PortalPage(QWidget):
                       else " acessam a rede.")
         for nome, o_que in acessos_acessorios():
             texto += f"  A {nome} {o_que}."
-        # A verificação de atualização é acesso à rede, e a promessa acima
-        # ficaria pela metade se ela não fosse dita no mesmo lugar.
-        texto += ("  Ao abrir, o sistema consulta se há versão nova, sem "
-                  "enviar identificação — desligável em Sobre.")
         privacy = QLabel(texto)
         privacy.setObjectName("subtext")
         privacy.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -796,7 +791,7 @@ class PerfilDialog(QDialog):
 # ─────────────────────────────────────────
 
 class SobreDialog(QDialog):
-    """Quem é o sistema, o que sai da máquina, e a atualização."""
+    """Quem é o sistema e o que sai da máquina."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -837,16 +832,16 @@ class SobreDialog(QDialog):
         # partir do registro: concorda em número e nomeia quem sai.
         if online:
             abertura = (
-                "O sistema acessa a rede nestas situações, "
-                "todas visíveis: "
+                "<p>O sistema acessa a rede só nestas situações, todas "
+                "visíveis: "
                 + ("a ferramenta " if len(online) == 1
                    else "as ferramentas ")
                 + enumerar(["<b>" + n + "</b>" for n in online])
                 + (", que abre " if len(online) == 1 else ", que abrem ")
                 + "num navegador dedicado o endereço que o operador "
-                  "indicar; e a ")
+                  "indicar.</p>")
         else:
-            abertura = "O sistema acessa a rede para a "
+            abertura = ""
         texto = QLabel(
             f"<p>Versão <b>{__version__}</b> — {disponiveis} de "
             f"{len(REGISTRY)} ferramentas disponíveis.</p>"
@@ -859,14 +854,15 @@ class SobreDialog(QDialog):
             "<p><b>Os arquivos não saem desta máquina.</b> Nenhum documento, "
             "hash ou metadado é enviado a servidor algum — tudo é lido e "
             "processado localmente.</p>"
-            "<p>" + abertura
-            + "<b>verificação de atualização</b>, que lê um arquivo de "
-            "versão e não envia identificação do usuário nem da estação.</p>"
+            + abertura
             + "".join(f"<p>A <b>{nome}</b> {o_que}.</p>"
                       for nome, o_que in acessos_acessorios())
+            + "<p><b>O sistema não se atualiza sozinho</b> nem consulta se "
+            "há versão nova. Quando sair uma, ela é comunicada por e-mail, "
+            "e o instalador é baixado e executado por quem o usa.</p>"
             +
             f"<p style='margin-top:12px;color:{PALETTE['text2']}'>"
-            f"Criado por <b style='color:{PALETTE['text']}'>{__author__}"
+            f"Projeto da <b style='color:{PALETTE['text']}'>{__author__}"
             "</b></p>")
         texto.setTextFormat(Qt.TextFormat.RichText)
         texto.setWordWrap(True)
@@ -874,50 +870,14 @@ class SobreDialog(QDialog):
         lay.addStretch()
         lay.addWidget(hsep())
 
-        prefs = atualizacao.ler_preferencias()
-        self._chk_auto = QCheckBox("Verificar atualizações ao abrir o sistema")
-        self._chk_auto.setChecked(prefs.verificar)
-        self._chk_auto.toggled.connect(self._alternar_verificacao)
-        lay.addWidget(self._chk_auto)
-
-        self._estado = QLabel("")
-        self._estado.setObjectName("subtext")
-        self._estado.setWordWrap(True)
-        lay.addWidget(self._estado)
-
         acoes = QHBoxLayout()
         acoes.setSpacing(8)
-        self._btn_verificar = QPushButton("  Verificar agora")
-        self._btn_verificar.setIcon(draw_icon("reload", 15, PALETTE["text"]))
-        self._btn_verificar.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._btn_verificar.clicked.connect(self._verificar)
-        acoes.addWidget(self._btn_verificar)
         acoes.addStretch()
         fechar = QPushButton("Fechar")
         fechar.setCursor(Qt.CursorShape.PointingHandCursor)
         fechar.clicked.connect(self.accept)
         acoes.addWidget(fechar)
         lay.addLayout(acoes)
-
-    def _alternar_verificacao(self, ligado: bool):
-        prefs = atualizacao.ler_preferencias()
-        prefs.verificar = ligado
-        try:
-            atualizacao.gravar_preferencias(prefs)
-        except OSError as e:
-            self._estado.setText(f"A preferência não pôde ser gravada: {e}")
-
-    def _verificar(self):
-        from .atualizacao_ui import verificar_agora
-        self._btn_verificar.setEnabled(False)
-        self._estado.setText("Consultando…")
-
-        def terminou(mensagem: str):
-            self._estado.setText(mensagem)
-            self._btn_verificar.setEnabled(True)
-
-        verificar_agora(self, terminou)
-
 
 class TemisWindow(QMainWindow):
 
@@ -1156,9 +1116,7 @@ class TemisWindow(QMainWindow):
     def _encerrar_tudo(self, avisar: bool = True):
         """Encerra as ferramentas e fecha o registro da sessão.
 
-        `avisar=False` é o fechamento para atualizar: o instalador vai
-        trocar os arquivos do programa, e uma janela à espera de clique —
-        ou o Explorer aberto na pasta da sessão — ficaria no caminho.
+        `avisar=False` fecha sem a janela que recomenda juntar o registro.
         """
         if getattr(self, "_ja_encerrado", False):
             return
@@ -1190,19 +1148,6 @@ class TemisWindow(QMainWindow):
                 self._recomendar_juntar_registro(destino, pasta_sessao)
             except Exception:                               # noqa: BLE001
                 pass
-
-    def fechar_para_atualizar(self) -> bool:
-        """Fecha tudo antes de o instalador ser iniciado. False = recusado.
-
-        O instalador era iniciado primeiro, e o programa pedia para
-        fechar depois: se o operador recusasse encerrar uma gravação ou
-        uma diligência, o programa seguia aberto com o instalador já
-        rodando, a trocar os arquivos por baixo dele.
-        """
-        if not self._pode_fechar():
-            return False
-        self._encerrar_tudo(avisar=False)
-        return True
 
     def closeEvent(self, ev):
         if getattr(self, "_ja_encerrado", False):

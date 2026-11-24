@@ -3,7 +3,7 @@ Prepara uma versão para publicação.
 
 Uso, a partir da raiz do projeto:
 
-    python build/publicar.py 1.1.0 --notas notas.txt
+    python build/publicar.py 1.1.0
 
 O que ele faz, nesta ordem:
 
@@ -12,30 +12,25 @@ O que ele faz, nesta ordem:
    mão é como nasce um instalador 1.1.0 que se apresenta como 1.0.0;
 2. compila o executável e (se o Inno Setup estiver instalado) o
    instalador;
-3. calcula o SHA-256 do instalador e escreve `dist/versao.json`.
+3. calcula o SHA-256 do instalador e dos arquivos do programa e o grava
+   em `dist/SHA256SUMS.txt`.
 
-Os dois arquivos a publicar são `dist/SistemaTemis-X.Y.Z-setup.exe` e
-`dist/versao.json`. O hash sai daqui justamente para não ser digitado: um
-hash errado no manifesto faz toda estação recusar a atualização — o que é
-o comportamento correto, e seria um enigma para quem estivesse do lado de
-lá.
+O que se distribui é `dist/SistemaTemis-X.Y.Z-setup.exe`. O sistema não
+se atualiza sozinho: a versão nova é anunciada por e-mail, com o resumo
+SHA-256 do instalador, e quem a recebe baixa e instala. O resumo sai daqui
+para não ser digitado: copiado à mão, um erro faria quem confere achar que
+o arquivo foi adulterado.
 """
 
 from __future__ import annotations
 
 import argparse
-import datetime
 import hashlib
-import json
 import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
-
-#: Mesmo endereço configurado em `temis/atualizacao.py`.
-SERVIDOR = "https://git.prf.gov.br"
-REPOSITORIO_PADRAO = "sistemas-nacionais/temis"
 
 RAIZ = Path(__file__).resolve().parents[1]
 DIST = RAIZ / "dist"
@@ -123,7 +118,7 @@ def compilar_instalador(versao: str) -> Path | None:
         iscc = Path(shutil.which("iscc"))
     if iscc is None:
         print("! Inno Setup não encontrado — compile build/installer.iss "
-              "manualmente e rode este script de novo com --so-manifesto")
+              "manualmente e rode este script de novo com --so-resumos")
         return None
     print("compilando o instalador…")
     subprocess.run([str(iscc), str(RAIZ / "build/installer.iss")],
@@ -131,92 +126,54 @@ def compilar_instalador(versao: str) -> Path | None:
     return DIST / f"SistemaTemis-{versao}-setup.exe"
 
 
-def escrever_manifesto(instalador: Path, versao: str, notas: str,
-                       repositorio: str, critica: bool, chave: str = ""):
-    # Endereço do anexo na release do GitLab. Existe porque o
-    # `publicar_gitlab.py` cadastra o instalador com este mesmo caminho, e
-    # tem de ser letra por letra o de `atualizacao.url_do_instalador`: a
-    # estação recusa manifesto que aponte para outro lugar.
-    url = (f"{SERVIDOR}/{repositorio}/-/releases/"
-           f"v{versao}/downloads/{instalador.name}")
-    manifesto = {
-        "versao": versao,
-        "publicado": datetime.date.today().strftime("%d/%m/%Y"),
-        "url": url,
-        "sha256": sha256(instalador),
-        "tamanho": instalador.stat().st_size,
-        "notas": notas,
-        "critica": critica,
-    }
-    # Os arquivos que são o programa, com os resumos que cada peça
-    # imprime. É contra estes que se confronta o que a peça declara.
-    componentes = {}
+def escrever_resumos(instalador: Path, versao: str) -> Path:
+    """Grava os resumos SHA-256 no formato do `sha256sum`.
+
+    O do instalador é o que vai no e-mail e na página de download, para
+    quem baixa conferir antes de executar. Os dos arquivos do programa
+    são os que cada peça imprime como procedência: é contra eles que se
+    confronta o que a peça declara.
+    """
+    linhas = [f"{sha256(instalador)}  {instalador.name}"]
     for nome in ("SistemaTemis.exe", "SistemaTemis.pkg"):
         arquivo = DIST / "SistemaTemis" / nome
         if arquivo.is_file():
-            componentes[nome] = sha256(arquivo)
-    if componentes:
-        manifesto["componentes"] = componentes
-    if chave:
-        # Publicação feita à mão, com a chave à mão: o manifesto já sai
-        # assinado. Na compilação pelo GitHub a chave não está lá, e a
-        # assinatura é feita depois (build/assinatura.py assinar).
-        sys.path.insert(0, str(RAIZ / "build"))
-        import assinatura
-        manifesto["assinatura"] = assinatura.assinar(
-            assinatura.ler_chave(chave), versao, manifesto["sha256"],
-            manifesto["tamanho"])
-    alvo = DIST / "versao.json"
-    alvo.write_text(json.dumps(manifesto, ensure_ascii=False, indent=2),
-                    encoding="utf-8")
-    print(f"\nmanifesto escrito em {alvo}")
-    print(json.dumps(manifesto, ensure_ascii=False, indent=2))
-    print(f"\nPublique estes dois arquivos na versão v{versao}:")
-    print(f"  {instalador}")
-    print(f"  {alvo}")
+            linhas.append(f"{sha256(arquivo)}  SistemaTemis/{nome}")
+    alvo = DIST / "SHA256SUMS.txt"
+    alvo.write_text("\n".join(linhas) + "\n", encoding="utf-8")
+    tamanho = instalador.stat().st_size
+    print(f"\nresumos gravados em {alvo}:")
+    print("\n".join(f"  {l}" for l in linhas))
+    print(f"\nInstalador da versão {versao} pronto para distribuir:")
+    print(f"  {instalador} ({tamanho} bytes)")
     print(f"\n  python build/publicar_gitlab.py {versao}")
+    return alvo
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Prepara uma versão para publicação")
     ap.add_argument("versao", help="Ex.: 1.1.0")
-    ap.add_argument("--notas", default="",
-                    help="Arquivo de texto com as novidades da versão")
-    ap.add_argument("--repositorio", default=REPOSITORIO_PADRAO,
-                    help="grupo/projeto no GitLab da PRF")
-    ap.add_argument("--chave", default="",
-                    help="Arquivo da chave de publicação, para o manifesto "
-                         "já sair assinado (publicação feita à mão)")
-    ap.add_argument("--critica", action="store_true",
-                    help="Marca a atualização como importante")
-    ap.add_argument("--so-manifesto", action="store_true",
-                    help="Não compila nada; só recalcula o versao.json")
+    ap.add_argument("--so-resumos", action="store_true",
+                    help="Não compila nada; só recalcula o SHA256SUMS.txt")
     args = ap.parse_args()
 
-    notas = ""
-    if args.notas:
-        notas = Path(args.notas).read_text(encoding="utf-8").strip()
-
     instalador = DIST / f"SistemaTemis-{args.versao}-setup.exe"
-    if not args.so_manifesto:
+    if not args.so_resumos:
         escrever_versao(args.versao)
         compilar_exe()
         compilado = compilar_instalador(args.versao)
         if compilado is not None:
             instalador = compilado
 
-        # ASSINATURA — quando houver certificado, o passo entra AQUI, antes
-        # do manifesto. Assinar altera o arquivo e portanto o seu SHA-256;
-        # assinar depois de escrever o versao.json faria toda estação
-        # recusar a atualização, com a mensagem certa e a causa
-        # indecifrável. Veja ASSINATURA.md.
+        # ASSINATURA — se um dia houver certificado de código, o passo
+        # entra AQUI, antes dos resumos: assinar altera o arquivo e
+        # portanto o seu SHA-256. Veja ASSINATURA.md.
 
     if not instalador.is_file():
         print(f"! instalador não encontrado em {instalador}")
         return 1
 
-    escrever_manifesto(instalador, args.versao, notas, args.repositorio,
-                       args.critica, args.chave)
+    escrever_resumos(instalador, args.versao)
     return 0
 
 

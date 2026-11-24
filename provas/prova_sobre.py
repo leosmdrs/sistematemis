@@ -68,7 +68,7 @@ class OSobreDizAVerdadeSobreARede(unittest.TestCase):
                 self.assertIn(o_que, self.texto)
 
     def test_nao_promete_que_os_acessos_sao_apenas_estes(self):
-        self.assertNotIn("apenas", self.texto.split("Criado por")[0]
+        self.assertNotIn("apenas", self.texto.split("Projeto da")[0]
                          .split("O sistema acessa a rede")[1])
 
     def test_concorda_em_numero_com_quantas_saem(self):

@@ -1,139 +1,24 @@
-# Publicar e atualizar o Sistema Têmis
+# Publicar uma versão do Sistema Têmis
 
-Como colocar o sistema à disposição dos servidores e como as versões
-seguintes chegam até eles.
-
----
-
-## Como funciona a atualização
-
-Ao abrir, alguns segundos depois de a janela aparecer, o sistema lê um
-arquivo `versao.json` num endereço fixo e compara com a versão instalada.
-
-- Se não houver nada novo, ou se a rede falhar, **nada aparece**. Quem
-  abriu o sistema quer trabalhar.
-- Havendo versão mais nova, abre uma janela com as novidades e três
-  saídas: **Atualizar agora**, **Agora não** e **Não avisar mais sobre
-  esta versão**. Nada é baixado antes do "sim".
-- Autorizado, o instalador é baixado, **conferido pelo SHA-256** que
-  consta do manifesto e só então executado. Se o arquivo não conferir, é
-  descartado e a instalação não acontece.
-
-- O manifesto **não escolhe de onde vem o instalador**: o endereço tem
-  de ser o da release daquela versão, neste repositório
-  (`releases/download/vX.Y.Z/SistemaTemis-X.Y.Z-setup.exe`). Qualquer
-  outro é recusado, assim como versão que não seja um número e
-  redirecionamento que saia do HTTPS.
-- O resumo é **conferido de novo no instante de executar**: o arquivo
-  fica em pasta do usuário, e entre o download e a execução poderia ser
-  trocado.
-
-A verificação pode ser desligada em **Sobre → Verificar atualizações ao
-abrir o sistema**. Nada é enviado da máquina: é a leitura de um arquivo
-estático, sem identificação do usuário nem da estação.
-
-### Desligar ou fixar a versão pela administração da estação
-
-A caixa do **Sobre** é do usuário. Para a equipe que administra as
-estações há uma chave de política, em local que o usuário comum não
-grava e que a política de grupo distribui:
-
-```
-HKEY_LOCAL_MACHINE\SOFTWARE\Policies\SistemaTemis
-  Atualizar      DWORD   0 desliga a consulta e a instalação por este canal
-  VersaoFixada   texto   ex.: 1.15.2 — nada acima disso é oferecido
-```
-
-Com `Atualizar = 0` o programa não consulta o manifesto ao abrir, e a
-verificação pedida no **Sobre** responde que o canal está desligado
-naquela estação. Sem a chave, vale o comportamento descrito acima.
-
-O que isto **não** resolve: enquanto o instalador não for assinado, a
-autenticidade do que é publicado continua dependendo de quem tem escrita
-no repositório. Ver `ASSINATURA.md`.
+Como uma versão nova chega a quem usa o sistema.
 
 ---
 
-## Assinatura do manifesto
+## Não há atualização automática
 
-Quem tem escrita no repositório publica um `versao.json`. Para que isso
-não baste para fazer um instalador chegar às estações, o anúncio de
-versão é **assinado** com uma chave que não está no repositório.
+O programa não consulta se existe versão nova, não baixa instalador e não
+se reinstala. A distribuição é manual:
 
-- A **chave privada** fica só com quem publica, fora do computador de
-  uso diário — num pendrive. É um arquivo de texto pequeno.
-- A **chave pública** vai embutida no programa, em
-  `temis/atualizacao.py` (`CHAVES_PUBLICAS`).
-- A assinatura cobre a **versão**, o **SHA-256** e o **tamanho** do
-  instalador. A estação recusa a atualização se ela faltar ou não
-  conferir. As notas da versão não são assinadas: alterá-las muda o
-  texto exibido, não o que é instalado.
+1. o instalador novo é publicado na página de Releases do projeto no
+   GitLab institucional (`git.prf.gov.br/sistemas-nacionais/temis`);
+2. quem usa o sistema recebe um **e-mail** avisando da versão, com o que
+   mudou, o endereço de download e o **resumo SHA-256** do instalador;
+3. a pessoa baixa, confere o resumo e instala por cima da versão
+   anterior. Os casos, o perfil e as sessões ficam onde estavam.
 
-Enquanto `CHAVES_PUBLICAS` estiver vazia, nada é exigido — é o estado
-de antes da primeira chave.
-
-### Uma vez: gerar as chaves
-
-Com o pendrive em `E:`, da raiz do projeto:
-
-```
-python build/assinatura.py gerar-chave E:\temis-publicacao.chave
-python build/assinatura.py gerar-chave F:\temis-reserva.chave
-```
-
-Cada comando grava a chave privada no arquivo indicado e registra a
-pública no programa. **Faça duas**, e guarde a de reserva em outro
-lugar: perdida a única chave, nenhuma estação volta a se atualizar sem
-reinstalação manual. Depois, faça o commit de `temis/atualizacao.py`.
-
-A exigência começa a valer **na estação** a partir da versão que levar
-a chave pública. Essa versão ainda chega pelo caminho antigo; as
-seguintes só chegam assinadas.
-
-### A cada versão: assinar
-
-O resumo da compilação ("Instalador") mostra o comando pronto, com a
-versão, o SHA-256 e o tamanho. Rode-o na sua máquina, com o pendrive:
-
-```
-python build/assinatura.py assinar --chave E:\temis-publicacao.chave --versao 1.16.0 --sha256 <resumo> --tamanho <bytes>
-```
-
-Ele imprime a assinatura. Cole-a no campo **assinatura** ao rodar
-"Publicar release". O fluxo a confere contra as chaves do programa antes
-de publicar, e a grava no `versao.json` da release.
-
-Antes de assinar, confira que o SHA-256 é o do instalador que você quer
-publicar: assinar é dizer às estações "podem instalar isto".
-
-### Se a chave vazar ou se perder
-
-- **Vazou:** gere outra, retire a antiga de `CHAVES_PUBLICAS` e publique
-  uma versão assinada com a de reserva. Enquanto essa versão não chegar
-  às estações, elas ainda aceitam a chave vazada.
-- **Perdeu-se a de uso:** assine com a de reserva, gere outra e
-  registre-a.
-- **Perderam-se as duas:** as estações precisam de reinstalação manual.
-
----
-
-## Dependências fixadas
-
-O `requirements.txt` diz o que o programa precisa, com versão mínima. O
-que entra no instalador é o `requirements.lock`: cada pacote com a versão
-exata e o resumo SHA-256 dos arquivos dele, para Windows x64 e Python
-3.12. A compilação instala com `--require-hashes` — pacote de versão ou
-de conteúdo diferente do relacionado é recusado.
-
-Atualizar uma biblioteca é ato deliberado: regenera-se o
-`requirements.lock` (o comando está no cabeçalho dele), confere-se o que
-mudou e testa-se antes de publicar. Sem isso, cada compilação pegava o
-que fosse mais novo naquele dia, e duas compilações do mesmo commit
-saíam diferentes.
-
-Cada release leva um `componentes.txt` com o que de fato entrou no
-instalador: a versão do Python e do OpenSSL, a origem do FFmpeg e do
-scrcpy, e todos os pacotes com as versões.
+Até a 1.15.2 havia uma consulta automática ao GitHub na abertura. Ela foi
+retirada do código: o sistema não abre conexão alguma sem ação do
+operador.
 
 ---
 
@@ -142,145 +27,95 @@ scrcpy, e todos os pacotes com as versões.
 Um comando só, da raiz do projeto:
 
 ```bash
-python build/publicar.py 1.1.0 --notas notas.txt
+python build/publicar.py 1.16.0
 ```
 
 Ele escreve a versão nos três arquivos que a declaram (`temis/__init__.py`,
 `build/installer.iss`, `build/version_info.txt`), compila o executável e o
-instalador, e gera `dist/versao.json` com o hash calculado.
+instalador, e grava `dist/SHA256SUMS.txt` com o resumo do instalador e dos
+arquivos do programa.
 
-O hash sai daí de propósito: digitado à mão, um erro faz **toda** estação
-recusar a atualização — comportamento correto, mas um enigma para quem
-estiver do outro lado.
+O resumo sai daí de propósito: copiado à mão para o e-mail, um erro de
+digitação faria quem confere achar que o arquivo foi adulterado.
 
-Ficam prontos dois arquivos em `dist/`:
+Ficam prontos em `dist/`:
 
-- `SistemaTemis-1.1.0-setup.exe`
-- `versao.json`
+- `SistemaTemis-1.16.0-setup.exe`
+- `SHA256SUMS.txt`
+
+As novidades da versão vão em `notas.txt`, que vira o texto da release e
+serve de base para o e-mail.
 
 ### Sem uma máquina montada: compilar no GitHub
 
-> Vale só para a cópia do código que ficou no GitHub. No GitLab da PRF
-> estes dois workflows não rodam, e o instalador que eles compilam sai
-> com o endereço de atualização que estiver no código daquele commit.
-
 O workflow **Instalador** (`.github/workflows/instalador.yml`) faz o mesmo
-que o `publicar.py` num Windows do próprio GitHub. Ele baixa o FFmpeg e o
-scrcpy das versões declaradas no `TERCEIROS.md` e confere cada um pelo
-SHA-256 antes de empacotar.
+que o `publicar.py` num Windows do GitHub, com as dependências fixadas no
+`requirements.lock`. Ele baixa o FFmpeg e o scrcpy das versões declaradas
+no `TERCEIROS.md` e confere cada um pelo SHA-256 antes de empacotar.
 
-1. Suba para o `main` o commit com a versão nova já escrita (o
-   `publicar.py` faz isso; ou edite os três arquivos) e o `notas.txt`.
-2. No GitHub: **Actions → Instalador → Run workflow**, informe a versão.
-   A execução recusa se ela não for a de `temis/__init__.py`.
-3. Ao fim (uns 30 a 50 minutos), baixe o artefato `SistemaTemis-X.Y.Z`:
-   traz o instalador e o `versao.json`. O resumo da execução mostra o
-   commit, o SHA-256 e o autoteste do pacote.
+1. Suba o commit com a versão nova já escrita nos três arquivos.
+2. **Actions → Instalador → Run workflow**, informe a versão. A execução
+   recusa se ela não for a de `temis/__init__.py`.
+3. Ao fim, baixe o artefato `SistemaTemis-X.Y.Z`: traz o instalador, o
+   `SHA256SUMS.txt` e a relação de componentes. O resumo da execução
+   mostra o commit, o SHA-256 e o autoteste do pacote.
 
-O workflow **não publica nada**. Para publicar, há dois caminhos:
-
-- à mão, pelo navegador, com a etiqueta apontando para o commit que o
-  resumo informa; ou
-- **Actions → Publicar release → Run workflow**, informando o número da
-  execução do Instalador (o do endereço `.../actions/runs/NÚMERO`). Ele
-  confere o SHA-256 do instalador contra o `versao.json`, confere a versão
-  no código daquele commit e cria a release `vX.Y.Z` apontando para ele,
-  com os dois anexos e as notas do manifesto.
-
-Publicar faz **todas** as estações receberem o aviso de atualização.
+O workflow não publica nada.
 
 ---
 
-## Publicar no GitLab da PRF
+## Publicar no GitLab
 
-A distribuição fica em `git.prf.gov.br/sistemas-nacionais/temis`. O
-endereço está em três lugares, que um teste mantém de acordo:
-`temis/atualizacao.py`, `build/publicar.py` e `build/publicar_gitlab.py`.
+Com um token pessoal de escopo `api` (papel Developer ou mais no projeto)
+na variável `GITLAB_TOKEN`:
 
-**A cada versão:**
+```bash
+python build/publicar_gitlab.py 1.16.0
+```
 
-1. Rode o `publicar.py`.
-2. Envie ao `main` o commit com a versão nova.
-3. Com um token pessoal de escopo `api` na variável `GITLAB_TOKEN`:
+Com `--conferir`, ele só mostra o que faria. O script confere o SHA-256
+do instalador contra o `SHA256SUMS.txt`, envia os dois arquivos ao
+registro de pacotes do projeto e cria a release `v1.16.0`, com as notas e
+o resumo no texto. No GitLab a release não guarda binário, só aponta para
+endereços; por isso o envio ao registro vem antes.
 
-   ```bash
-   python build/publicar_gitlab.py 1.1.0
-   ```
+O projeto é interno: a página de download pede o login institucional.
 
-   Com `--conferir`, ele só mostra o que faria.
+---
 
-O script confere o SHA-256 do instalador contra o `versao.json`, envia os
-dois arquivos ao registro de pacotes do projeto e cria a release `v1.1.0`
-com os dois anexos. No GitLab a release não guarda binário, só aponta
-para endereços; por isso o envio ao registro vem antes.
+## O e-mail da versão
 
-O que faz a atualização funcionar é o **caminho** de cada anexo
-(`/versao.json` e `/SistemaTemis-1.1.0-setup.exe`). É por ele que o
-endereço `releases/permalink/latest/downloads/versao.json` responde, e é
-nele que o manifesto aponta o instalador. Release criada à mão, pelo
-navegador, sem preencher esse campo, aparece na página e não é achada por
-estação nenhuma.
+Modelo:
 
-Não há nada a mexer no código a cada lançamento.
-
-### A versão da mudança sai nos dois lugares
-
-Até a 1.15.2 as estações liam o manifesto no GitHub
-(`leosmdrs/sistematemis`). A primeira versão com o endereço novo precisa
-ser publicada **também lá**, com o `versao.json` apontando o instalador
-para o GitHub: é a única forma de quem tem a versão antiga recebê-la.
-Depois dela, o GitHub deixa de ser consultado.
-
-### O projeto precisa responder sem login
-
-A estação consulta sem credencial, e é de propósito: nada identifica o
-usuário nem a máquina. Enquanto o projeto exigir login, a consulta recebe
-a página de entrada no lugar do manifesto e o sistema abre sem avisar de
-versão nova, em silêncio.
-
-Para funcionar, a visibilidade do projeto e a do registro de pacotes
-precisam permitir leitura anônima. Se o código não puder ficar aberto, a
-saída é manter **dois** projetos: o código em um restrito e apenas os
-artefatos — instalador e manifesto — em um de distribuição, aberto.
-
-O `git.prf.gov.br` responde em endereço da rede interna. Estação fora
-dela, sem VPN, também não recebe o aviso.
-
-### Quem pode escrever ali, pode instalar código nas estações
-
-Vale dizer sem rodeio: quem tiver acesso de escrita ao repositório de
-distribuição consegue fazer chegar um executável a todas as máquinas que
-usam o sistema. O SHA-256 protege contra arquivo corrompido ou adulterado
-no caminho, e o HTTPS contra interceptação — nenhum dos dois protege
-contra o repositório comprometido. Portanto: **2FA obrigatório** na conta,
-e acesso de escrita restrito a quem responde pelo sistema.
+> **Sistema Têmis 1.16.0 disponível**
+>
+> *(o que mudou, a partir do `notas.txt`)*
+>
+> Baixe em: `https://git.prf.gov.br/sistemas-nacionais/temis/-/releases/v1.16.0`
+>
+> Antes de instalar, confira o resumo do arquivo no PowerShell:
+> `Get-FileHash SistemaTemis-1.16.0-setup.exe -Algorithm SHA256`
+>
+> O resultado deve ser: `<SHA-256 do SHA256SUMS.txt>`
+>
+> Se não conferir, não instale e avise a Corregedoria-Geral.
 
 ---
 
 ## O aviso do Windows
 
-O instalador não é assinado, então o Windows vai reclamar:
+O instalador não é assinado — a instituição não dispõe de certificado de
+assinatura de código —, então o Windows avisa:
 
-- **SmartScreen** ("O Windows protegeu o seu PC") — clicar em *Mais
-  informações* → *Executar assim mesmo*. Some depois que o arquivo ganha
-  reputação.
-- **Smart App Control** — este **não** tem como contornar arquivo a
-  arquivo. Onde estiver ligado, a instalação é recusada de saída. Só sai
-  desligando o recurso na estação (o que exige reinstalação do Windows
-  para religar) ou assinando o executável.
+- **SmartScreen** ("O Windows protegeu o seu PC") — *Mais informações* →
+  *Executar assim mesmo*. Some depois que o arquivo ganha reputação.
+- **Smart App Control** — não tem exceção arquivo a arquivo. Onde estiver
+  ligado, a instalação pode ser recusada; tentar de novo minutos depois
+  costuma funcionar, porque a avaliação de reputação é assíncrona.
 
-A solução de verdade é um **certificado de assinatura de código**: resolve
-os dois avisos e dá autenticidade real à atualização, porque aí é o
-próprio Windows que verifica quem assinou antes de executar. Enquanto não
-houver, convém avisar quem for instalar que o alerta vai aparecer — para
-que ninguém aprenda a clicar em "executar assim mesmo" por hábito.
+Convém dizer no e-mail que o alerta vai aparecer, e que a conferência do
+SHA-256 é o que garante que o arquivo é o publicado — para que ninguém
+aprenda a clicar em "executar assim mesmo" sem conferir.
 
 Antivírus corporativo que ponha o programa em quarentena é outro caso,
 tratado em [ASSINATURA.md](ASSINATURA.md#antivírus-corporativo).
-
----
-
-## Primeira distribuição
-
-A primeira instalação é manual: as pessoas baixam o instalador da página
-de releases. Da segunda versão em diante, o próprio sistema avisa.

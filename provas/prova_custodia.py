@@ -336,7 +336,7 @@ class ORegistroDeAtividadesSeEncadeia(unittest.TestCase):
         from temis.tools import atividades_core as ac
         s = ac.Sessao(identificador="s1", versao=__version__,
                       inicio="2026-08-27T15:00:00-03:00",
-                      maquina={"estacao": "Leonardo"})
+                      maquina={"estacao": "ESTACAO-01"})
         s.usos.append(ac.Uso(chave="tarja", nome="Tarja Preta",
                              abriu="2026-08-27T15:00:10-03:00",
                              fechou="2026-08-27T15:04:00-03:00",

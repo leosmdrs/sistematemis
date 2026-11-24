@@ -62,7 +62,7 @@ compilação produziu.
 para refazer esta.
 
 ```bash
-git clone https://github.com/leosmdrs/sistematemis.git
+git clone https://git.prf.gov.br/sistemas-nacionais/temis.git
 cd sistematemis
 pip install -r requirements.txt
 ```

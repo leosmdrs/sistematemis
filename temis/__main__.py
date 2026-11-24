@@ -154,10 +154,8 @@ def main() -> int:
     win = TemisWindow()
     win.show()
 
-    # Depois de a janela aparecer: a consulta é discreta e não atrasa a
-    # abertura. Silenciosa quando não há novidade ou quando a rede falha.
-    from .atualizacao_ui import verificar_ao_abrir
-    verificar_ao_abrir(win)
+    # Não há verificação de atualização: a versão nova é comunicada por
+    # e-mail e instalada por quem usa, sem o programa consultar a rede.
 
     return app.exec()
 

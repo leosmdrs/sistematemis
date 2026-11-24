@@ -1,17 +1,16 @@
-"""Testes dos endereços de publicação.
+"""Testes da preparação e da publicação de uma versão.
 
-O atualizador, o manifesto e a release precisam concordar sobre onde cada
-arquivo fica. Cada um mora num arquivo diferente, e divergência entre eles
-não quebra nada à vista: a estação só deixa de achar a versão nova.
+Não há atualização automática: o que se publica é o instalador, com o
+resumo SHA-256 que quem baixa confere. Os testes cuidam de que esse
+resumo saia certo e chegue à release, e de que nenhum resto do antigo
+atualizador volte a entrar no programa.
 """
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
-import json
 from pathlib import Path
-
-from temis import atualizacao as at
 
 RAIZ = Path(__file__).resolve().parents[1]
 
@@ -28,47 +27,52 @@ publicar = _carregar("publicar")
 publicar_gitlab = _carregar("publicar_gitlab")
 
 
-def test_os_tres_arquivos_apontam_para_o_mesmo_projeto():
-    assert publicar.SERVIDOR == at.SERVIDOR == publicar_gitlab.SERVIDOR
-    assert (publicar.REPOSITORIO_PADRAO == at.REPOSITORIO
-            == publicar_gitlab.REPOSITORIO_PADRAO)
-
-
-def test_manifesto_e_lido_do_permalink_da_ultima_release():
-    assert at.URL_MANIFESTO == (
-        "https://git.prf.gov.br/sistemas-nacionais/temis"
-        "/-/releases/permalink/latest/downloads/versao.json")
-
-
-def test_manifesto_aponta_o_instalador_para_o_anexo_da_release(
-        monkeypatch, tmp_path):
+def test_resumos_saem_no_formato_do_sha256sum(monkeypatch, tmp_path):
     instalador = tmp_path / "SistemaTemis-9.9.9-setup.exe"
     instalador.write_bytes(b"instalador")
     monkeypatch.setattr(publicar, "DIST", tmp_path)
 
-    publicar.escrever_manifesto(instalador, "9.9.9", "notas",
-                                publicar.REPOSITORIO_PADRAO, False)
+    alvo = publicar.escrever_resumos(instalador, "9.9.9")
 
-    dados = json.loads((tmp_path / "versao.json").read_text(encoding="utf-8"))
-    assert dados["url"] == (
-        "https://git.prf.gov.br/sistemas-nacionais/temis"
-        "/-/releases/v9.9.9/downloads/SistemaTemis-9.9.9-setup.exe")
-    # A estação recusa manifesto cujo endereço não seja exatamente este.
-    assert dados["url"] == at.url_do_instalador("9.9.9")
-    assert at.de_dict(dados).valida
+    esperado = hashlib.sha256(b"instalador").hexdigest()
+    assert alvo.read_text(encoding="utf-8") == (
+        f"{esperado}  SistemaTemis-9.9.9-setup.exe\n")
+    assert publicar_gitlab.resumo_declarado(
+        alvo, "SistemaTemis-9.9.9-setup.exe") == esperado
+    assert not (tmp_path / "versao.json").exists()
 
 
-def test_release_cadastra_os_anexos_nos_caminhos_que_a_estacao_procura():
+def test_resumo_de_arquivo_ausente_e_vazio(tmp_path):
+    resumos = tmp_path / "SHA256SUMS.txt"
+    resumos.write_text("a" * 64 + "  outro.exe\n", encoding="utf-8")
+    assert publicar_gitlab.resumo_declarado(resumos, "SistemaTemis.exe") == ""
+
+
+def test_release_traz_o_resumo_e_os_dois_anexos():
     corpo = publicar_gitlab.corpo_release(
-        "sistemas-nacionais/temis", "9.9.9", "notas",
-        ["SistemaTemis-9.9.9-setup.exe", "versao.json"])
+        "sistemas-nacionais/temis", "9.9.9",
+        publicar_gitlab.descricao("Novidades.", "SistemaTemis-9.9.9-setup.exe",
+                                  "b" * 64),
+        ["SistemaTemis-9.9.9-setup.exe", "SHA256SUMS.txt"])
 
     assert corpo["tag_name"] == "v9.9.9"
-    caminhos = {a["direct_asset_path"] for a in corpo["assets"]["links"]}
-    # O fim do endereço do manifesto e o do instalador são estes caminhos.
-    assert at.URL_MANIFESTO.endswith("/downloads/versao.json")
-    assert caminhos == {"/versao.json", "/SistemaTemis-9.9.9-setup.exe"}
+    assert "b" * 64 in corpo["description"]
+    assert corpo["description"].startswith("Novidades.")
+    nomes = {a["name"] for a in corpo["assets"]["links"]}
+    assert nomes == {"SistemaTemis-9.9.9-setup.exe", "SHA256SUMS.txt"}
     for anexo in corpo["assets"]["links"]:
         assert anexo["url"].startswith(
             "https://git.prf.gov.br/api/v4/projects/"
             "sistemas-nacionais%2Ftemis/packages/generic/SistemaTemis/9.9.9/")
+
+
+def test_o_programa_nao_consulta_atualizacao():
+    """A garantia dada à análise de segurança, conferida no código."""
+    pacote = RAIZ / "temis"
+    assert not (pacote / "atualizacao.py").exists()
+    assert not (pacote / "atualizacao_ui.py").exists()
+    for arquivo in pacote.rglob("*.py"):
+        fonte = arquivo.read_text(encoding="utf-8")
+        assert "atualizacao" not in fonte.replace("desatualizacao", ""), arquivo
+        assert "versao.json" not in fonte, arquivo
+        assert "sistematemis/releases" not in fonte, arquivo

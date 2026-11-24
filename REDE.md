@@ -3,8 +3,8 @@
 Documento de resposta ao questionamento da DTIC sobre tráfego de rede,
 para instrução do processo de autorização de uso nas estações da PRF.
 
-Versão a que se refere: **1.15.0**.
-Código-fonte: <https://github.com/leosmdrs/sistematemis> (AGPL-3.0).
+Versão a que se refere: **1.16.0**.
+Código-fonte: <https://git.prf.gov.br/sistemas-nacionais/temis> (AGPL-3.0).
 
 Tudo o que segue é verificável no código-fonte, nos pontos indicados.
 
@@ -26,9 +26,10 @@ Das dezessete ferramentas do sistema, **catorze não acessam a rede em
 hipótese alguma**. As três que acessam estão assinaladas na própria
 interface e no README, e o que elas acessam é descrito no item 3.
 
-Existe ainda a verificação de atualização do próprio programa, e o
-download, por solicitação expressa do operador, dos modelos de
-reconhecimento de fala. Ambos são descritos adiante.
+Existe ainda o download, por solicitação expressa do operador, dos
+modelos de reconhecimento de fala, descrito adiante. O programa **não
+verifica nem baixa atualização**: versão nova chega por e-mail e é
+instalada por quem usa.
 
 **Em nenhum desses casos trafega conteúdo de arquivo do usuário.** O
 tráfego é de entrada — o sistema busca; não remete.
@@ -57,26 +58,14 @@ upload, de API externa, de envio de relatório ou de coleta de uso.
 
 ## 3. Endereços acessados
 
-### 3.1 Verificação de atualização
+### 3.1 Atualização do programa
 
-| | |
-|---|---|
-| **Endereço** | `https://git.prf.gov.br/sistemas-nacionais/temis/-/releases/permalink/latest/downloads/versao.json` |
-| **Host** | `git.prf.gov.br` (redireciona para o registro de pacotes do mesmo host). Até a 1.15.2 era `github.com` |
-| **Quando** | uma vez, na abertura do programa |
-| **Método** | GET |
-| **O que é enviado** | apenas o cabeçalho `User-Agent: SistemaTemis-atualizador` |
-| **O que é recebido** | arquivo JSON de até 64 KB com o número da versão mais recente, o endereço do instalador e o resumo SHA-256 dele |
-| **Código** | `temis/atualizacao.py` |
-
-O cabeçalho é fixo: **não leva versão instalada, nome de máquina, nome
-de usuário, domínio nem identificador algum**. A consulta tem limite de
-6 segundos e, falhando, o programa abre normalmente — atualizar é
-acessório.
-
-O download do instalador novo, quando há atualização, só ocorre se o
-operador clicar para atualizar, e o arquivo baixado é conferido pelo
-resumo SHA-256 declarado no manifesto antes de ser executado.
+**Não há.** O sistema não consulta se existe versão nova, não baixa
+instalador e não se reinstala. Versão nova é publicada no GitLab
+institucional (`git.prf.gov.br`) e comunicada por e-mail a quem usa o
+sistema, com o resumo SHA-256 do instalador; quem a recebe baixa e
+instala, como qualquer outro programa. Até a versão 1.15.2 havia uma
+consulta automática ao GitHub na abertura; ela foi retirada do código.
 
 ### 3.2 Modelos de reconhecimento de fala e de separação de locutores
 
@@ -190,7 +179,6 @@ estação ou de órgão. Os cabeçalhos são fixos:
 
 | Função | `User-Agent` |
 |---|---|
-| Verificação de atualização | `SistemaTemis-atualizador` |
 | Consulta RDAP | `SistemaTemis/RDAP` |
 | Modelos de locutor | `Temis` |
 | Modelos de fala | `unknown/None; hf_hub/<versão>; python/<versão>; origin/SistemaTemis` |
@@ -256,7 +244,6 @@ Caso a DTIC opte por restringir a saída das estações, estes são os
 
 | Host | Para quê | Bloqueando, o que acontece |
 |---|---|---|
-| `git.prf.gov.br` | verificação de atualização | o programa abre e funciona; não avisa de versão nova |
 | `github.com` | modelos de locutor | a separação de locutores fica indisponível |
 | `objects.githubusercontent.com` | entrega dos modelos de locutor | idem |
 | `huggingface.co`, `cdn-lfs.huggingface.co` | modelos de reconhecimento de fala | a Degravação fica indisponível até que os modelos sejam instalados por outro meio |
@@ -274,19 +261,19 @@ já tenham sido instalados.
 ## 7. Como conferir
 
 1. **Código-fonte aberto**, sob AGPL-3.0, em
-   <https://github.com/leosmdrs/sistematemis>. Os pontos citados neste
+   <https://git.prf.gov.br/sistemas-nacionais/temis>. Os pontos citados neste
    documento estão indicados por arquivo.
 2. **Levantamento independente**: os únicos pontos do programa capazes
-   de abrir conexão são os cinco listados no item 3. Podem ser
+   de abrir conexão são os quatro listados nos itens 3.2 a 3.5. Podem ser
    localizados por busca em `temis/` pelos termos `urlopen`,
    `urllib.request`, `socket.create_connection` e `snapshot_download`.
 3. **Autoteste embutido**: executando `SistemaTemis.exe --autoteste` num
    terminal, o programa relaciona seus componentes e grava o resultado
    em `%LOCALAPPDATA%\SistemaTemis\autoteste.txt`.
 4. **Observação de tráfego**: a instalação pode ser submetida a captura
-   de rede numa estação de teste. Fora da verificação de atualização na
-   abertura, nenhuma conexão parte do sistema sem ação do operador.
+   de rede numa estação de teste. Nenhuma conexão parte do sistema sem
+   ação do operador — nem na abertura.
 
 ---
 
-*Documento preparado em 16/10/2026, referente à versão 1.15.0.*
+*Documento preparado em 16/10/2026, referente à versão 1.15.0; revisto em 24/11/2026 para a 1.16.0, com a retirada da atualização automática.*

@@ -91,9 +91,9 @@ fica no HSM deles e nunca é manuseada por quem publica.
    Foundation** — é ela que aparece como signatária, não o autor.
 3. Ligar a assinatura ao fluxo de publicação: hoje o `build/publicar.py`
    compila e calcula o hash; o passo de assinatura entra entre a
-   compilação do instalador e a escrita do `versao.json`, porque **assinar
-   altera o arquivo e portanto o seu SHA-256**. Assinar depois de gerar o
-   manifesto faria todas as estações recusarem a atualização.
+   compilação do instalador e o cálculo dos resumos, porque **assinar
+   altera o arquivo e portanto o seu SHA-256**. Assinar depois faria o
+   resumo do e-mail não conferir com o arquivo.
 
 ## Alternativas, se a candidatura não prosperar
 

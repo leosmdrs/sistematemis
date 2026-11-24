@@ -7,20 +7,19 @@ conteúdo publicado na internet, degravação de oitivas, organização de
 evidências e montagem da Informação de juízo de admissibilidade.
 
 Os arquivos não saem da máquina: nenhum documento, hash ou metadado é
-enviado a servidor algum. Os acessos à rede são poucos e declarados: a
-verificação de atualização ao abrir — que lê um arquivo de versão, sem
-enviar identificação do usuário ou da estação, e pode ser desligada em
-**Sobre** —; as três ferramentas que existem para ir à rede (Constatação
+enviado a servidor algum, e o programa não se atualiza nem consulta a
+rede ao abrir. Os acessos à rede são poucos e declarados: as três
+ferramentas que existem para ir à rede (Constatação
 Web, Extração Registrada e Vídeo da Internet), que acessam o endereço
 que o operador indicar; e a Degravação, que na primeira vez baixa os
 modelos de reconhecimento de fala. O `REDE.md` relaciona cada um, com
 destino e conteúdo.
 
-## Autoria e vínculo
+## Vínculo institucional
 
-Escrito por **Leonardo Medeiros**, Policial Rodoviário Federal, por
-iniciativa e conta próprias. **Não é um produto oficial da Polícia
-Rodoviária Federal**, que não o encomendou, não o custeia e não o mantém.
+O Sistema Têmis é um projeto da **Corregedoria-Geral da Polícia
+Rodoviária Federal**, mantido no GitLab institucional
+(`git.prf.gov.br/sistemas-nacionais/temis`).
 
 O programa produz documentos destinados a procedimentos correcionais e por
 isso os apresenta no formato dessas peças, com o timbre que elas levam. O
@@ -66,9 +65,13 @@ está íntegro, o executável aceita:
 SistemaTemis.exe --autoteste
 ```
 
-Das versões seguintes em diante o próprio sistema avisa quando houver
-atualização, pede autorização, baixa e confere o SHA-256 antes de
-instalar.
+O sistema não se atualiza sozinho. Quando sair versão nova, ela é
+avisada por e-mail com o resumo SHA-256 do instalador; baixe-o da página
+de Releases, confira o resumo e instale por cima da versão anterior:
+
+```
+Get-FileHash SistemaTemis-X.Y.Z-setup.exe -Algorithm SHA256
+```
 
 ---
 
@@ -250,13 +253,13 @@ compilar — o resultado sai em `dist/SistemaTemis-1.0.0-setup.exe`.
 Um comando só:
 
 ```bash
-python build/publicar.py 1.1.0 --notas notas.txt
+python build/publicar.py 1.1.0
 ```
 
 Ele acerta a versão nos três arquivos que a declaram, compila o executável
-e o instalador, e gera `dist/versao.json` com o SHA-256 calculado. Publique
-os dois arquivos numa release com a tag `v1.1.0` — o `v` importa, é o que o
-manifesto usa para montar o endereço.
+e o instalador, e grava `dist/SHA256SUMS.txt` com os resumos. O instalador
+vai para a release `v1.1.0` no GitLab (`build/publicar_gitlab.py`) e a
+versão é avisada por e-mail, com o resumo dele.
 
 O passo a passo completo está em [PUBLICACAO.md](PUBLICACAO.md).
 

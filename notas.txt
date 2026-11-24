@@ -1,14 +1,14 @@
-ATUALIZAÇÃO — o sistema passa a ser distribuído pelo GitLab da PRF
+SEM ATUALIZAÇÃO AUTOMÁTICA, E PROJETO DA CORREGEDORIA-GERAL
 
-Até a 1.15.2, o aviso de versão nova e o instalador vinham do GitHub. A
-partir desta versão, vêm de git.prf.gov.br, onde o código-fonte também
-passou a ficar.
+O sistema deixou de consultar a rede ao abrir. Não há mais verificação de
+versão nova, nem download ou instalação automática: quando sair uma
+versão, ela é avisada por e-mail, com o endereço de download no GitLab
+institucional e o resumo SHA-256 do instalador, para conferência antes de
+instalar. A opção "Verificar atualizações ao abrir o sistema" saiu da
+tela Sobre.
 
-Nada muda no uso nem nas ferramentas: esta versão troca apenas o endereço
-que o sistema consulta ao abrir. A consulta continua a mesma — a leitura
-de um arquivo de versão, sem identificação do usuário nem da estação — e
-pode ser desligada em Sobre.
+O Sistema Têmis passa a ser identificado como projeto da
+Corregedoria-Geral da Polícia Rodoviária Federal, na tela Sobre, no
+instalador e nas propriedades do executável.
 
-Para receber as versões seguintes, a estação precisa alcançar
-git.prf.gov.br. Onde ele não responder, o sistema abre e funciona
-normalmente, só não avisa de versão nova.
+Nada muda nas ferramentas nem nas peças que elas produzem.

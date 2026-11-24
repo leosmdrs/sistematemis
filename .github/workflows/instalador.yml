@@ -1,14 +1,13 @@
 # Compila o instalador do Sistema Têmis num Windows do GitHub.
 #
-# Faz o mesmo que `python build/publicar.py X.Y.Z --notas notas.txt` numa
+# Faz o mesmo que `python build/publicar.py X.Y.Z` numa
 # máquina montada à mão, mas sem depender de que essa máquina exista: o
 # FFmpeg e o scrcpy são baixados das versões declaradas no TERCEIROS.md e
 # conferidos pelo SHA-256 antes de entrar no pacote.
 #
-# NÃO publica nada. O instalador e o versao.json ficam como anexo da
-# execução (aba Actions → a execução → Artifacts). Quem publica a release,
-# pelo navegador, continua sendo uma pessoa — quem pode escrever ali pode
-# instalar código em todas as estações (PUBLICACAO.md).
+# NÃO publica nada. O instalador e o SHA256SUMS.txt ficam como anexo da
+# execução (aba Actions → a execução → Artifacts). A publicação é feita no
+# GitLab institucional, e a versão é avisada por e-mail (PUBLICACAO.md).
 #
 # Uso: Actions → "Instalador" → Run workflow → versão (ex.: 1.15.1). A
 # versão tem de ser a mesma que já está em temis/__init__.py no commit
@@ -23,10 +22,6 @@ on:
       versao:
         description: "Versão a compilar (ex.: 1.15.1) — igual à de temis/__init__.py"
         required: true
-      critica:
-        description: "Marcar a atualização como importante"
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -112,9 +107,7 @@ jobs:
 
       - name: Compilar
         run: |
-          $argumentos = @("build/publicar.py", "${{ inputs.versao }}", "--notas", "notas.txt")
-          if ("${{ inputs.critica }}" -eq "true") { $argumentos += "--critica" }
-          python @argumentos
+          python build/publicar.py "${{ inputs.versao }}"
           if ($LASTEXITCODE -ne 0) { throw "publicar.py falhou ($LASTEXITCODE)" }
 
       - name: Relação de componentes
@@ -167,12 +160,8 @@ jobs:
           | SHA-256 | ``$hash`` |
           | Tamanho | ``$($instalador.Length)`` bytes |
 
-          Para publicar, assine o manifesto na sua máquina, com a chave de
-          publicação, e informe a assinatura ao rodar "Publicar release":
-
-          ``````
-          python build/assinatura.py assinar --chave CAMINHO-DA-CHAVE --versao ${{ inputs.versao }} --sha256 $hash --tamanho $($instalador.Length)
-          ``````
+          Para publicar: `python build/publicar_gitlab.py ${{ inputs.versao }}`,
+          e avisar a versão por e-mail com o SHA-256 acima.
           "@ | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
       - uses: actions/upload-artifact@v4
@@ -180,7 +169,7 @@ jobs:
           name: SistemaTemis-${{ inputs.versao }}
           path: |
             dist/SistemaTemis-${{ inputs.versao }}-setup.exe
-            dist/versao.json
+            dist/SHA256SUMS.txt
             dist/componentes.txt
           if-no-files-found: error
           retention-days: 30
